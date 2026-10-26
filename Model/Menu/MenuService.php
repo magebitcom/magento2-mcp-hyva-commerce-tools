@@ -589,6 +589,18 @@ class MenuService
     }
 
     /**
+     * Refuse a store view the caller's role may not read (names and URLs of its categories are read in it).
+     *
+     * @param int $storeId
+     * @return void
+     * @throws AuthorizationException
+     */
+    public function assertStoreViewReadable(int $storeId): void
+    {
+        $this->storeScopeGuard->assertReadable('store view ' . $storeId, [$storeId]);
+    }
+
+    /**
      * Lookup store id.
      *
      * @param array $storeIds
