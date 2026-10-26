@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Model\FieldResolver\Menu;
 
 use Magebit\McpHyvaCommerceTools\Api\ContentFieldResolverInterface;
+use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 
@@ -23,10 +24,12 @@ class PlacementResolver implements ContentFieldResolverInterface
     /**
      * @param MenuService $menuService
      * @param ScheduleService $scheduleService
+     * @param ContentAcl $contentAcl
      */
     public function __construct(
         private readonly MenuService $menuService,
-        private readonly ScheduleService $scheduleService
+        private readonly ScheduleService $scheduleService,
+        private readonly ContentAcl $contentAcl
     ) {
     }
 
@@ -55,10 +58,16 @@ class PlacementResolver implements ContentFieldResolverInterface
         $assignments = $this->menuService->filterAssignments(
             $this->menuService->getAssignments($entity['identifier'])
         );
+        $canSeeScheduling = $this->contentAcl->isAllowed('menu', ContentAcl::VERB_SCHEDULING);
         $placement = [
             'design_config' => $assignments['visible'],
-            'scheduled' => $this->scheduleService->getItems(['entity_type' => 'menu', 'entity_id' => $entity['id']]),
+            'scheduled' => $canSeeScheduling
+                ? $this->scheduleService->getItems(['entity_type' => 'menu', 'entity_id' => $entity['id']])
+                : [],
         ];
+        if (!$canSeeScheduling) {
+            $placement['scheduled_hidden_by_permissions'] = true;
+        }
         if ($assignments['hidden'] > 0) {
             $placement['design_config_hidden_by_permissions'] = $assignments['hidden'];
         }
