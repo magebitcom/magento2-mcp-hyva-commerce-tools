@@ -117,12 +117,24 @@ class FormRules
                     $options
                 );
                 $legacyDefault = Cast::string($field['node']['default_value'] ?? '');
-                if ($legacyDefault !== '' && !in_array($legacyDefault, $values, true)) {
-                    $issues[] = $this->issue('error', 'default_not_an_option', $field['uid'], sprintf(
-                        'Default "%s" of "%s" is not one of its options.',
-                        $legacyDefault,
-                        $field['label']
-                    ));
+                // Hyvä skips fields whose options carry the new default flag and splits multiselect defaults.
+                $defaults = $field['component'] === 'form_field_multiselect'
+                    ? array_filter(
+                        array_map('trim', explode(',', $legacyDefault)),
+                        static fn (string $d): bool => $d !== ''
+                    )
+                    : ($legacyDefault !== '' ? [$legacyDefault] : []);
+                if ($this->flaggedOptions($options)) {
+                    $defaults = [];
+                }
+                foreach ($defaults as $default) {
+                    if (!in_array($default, $values, true)) {
+                        $issues[] = $this->issue('error', 'default_not_an_option', $field['uid'], sprintf(
+                            'Default "%s" of "%s" is not one of its options.',
+                            $default,
+                            $field['label']
+                        ));
+                    }
                 }
             }
         }
@@ -282,6 +294,23 @@ class FormRules
     }
 
     /**
+     * Whether any option row carries Hyvä's default flag.
+     *
+     * @param array $options
+     * @return bool
+     * @phpstan-param array<mixed> $options
+     */
+    private function flaggedOptions(array $options): bool
+    {
+        foreach ($options as $row) {
+            if (is_array($row) && !empty($row['default'])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Whether a merchant pattern compiles the way the storefront uses it (HTML pattern, anchored, unicode).
      *
      * @param string $pattern
@@ -292,7 +321,8 @@ class FormRules
         // An invalid pattern raises a warning; treat it as "does not compile" without logging it.
         set_error_handler(static fn (): bool => true);
         try {
-            return preg_match('/^(?:' . str_replace('/', '\\/', $pattern) . ')$/u', '') !== false;
+            // Same delimiting as Hyvä's MerchantPattern: ~ delimiter, only ~ escaped.
+            return preg_match('~^(?:' . str_replace('~', '\\~', $pattern) . ')$~u', '') !== false;
         } finally {
             restore_error_handler();
         }

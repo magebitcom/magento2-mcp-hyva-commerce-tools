@@ -39,6 +39,7 @@ class FormRulesTest extends TestCase
             'form_field_text' => $field,
             'form_field_email' => $field,
             'form_field_select' => $field,
+            'form_field_multiselect' => $field,
         ];
         $provider = $this->createMock(ComponentProvider::class);
         $provider->method('getComponents')->willReturn($components);
@@ -74,6 +75,31 @@ class FormRulesTest extends TestCase
         $this->assertSame([], $this->rules->documentIssues($this->form([
             ['form_field_text', ['label' => 'Name', 'field_name' => 'name', 'pattern' => '[A-Za-z ]+']],
         ])));
+    }
+
+    public function testPatternsAreDelimitedLikeHyva(): void
+    {
+        $this->assertSame([], $this->rules->documentIssues($this->form([
+            ['form_field_text', ['label' => 'Ratio', 'field_name' => 'ratio', 'pattern' => '\d+\/\d+']],
+            ['form_field_text', ['label' => 'Tilde', 'field_name' => 'tilde', 'pattern' => 'a~b']],
+        ])));
+    }
+
+    public function testOptionDefaultsFollowHyva(): void
+    {
+        $options = [['label' => 'S', 'value' => 's'], ['label' => 'M', 'value' => 'm']];
+        $this->assertSame([], $this->rules->documentIssues($this->form([
+            ['form_field_multiselect', ['label' => 'Sizes', 'field_name' => 'sizes', 'options' => $options,
+                'default_value' => 's, m']],
+            ['form_field_select', ['label' => 'Flagged', 'field_name' => 'flagged', 'options' => [
+                ['label' => 'S', 'value' => 's', 'default' => true],
+            ], 'default_value' => 'xl']],
+        ])));
+        $issues = $this->rules->documentIssues($this->form([
+            ['form_field_multiselect', ['label' => 'Sizes', 'field_name' => 'sizes', 'options' => $options,
+                'default_value' => 's,xl']],
+        ]));
+        $this->assertSame(['default_not_an_option'], array_column($issues, 'code'));
     }
 
     public function testDeliveryIssues(): void
