@@ -40,6 +40,7 @@ class ComponentTreeTest extends TestCase
                         'options' => [['label' => 'H1', 'value' => 'h1'], ['label' => 'H2', 'value' => 'h2']]],
                     'text' => ['type' => 'textarea', 'default_value' => 'Add your text here'],
                 ]],
+            'cta' => ['name' => 'cta', 'template' => 'c.phtml', 'content' => ['link' => ['type' => 'link']]],
             'accordion_list' => ['name' => 'accordion_list', 'template' => 'x.phtml',
                 'children' => ['config' => ['accepts' => ['accordion_item'], 'max_children' => 2]]],
             'accordion_item' => ['name' => 'accordion_item', 'template' => 'y.phtml', 'require_parent' => true,
@@ -179,6 +180,23 @@ class ComponentTreeTest extends TestCase
         $this->assertContains('disabled_component', $codes);
         $this->assertContains('invalid_child', $codes);
         $this->assertContains('too_many_children', $codes);
+    }
+
+    public function testLinkValueWithoutTypeAndValueIsWarnedAbout(): void
+    {
+        $document = $this->tree->newDocument('cms_page', 1);
+        $document = $this->tree->insertNode($document, $this->node('cta', 'bad', ['link' => ['url' => '/sale']]));
+        $document = $this->tree->insertNode(
+            $document,
+            $this->node('cta', 'good', ['link' => ['type' => 'custom_url', 'value' => '/sale']])
+        );
+        $document = $this->tree->insertNode($document, $this->node('cta', 'empty', ['link' => []]));
+
+        $issues = $this->tree->validate($document);
+
+        $this->assertSame(['invalid_link'], array_column($issues, 'code'));
+        $this->assertSame('warning', $issues[0]['severity']);
+        $this->assertSame('bad', $issues[0]['uid']);
     }
 
     public function testValidDocumentHasNoIssues(): void

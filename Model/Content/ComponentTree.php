@@ -642,6 +642,21 @@ class ComponentTree
                         sprintf('Field "%s" allows only one option marked "default".', $field)
                     );
                 }
+                if (($fieldDefinition['type'] ?? null) === 'link' && $value !== null && $value !== ''
+                    && $value !== [] && !$this->isUsableLink($value)
+                ) {
+                    $issues[] = $this->issue(
+                        'warning',
+                        'invalid_link',
+                        $uid,
+                        $name,
+                        sprintf(
+                            'Link field "%s" needs {"type": ..., "value": ...}; keys like "url" are ignored and the '
+                                . 'link renders an empty href.',
+                            $field
+                        )
+                    );
+                }
                 if ($value !== null && $value !== '' && ($fieldDefinition['type'] ?? null) === 'select') {
                     $allowed = $this->optionValues($fieldDefinition['options'] ?? null);
                     if ($allowed !== null && is_scalar($value) && !in_array((string) $value, $allowed, true)) {
@@ -666,6 +681,19 @@ class ComponentTree
             $issues[] = $issue;
         }
         return $issues;
+    }
+
+    /**
+     * Whether a link field value has the `type` and `value` Hyvä reads.
+     *
+     * @param mixed $value
+     * @return bool
+     */
+    private function isUsableLink(mixed $value): bool
+    {
+        return is_array($value)
+            && is_string($value['type'] ?? null) && $value['type'] !== ''
+            && isset($value['value']) && $value['value'] !== '';
     }
 
     /**
