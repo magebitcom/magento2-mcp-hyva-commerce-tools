@@ -70,12 +70,39 @@ class ImageReplaceConfirmTest extends TestCase
         $this->assertFalse($payload['published'] ?? null);
     }
 
+    public function testEveryTargetOutOfScopeReportsTheSkippedOnes(): void
+    {
+        $this->editor->expects($this->never())->method('rewrite');
+
+        $result = $this->tool(true)->execute([
+            'old_path' => 'wysiwyg/old.jpg',
+            'new_path' => 'wysiwyg/new.jpg',
+            'scope' => 'cms_page',
+        ]);
+
+        $this->assertTrue($result->isError());
+        $this->assertSame(self::TARGETS, $this->payload($result)['skipped_out_of_scope'] ?? null);
+    }
+
+    public function testTheGlobalPreviewListsTheOutOfScopeTargets(): void
+    {
+        $payload = $this->payload($this->tool(true)->execute([
+            'old_path' => 'wysiwyg/old.jpg',
+            'new_path' => 'wysiwyg/new.jpg',
+            'scope' => 'global',
+        ]));
+
+        $this->assertTrue($payload['confirmation_required'] ?? null);
+        $this->assertStringContainsString('skipped_out_of_scope', (string) json_encode($payload));
+    }
+
     /**
-     * Image replace for an unrestricted caller allowed to save every content type.
+     * Image replace for a caller allowed to save every content type; $readOnly = every target is outside its scope.
      *
+     * @param bool $readOnly
      * @return ImageReplace
      */
-    private function tool(): ImageReplace
+    private function tool(bool $readOnly = false): ImageReplace
     {
         $files = $this->createMock(MediaFileInfo::class);
         $files->method('exists')->willReturn(true);
@@ -83,7 +110,9 @@ class ImageReplaceConfirmTest extends TestCase
         $acl->method('allowedTypes')->willReturnArgument(0);
         $locator = $this->createMock(ContentLocator::class);
         $locator->method('partitionByScope')->willReturnCallback(
-            static fn (array $targets): array => ['writable' => $targets, 'read_only' => []]
+            static fn (array $targets): array => $readOnly
+                ? ['writable' => [], 'read_only' => $targets]
+                : ['writable' => $targets, 'read_only' => []]
         );
         return new ImageReplace($this->editor, $files, $acl, $locator);
     }
