@@ -13,6 +13,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\NumberBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Api\Adapter\StoreCreditGatewayInterface;
 use Magento\Framework\Exception\LocalizedException;
 
 /**
@@ -20,6 +21,8 @@ use Magento\Framework\Exception\LocalizedException;
  *
  * Hyvä's ledger returns the earlier entry, silently, when an idempotency key is reused, even for a different
  * customer or amount; the tool looks the key up first and tells a replay apart from a key clash.
+ *
+ * @phpstan-import-type LedgerRow from StoreCreditGatewayInterface
  */
 abstract class AbstractBalanceAdjust extends AbstractStoreCreditTool
 {
@@ -96,15 +99,8 @@ abstract class AbstractBalanceAdjust extends AbstractStoreCreditTool
 
         $existing = $this->storeCredit->findByIdempotencyKey($key);
         if ($existing !== null) {
-            if ($existing['customer_id'] !== $customer['id'] || $existing['website_id'] !== $websiteId
-                || abs($existing['delta'] - $delta) > 0.00001) {
-                // Show the clashing entry only when the caller may see its website.
-                $visible = $this->scopeGuard->allowsWebsite($adminUserId, $existing['website_id']);
-                return $this->softError(
-                    'This idempotency_key was already used for a different adjustment; nothing was changed. Use a '
-                    . 'new key.',
-                    ['status' => 409] + ($visible ? ['existing_entry' => $existing] : [])
-                );
+            if ($this->isOtherAdjustment($existing, $customer['id'], $websiteId, $delta)) {
+                return $this->keyClash($existing, $adminUserId);
             }
             return $this->jsonResult([
                 'replayed' => true,
@@ -155,9 +151,47 @@ abstract class AbstractBalanceAdjust extends AbstractStoreCreditTool
             // InsufficientBalanceException when the balance changed since the preview.
             return $this->softError($e->getMessage() . ' Nothing was changed.');
         }
+        // A concurrent call with the same key may have won the race: Hyvä then returns that call's entry.
+        if ($this->isOtherAdjustment($entry, $customer['id'], $websiteId, $delta)) {
+            return $this->keyClash($entry, $adminUserId);
+        }
         return $this->jsonResult(
             ['replayed' => false, 'entry' => $entry, 'idempotency_key' => $key],
             ['entry_id' => $entry['entry_id'], 'customer_id' => $customer['id'], 'delta' => $delta]
+        );
+    }
+
+    /**
+     * Whether a ledger entry records a different adjustment than the one requested.
+     *
+     * @param array $entry
+     * @param int $customerId
+     * @param int $websiteId
+     * @param float $delta
+     * @return bool
+     * @phpstan-param LedgerRow $entry
+     */
+    private function isOtherAdjustment(array $entry, int $customerId, int $websiteId, float $delta): bool
+    {
+        return $entry['customer_id'] !== $customerId || $entry['website_id'] !== $websiteId
+            || abs($entry['delta'] - $delta) > 0.00001;
+    }
+
+    /**
+     * Refusal for an idempotency key already used by another adjustment.
+     *
+     * @param array $entry
+     * @param int|null $adminUserId
+     * @return ToolResultInterface
+     * @phpstan-param LedgerRow $entry
+     */
+    private function keyClash(array $entry, ?int $adminUserId): ToolResultInterface
+    {
+        // Show the clashing entry only when the caller may see its website.
+        $visible = $this->scopeGuard->allowsWebsite($adminUserId, $entry['website_id']);
+        return $this->softError(
+            'This idempotency_key was already used for a different adjustment; nothing was changed. Use a new key.',
+            ['status' => 409] + ($visible ? ['existing_entry' => $entry] : [])
         );
     }
 

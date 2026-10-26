@@ -153,6 +153,16 @@ class BalanceAdjustTest extends TestCase
         $this->assertFalse($payload['replayed']);
     }
 
+    public function testAConcurrentCallThatWonTheKeyIsReportedAsAClash(): void
+    {
+        // The pre-check found no entry, but another call with the same key wrote first; Hyvä returns its entry.
+        $this->gateway->expects($this->once())->method('adjust')->willReturn($this->entry(2, 1, 50.0));
+        $result = $this->tool(BalanceCredit::class)->execute(['customer_id' => 1, 'amount' => 5,
+            'reason' => 'goodwill', 'idempotency_key' => 'ticket-1234', 'confirm' => true]);
+        $this->assertTrue($result->isError());
+        $this->assertSame(409, $this->payload($result)['status'] ?? null);
+    }
+
     /**
      * @param class-string<BalanceCredit|BalanceDebit> $class
      * @return BalanceCredit|BalanceDebit
