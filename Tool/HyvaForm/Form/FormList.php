@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form;
 
 use Magebit\McpHyvaCommerceTools\Model\Tool\Form\AbstractFormTool;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Form\ReadableFormsTrait;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
@@ -19,9 +20,10 @@ use Magebit\Mcp\Model\Tool\Schema\Schema;
  */
 class FormList extends AbstractFormTool
 {
+    use ReadableFormsTrait;
+
     public const TOOL_NAME = 'hyva_form.form.list';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_form_form_list';
-    private const SCAN_PAGE_SIZE = 200;
 
     /**
      * @inheritDoc
@@ -69,18 +71,8 @@ class FormList extends AbstractFormTool
         }
 
         // A restricted role sees only forms of its store views: filter every form, then paginate, so the total is
-        // right. Form counts are admin-scale.
-        $visible = [];
-        $batch = 1;
-        do {
-            $chunk = $this->formGateway->getList($search, $storeId, $batch, self::SCAN_PAGE_SIZE);
-            foreach ($chunk['items'] as $form) {
-                if ($this->storeScopeGuard->allowsRead($form['store_ids'])) {
-                    $visible[] = $form;
-                }
-            }
-            $batch++;
-        } while ($chunk['items'] !== [] && ($batch - 1) * self::SCAN_PAGE_SIZE < $chunk['total']);
+        // right.
+        $visible = $this->readableForms($search, $storeId)['items'];
         $pageSize = max(1, min(200, $pageSize));
         $result = [
             'total' => count($visible),

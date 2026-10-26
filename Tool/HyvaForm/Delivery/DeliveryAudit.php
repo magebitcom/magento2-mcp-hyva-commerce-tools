@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Delivery;
 
 use Magebit\McpHyvaCommerceTools\Model\Tool\Form\AbstractFormTool;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Form\ReadableFormsTrait;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 
@@ -17,8 +18,15 @@ use Magebit\Mcp\Model\Tool\Schema\Schema;
  */
 class DeliveryAudit extends AbstractFormTool
 {
+    use ReadableFormsTrait;
+
     public const TOOL_NAME = 'hyva_form.delivery.audit';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_form_delivery_audit';
+
+    /**
+     * Forms audited per call; forms_total and truncated tell when there are more.
+     */
+    private const MAX_FORMS = 200;
 
     /**
      * @inheritDoc
@@ -57,14 +65,17 @@ class DeliveryAudit extends AbstractFormTool
         if (isset($arguments['id']) || isset($arguments['identifier'])) {
             $forms = [$this->locateForm($arguments)];
         } else {
-            $list = $this->formGateway->getList(null, null, 1, 200);
-            // Forms of store views outside the caller's website/store view restriction are not audited.
-            $forms = array_values(array_filter(
-                $list['items'],
-                fn (array $form): bool => $this->storeScopeGuard->allowsRead($form['store_ids'])
-            ));
-            $hidden = count($list['items']) - count($forms);
-            $total = $list['total'] - $hidden;
+            if ($this->storeScopeGuard->restrictedStoreIds() === null) {
+                $list = $this->formGateway->getList(null, null, 1, self::MAX_FORMS);
+                $forms = $list['items'];
+                $total = $list['total'];
+            } else {
+                // Forms of store views outside the caller's website/store view restriction are not audited.
+                $readable = $this->readableForms(null, null);
+                $hidden = $readable['hidden'];
+                $total = count($readable['items']);
+                $forms = array_slice($readable['items'], 0, self::MAX_FORMS);
+            }
         }
         $report = [];
         $counts = ['error' => 0, 'warning' => 0, 'info' => 0];

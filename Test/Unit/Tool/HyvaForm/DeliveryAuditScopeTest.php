@@ -44,6 +44,32 @@ class DeliveryAuditScopeTest extends TestCase
         $this->assertSame(0, $payload['forms_hidden_by_permissions']);
     }
 
+    public function testARestrictedRoleAuditsItsFormsPastTheFirstPage(): void
+    {
+        // 250 forms, newest first: even ids on store view 1 (readable), odd ids on store view 2.
+        $all = [];
+        for ($id = 250; $id >= 1; $id--) {
+            $all[] = $this->form($id, [$id % 2 === 0 ? 1 : 2]);
+        }
+        $gateway = $this->createMock(FormGatewayInterface::class);
+        $gateway->expects($this->exactly(2))->method('getList')->willReturnCallback(
+            static fn (?string $search, ?int $storeId, int $page, int $pageSize): array => [
+                'total' => count($all),
+                'items' => array_slice($all, ($page - 1) * $pageSize, $pageSize),
+            ]
+        );
+
+        $payload = $this->payload($this->tool([1], $gateway)->execute([]));
+
+        $ids = array_column($this->forms($payload), 'id');
+        $this->assertCount(125, $ids);
+        $this->assertContains(2, $ids, 'a form of the second page');
+        $this->assertNotContains(249, $ids);
+        $this->assertSame(125, $payload['forms_total']);
+        $this->assertSame(125, $payload['forms_hidden_by_permissions']);
+        $this->assertFalse($payload['truncated']);
+    }
+
     /**
      * Form row.
      *
@@ -64,21 +90,24 @@ class DeliveryAuditScopeTest extends TestCase
     }
 
     /**
-     * Tool over forms 9 (store view 1), 8 (store view 2) and 7 (all store views).
+     * Tool over forms 9 (store view 1), 8 (store view 2) and 7 (all store views), or over the given gateway.
      *
      * @param array|null $allowedStoreIds
+     * @param FormGatewayInterface|null $gateway
      * @return DeliveryAudit
      * @phpstan-param list<int>|null $allowedStoreIds
      */
-    private function tool(?array $allowedStoreIds): DeliveryAudit
+    private function tool(?array $allowedStoreIds, ?FormGatewayInterface $gateway = null): DeliveryAudit
     {
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn(true);
-        $gateway = $this->createMock(FormGatewayInterface::class);
-        $gateway->method('getList')->willReturn([
-            'total' => 3,
-            'items' => [$this->form(9, [1]), $this->form(8, [2]), $this->form(7, [0])],
-        ]);
+        if ($gateway === null) {
+            $gateway = $this->createMock(FormGatewayInterface::class);
+            $gateway->method('getList')->willReturn([
+                'total' => 3,
+                'items' => [$this->form(9, [1]), $this->form(8, [2]), $this->form(7, [0])],
+            ]);
+        }
         $contentService = $this->createMock(ContentService::class);
         $contentService->method('getDocuments')->willReturn(['draft' => null, 'published' => null]);
         return new DeliveryAudit(
