@@ -294,12 +294,14 @@ class ImageUsageIndex
                 . ' OR ' . $connection->quoteInto('value LIKE ?', '%{{media%')
             );
         if ($needles !== []) {
+            // The extractor decodes references, so a description linking `my%20image.jpg` is a usage of
+            // `my image.jpg`; the LIKE prefilter has to look for the encoded spelling too.
             $select->where(implode(' OR ', array_map(
                 static fn (string $needle): string => $connection->quoteInto(
                     'value LIKE ?',
                     '%' . addcslashes($needle, '%_') . '%'
                 ),
-                $needles
+                $this->withEncodedVariants($needles)
             )));
         }
         $rows = [];
@@ -311,5 +313,25 @@ class ImageUsageIndex
             ];
         }
         return $rows;
+    }
+
+    /**
+     * The paths plus their URL-encoded spelling (per segment, slashes kept) where it differs.
+     *
+     * @param array $paths
+     * @return array
+     * @phpstan-param list<string> $paths
+     * @phpstan-return list<string>
+     */
+    private function withEncodedVariants(array $paths): array
+    {
+        $needles = $paths;
+        foreach ($paths as $path) {
+            $encoded = implode('/', array_map('rawurlencode', explode('/', $path)));
+            if ($encoded !== $path) {
+                $needles[] = $encoded;
+            }
+        }
+        return array_values(array_unique($needles));
     }
 }

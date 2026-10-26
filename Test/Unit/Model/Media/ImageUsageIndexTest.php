@@ -131,4 +131,53 @@ class ImageUsageIndexTest extends TestCase
         $this->assertCount(1, $usages['wysiwyg/img29.jpg']);
         $this->assertSame([], $usages['wysiwyg/img1.jpg']);
     }
+
+    /**
+     * @return void
+     */
+    public function testUrlEncodedReferencesAreFoundByThePrefilterAndMatchedToTheDecodedPath(): void
+    {
+        $select = $this->createMock(Select::class);
+        $select->method('from')->willReturnSelf();
+        $select->method('join')->willReturnSelf();
+        $likeFilters = [];
+        $select->method('where')->willReturnCallback(
+            function (string $condition) use ($select, &$likeFilters): Select {
+                if (str_contains($condition, 'value LIKE \'%wysiwyg')) {
+                    $likeFilters[] = $condition;
+                }
+                return $select;
+            }
+        );
+        $connection = $this->createMock(AdapterInterface::class);
+        $connection->method('select')->willReturn($select);
+        $connection->method('quoteInto')->willReturnCallback(
+            static fn (string $text, string $value): string => str_replace('?', "'" . $value . "'", $text)
+        );
+        $connection->method('fetchPairs')->willReturn(['72' => 'description']);
+        $connection->method('fetchAll')->willReturnOnConsecutiveCalls(
+            [['entity_id' => '10', 'attribute_id' => '72', 'value' => '<img src="wysiwyg/my%20image.jpg">']],
+            []
+        );
+        $resource = $this->createMock(ResourceConnection::class);
+        $resource->method('getConnection')->willReturn($connection);
+        $resource->method('getTableName')->willReturnArgument(0);
+        $scanner = $this->createMock(ContentScanner::class);
+        $scanner->method('getDocuments')->willReturn([]);
+        $contentIndex = $this->createMock(ContentIndex::class);
+        $contentIndex->method('getRows')->willReturn([]);
+        $extractor = $this->createMock(ImageReferenceExtractor::class);
+        $extractor->method('fromHtml')->willReturn([
+            ['path' => 'wysiwyg/my image.jpg', 'alt' => 'A', 'kind' => 'img'],
+        ]);
+
+        $usages = (new ImageUsageIndex($scanner, $contentIndex, $extractor, $resource))
+            ->usagesOfMany(['wysiwyg/my image.jpg']);
+
+        $this->assertStringContainsString('%wysiwyg/my image.jpg%', $likeFilters[0]);
+        // The literal percent sign of the encoded spelling is escaped for LIKE.
+        $this->assertStringContainsString('%wysiwyg/my\\%20image.jpg%', $likeFilters[0]);
+        $this->assertSame(1, substr_count($likeFilters[0], ' OR '));
+        $this->assertCount(1, $usages['wysiwyg/my image.jpg']);
+    }
 }
