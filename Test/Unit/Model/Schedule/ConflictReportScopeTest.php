@@ -8,9 +8,9 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Schedule;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
-use Magebit\McpHyvaCommerceTools\Model\Content\ContentScanner;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ScheduleConflictDetector;
@@ -46,6 +46,53 @@ class ConflictReportScopeTest extends TestCase
         $this->assertSame(3, $scoped['hidden']);
     }
 
+    public function testOnlyTheScheduledEntitiesAreReadWithoutContent(): void
+    {
+        $service = $this->createMock(ScheduleService::class);
+        $service->method('getItems')->willReturn([
+            $this->item(1, 'cms_page', 5),
+            $this->item(2, 'cms_page', 5),
+            $this->item(3, 'menu', 3),
+        ]);
+        $service->method('getReleases')->willReturn([]);
+        $index = $this->createMock(ContentIndex::class);
+        $index->expects($this->never())->method('getRows');
+        $calls = [];
+        $index->method('getIdentifiersByIds')->willReturnCallback(
+            function (string $type, array $ids) use (&$calls): array {
+                $calls[] = [$type, $ids];
+                return [];
+            }
+        );
+        $featureChecker = $this->createMock(FeatureCheckerInterface::class);
+        $featureChecker->method('isAvailable')->willReturn(true);
+        $locator = $this->createMock(ContentLocator::class);
+        $report = new ConflictReport(
+            $service,
+            $this->detector([]),
+            $index,
+            $featureChecker,
+            $locator,
+            $this->storeScope(null)
+        );
+
+        $report->getConflicts();
+
+        $this->assertSame([['cms_page', [5]], ['menu', [3]]], $calls);
+    }
+
+    public function testTheEntityFilterKeepsCollisionsOfEitherEntityOnly(): void
+    {
+        $collision = $this->conflict('store_view_collision', [1, 2], 'cms_page', 5)
+            + ['entity_ids' => [5, 6]];
+        $locator = $this->createMock(ContentLocator::class);
+        $report = $this->report($this->service(false), $locator, $this->detector([$collision]), null);
+
+        $this->assertSame([$collision], $report->getConflicts(60, 'cms_page', 6));
+        $this->assertSame([], $report->getConflicts(60, 'cms_page', 9));
+        $this->assertSame([], $report->getConflicts(60, 'cms_block'));
+    }
+
     public function testAnUnrestrictedCallerKeepsEveryConflictWithoutAScopeQuery(): void
     {
         $locator = $this->createMock(ContentLocator::class);
@@ -62,12 +109,13 @@ class ConflictReportScopeTest extends TestCase
     /**
      * Schedule service with pending items 1 (page 5), 2 (page 6) and 3 (menu 3), read exactly once.
      *
+     * @param bool $once
      * @return ScheduleService
      */
-    private function service(): ScheduleService
+    private function service(bool $once = true): ScheduleService
     {
         $service = $this->createMock(ScheduleService::class);
-        $service->expects($this->once())->method('getItems')->willReturn([
+        $service->expects($once ? $this->once() : $this->atLeastOnce())->method('getItems')->willReturn([
             $this->item(1, 'cms_page', 5),
             $this->item(2, 'cms_page', 6),
             $this->item(3, 'menu', 3),
@@ -108,17 +156,23 @@ class ConflictReportScopeTest extends TestCase
         ?array $allowedStoreIds
     ): ConflictReport {
         $index = $this->createMock(ContentIndex::class);
-        $index->method('getRows')->willReturnCallback(fn (string $type): array => $type === 'cms_page'
-            ? [$this->row(5, [1]), $this->row(6, [2])]
-            : []);
+        $index->expects($this->never())->method('getRows');
         $index->expects($this->never())->method('getStoreIds');
-        $scanner = $this->createMock(ContentScanner::class);
-        $scanner->method('getMenuRows')->willReturn([['id' => '3', 'identifier' => 'main']]);
+        $index->method('getIdentifiersByIds')->willReturnCallback(
+            fn (string $type, array $ids): array => match ($type) {
+                'cms_page' => [5 => ['identifier' => 'p5', 'store_ids' => [1]],
+                    6 => ['identifier' => 'p6', 'store_ids' => [2]]],
+                'menu' => [3 => ['identifier' => 'main', 'store_ids' => []]],
+                default => [],
+            }
+        );
+        $featureChecker = $this->createMock(FeatureCheckerInterface::class);
+        $featureChecker->method('isAvailable')->willReturn(true);
         return new ConflictReport(
             $service,
             $detector,
             $index,
-            $scanner,
+            $featureChecker,
             $locator,
             $this->storeScope($allowedStoreIds)
         );
@@ -140,26 +194,6 @@ class ConflictReportScopeTest extends TestCase
         return ['item_id' => $itemId, 'release_id' => 1, 'entity_type' => $type, 'entity_id' => $entityId,
             'name' => '', 'status' => 'pending', 'settings' => null, 'version_history_id' => null,
             'creation_time' => '', 'release_name' => 'R', 'release_status' => 'pending', 'time_scheduled' => ''];
-    }
-
-    /**
-     * Content index row of a page.
-     *
-     * @param int $id
-     * @param array $storeIds
-     * @return array
-     * @phpstan-param list<int> $storeIds
-     * @phpstan-return array{type: string, id: int, identifier: string, title: string, is_active: bool,
-     *     store_ids: list<int>, has_hyva_row: bool, liveview_enabled: bool, status: string, has_draft: bool,
-     *     is_published: bool, draft_differs: bool, uses_page_builder: bool, has_magento_content: bool,
-     *     updated_at: string}
-     */
-    private function row(int $id, array $storeIds): array
-    {
-        return ['type' => 'cms_page', 'id' => $id, 'identifier' => 'p' . $id, 'title' => '', 'is_active' => true,
-            'store_ids' => $storeIds, 'has_hyva_row' => true, 'liveview_enabled' => true, 'status' => '',
-            'has_draft' => false, 'is_published' => true, 'draft_differs' => false, 'uses_page_builder' => false,
-            'has_magento_content' => false, 'updated_at' => ''];
     }
 
     /**

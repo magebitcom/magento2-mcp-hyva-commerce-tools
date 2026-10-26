@@ -300,6 +300,39 @@ class ContentIndex
     }
 
     /**
+     * Identifier and store views of the entities with these ids, without any content column; ids that do not
+     * exist are absent. Menus carry no store views here (they count as every store view).
+     *
+     * @param string $type cms_page|cms_block|menu
+     * @param array $ids
+     * @return array
+     * @phpstan-param list<int> $ids
+     * @phpstan-return array<int, array{identifier: string, store_ids: list<int>}>
+     */
+    public function getIdentifiersByIds(string $type, array $ids): array
+    {
+        $tables = self::STORE_LINKS[$type] ?? null;
+        if ($tables === null || $ids === []) {
+            return [];
+        }
+        $connection = $this->resourceConnection->getConnection();
+        $table = $this->resourceConnection->getTableName($tables['entity']);
+        if ($type === ContentLocator::TYPE_MENU && !$connection->isTableExists($table)) {
+            return [];
+        }
+        $select = $connection->select()
+            ->from($table, ['id' => $tables['id'], 'identifier'])
+            ->where($tables['id'] . ' IN (?)', array_values(array_unique($ids)));
+        $storeIds = $type === ContentLocator::TYPE_MENU ? [] : $this->getStoreIds($type, $ids);
+        $rows = [];
+        foreach ($connection->fetchAll($select) as $row) {
+            $id = Cast::int($row['id']);
+            $rows[$id] = ['identifier' => Cast::string($row['identifier']), 'store_ids' => $storeIds[$id] ?? []];
+        }
+        return $rows;
+    }
+
+    /**
      * Legacy = not rendered by Hyvä CMS (liveview off) while Magento content exists.
      *
      * @param ContentRow $row

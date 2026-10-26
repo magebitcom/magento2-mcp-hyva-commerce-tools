@@ -131,12 +131,13 @@ class ScheduleList extends AbstractContentTool
                 'settings' => json_decode($item['settings'] ?? 'null', true),
             ];
         }
+        $totalReleases = count($releases);
         $releases = array_slice(array_values($releases), 0, $this->intArg($arguments, 'limit', 100) ?? 100);
 
         return $this->jsonResult(
             [
                 'store_timezone' => $this->scheduleTime->getStoreTimezone(),
-                'total_releases' => count($releases),
+                'total_releases' => $totalReleases,
                 'releases' => $releases,
                 'items_hidden_by_permissions' => $hidden,
             ],

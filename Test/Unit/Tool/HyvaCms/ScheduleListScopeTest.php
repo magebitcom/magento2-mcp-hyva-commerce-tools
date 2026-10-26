@@ -52,6 +52,30 @@ class ScheduleListScopeTest extends TestCase
         $this->assertCount(1, $payload['releases'][0]['items'] ?? []);
     }
 
+    public function testTotalReleasesIsCountedBeforeTheLimit(): void
+    {
+        $service = $this->createMock(ScheduleService::class);
+        $service->method('getItems')->willReturn([
+            $this->item(1, 10, 'cms_page', 5),
+            $this->item(2, 11, 'cms_page', 6),
+            $this->item(3, 12, 'cms_page', 7),
+        ]);
+        $acl = $this->createMock(ContentAcl::class);
+        $acl->method('isAllowed')->willReturn(true);
+        $locator = $this->createMock(ContentLocator::class);
+        $locator->method('allowsRead')->willReturn(true);
+        $time = $this->createMock(ScheduleTime::class);
+        $time->method('toLocal')->willReturnArgument(0);
+
+        $result = (new ScheduleList($service, $time, $locator, $acl))->execute(['limit' => 2]);
+        $text = $result->getContent()[0]['text'] ?? '';
+        $payload = json_decode(is_string($text) ? $text : '', true);
+
+        $this->assertIsArray($payload);
+        $this->assertSame(3, $payload['total_releases']);
+        $this->assertCount(2, $payload['releases']);
+    }
+
     /**
      * Scheduled item row.
      *

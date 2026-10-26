@@ -33,7 +33,7 @@ class ScheduleConflictDetector
      * @phpstan-param array<int, array{release_id: int, name: string, time_scheduled: string, status: string}> $releases
      * @phpstan-param array<string, array{exists: bool, identifier?: string, store_ids?: list<int>}> $entities
      * @phpstan-return list<array{severity: string, code: string, message: string, entity_type?: string,
-     *     entity_id?: int, release_ids: list<int>, item_ids: list<int>}>
+     *     entity_id?: int, entity_ids?: list<int>, release_ids: list<int>, item_ids: list<int>}>
      */
     public function detect(array $items, array $releases, array $entities, int $now, int $windowMinutes = 60): array
     {
@@ -142,7 +142,7 @@ class ScheduleConflictDetector
      * @phpstan-param array<int, array{release_id: int, name: string, time_scheduled: string, status: string}> $releases
      * @phpstan-param array<string, array{exists: bool, identifier?: string, store_ids?: list<int>}> $entities
      * @phpstan-return list<array{severity: string, code: string, message: string, entity_type?: string,
-     *     entity_id?: int, release_ids: list<int>, item_ids: list<int>}>
+     *     entity_id?: int, entity_ids?: list<int>, release_ids: list<int>, item_ids: list<int>}>
      */
     private function storeCollisions(array $byEntity, array $releases, array $entities, int $windowMinutes): array
     {
@@ -174,7 +174,10 @@ class ScheduleConflictDetector
                         $itemB['entity_id'],
                         (string) ($a['identifier'] ?? ''),
                         $windowMinutes
-                    ), [$itemA['release_id'], $itemB['release_id']], [$itemA['item_id'], $itemB['item_id']]);
+                    ), [$itemA['release_id'], $itemB['release_id']], [$itemA['item_id'], $itemB['item_id']], $itemA, [
+                        $itemA['entity_id'],
+                        $itemB['entity_id'],
+                    ]);
                 }
             }
         }
@@ -205,12 +208,14 @@ class ScheduleConflictDetector
      * @param array $releaseIds
      * @param array $itemIds
      * @param array|null $item
+     * @param array $entityIds All entities a conflict involves, when more than one.
      * @return array
      * @phpstan-param list<int> $releaseIds
      * @phpstan-param list<int> $itemIds
+     * @phpstan-param list<int> $entityIds
      * @phpstan-param array{entity_type: string, entity_id: int}|null $item
      * @phpstan-return array{severity: string, code: string, message: string, entity_type?: string, entity_id?: int,
-     *     release_ids: list<int>, item_ids: list<int>}
+     *     entity_ids?: list<int>, release_ids: list<int>, item_ids: list<int>}
      */
     private function conflict(
         string $severity,
@@ -218,12 +223,16 @@ class ScheduleConflictDetector
         string $message,
         array $releaseIds,
         array $itemIds,
-        ?array $item = null
+        ?array $item = null,
+        array $entityIds = []
     ): array {
         $conflict = ['severity' => $severity, 'code' => $code, 'message' => $message];
         if ($item !== null) {
             $conflict['entity_type'] = $item['entity_type'];
             $conflict['entity_id'] = $item['entity_id'];
+        }
+        if ($entityIds !== []) {
+            $conflict['entity_ids'] = $entityIds;
         }
         $conflict['release_ids'] = array_values(array_unique($releaseIds));
         $conflict['item_ids'] = array_values(array_unique($itemIds));

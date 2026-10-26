@@ -8,10 +8,9 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Schedule;
 
-use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
-use Magebit\McpHyvaCommerceTools\Model\Content\ContentScanner;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 
@@ -21,7 +20,7 @@ use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
  * @phpstan-type Item array{item_id: int, release_id: int, entity_type: string, entity_id: int, name: string}
  * @phpstan-type Entity array{exists: bool, identifier?: string, store_ids?: list<int>}
  * @phpstan-type Conflict array{severity: string, code: string, message: string, entity_type?: string,
- *     entity_id?: int, release_ids: list<int>, item_ids: list<int>}
+ *     entity_id?: int, entity_ids?: list<int>, release_ids: list<int>, item_ids: list<int>}
  */
 class ConflictReport
 {
@@ -29,7 +28,7 @@ class ConflictReport
      * @param ScheduleService $scheduleService
      * @param ScheduleConflictDetector $detector
      * @param ContentIndex $contentIndex
-     * @param ContentScanner $contentScanner
+     * @param FeatureCheckerInterface $featureChecker
      * @param ContentLocator $contentLocator
      * @param StoreScopeGuard $storeScopeGuard
      */
@@ -37,7 +36,7 @@ class ConflictReport
         private readonly ScheduleService $scheduleService,
         private readonly ScheduleConflictDetector $detector,
         private readonly ContentIndex $contentIndex,
-        private readonly ContentScanner $contentScanner,
+        private readonly FeatureCheckerInterface $featureChecker,
         private readonly ContentLocator $contentLocator,
         private readonly StoreScopeGuard $storeScopeGuard
     ) {
@@ -164,7 +163,8 @@ class ConflictReport
             return $conflicts;
         }
         return array_values(array_filter($conflicts, static fn (array $c): bool => !array_key_exists('entity_type', $c)
-            || ($c['entity_type'] === $entityType && ($entityId === null || ($c['entity_id'] ?? null) === $entityId))));
+            || ($c['entity_type'] === $entityType && ($entityId === null
+                || in_array($entityId, $c['entity_ids'] ?? [$c['entity_id'] ?? null], true)))));
     }
 
     /**
@@ -178,24 +178,24 @@ class ConflictReport
     private function getEntities(array $items): array
     {
         $known = [];
-        foreach ([ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK] as $type) {
-            if (array_filter($items, static fn (array $i): bool => $i['entity_type'] === $type) === []) {
+        // Only the scheduled entities are read, and without their content columns.
+        foreach ([ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK, ContentLocator::TYPE_MENU] as $type) {
+            $ids = array_values(array_unique(array_map(
+                static fn (array $i): int => $i['entity_id'],
+                array_filter($items, static fn (array $i): bool => $i['entity_type'] === $type)
+            )));
+            if ($ids === []
+                || ($type === ContentLocator::TYPE_MENU
+                    && !$this->featureChecker->isAvailable(FeatureCheckerInterface::MENU_BUILDER))) {
                 continue;
             }
-            foreach ($this->contentIndex->getRows($type) as $row) {
-                $known[$type . ':' . $row['id']] = [
+            foreach ($this->contentIndex->getIdentifiersByIds($type, $ids) as $id => $row) {
+                $known[$type . ':' . $id] = [
                     'exists' => true,
                     'identifier' => $row['identifier'],
                     'store_ids' => $row['store_ids'],
                 ];
             }
-        }
-        foreach ($this->contentScanner->getMenuRows() as $row) {
-            $known['menu:' . Cast::int($row['id'])] = [
-                'exists' => true,
-                'identifier' => Cast::string($row['identifier']),
-                'store_ids' => [],
-            ];
         }
         $entities = [];
         foreach ($items as $item) {

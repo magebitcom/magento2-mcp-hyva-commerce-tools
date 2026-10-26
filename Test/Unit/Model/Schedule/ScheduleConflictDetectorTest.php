@@ -80,6 +80,12 @@ class ScheduleConflictDetectorTest extends TestCase
         ];
         $codes = $this->codes($this->detector->detect($items, $releases, $entities, self::NOW));
         $this->assertSame('error', $codes['store_view_collision']);
+        $collision = array_values(array_filter(
+            $this->detector->detect($items, $releases, $entities, self::NOW),
+            static fn (array $c): bool => $c['code'] === 'store_view_collision'
+        ))[0];
+        $this->assertSame('cms_page', $collision['entity_type'] ?? null);
+        $this->assertSame([2, 7], $collision['entity_ids'] ?? null);
     }
 
     public function testErrorsAreSortedFirst(): void
