@@ -13,9 +13,15 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScanner;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 
 /**
  * Loads pending releases/items and the scheduled entities, then runs the conflict detector.
+ *
+ * @phpstan-type Item array{item_id: int, release_id: int, entity_type: string, entity_id: int, name: string}
+ * @phpstan-type Entity array{exists: bool, identifier?: string, store_ids?: list<int>}
+ * @phpstan-type Conflict array{severity: string, code: string, message: string, entity_type?: string,
+ *     entity_id?: int, release_ids: list<int>, item_ids: list<int>}
  */
 class ConflictReport
 {
@@ -25,53 +31,16 @@ class ConflictReport
      * @param ContentIndex $contentIndex
      * @param ContentScanner $contentScanner
      * @param ContentLocator $contentLocator
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         private readonly ScheduleService $scheduleService,
         private readonly ScheduleConflictDetector $detector,
         private readonly ContentIndex $contentIndex,
         private readonly ContentScanner $contentScanner,
-        private readonly ContentLocator $contentLocator
+        private readonly ContentLocator $contentLocator,
+        private readonly StoreScopeGuard $storeScopeGuard
     ) {
-    }
-
-    /**
-     * Drop conflicts naming a scheduled item of content outside the MCP caller's website/store view restriction.
-     *
-     * Release-level conflicts and identifier collisions, which carry no single entity, are judged by their items.
-     * Unrestricted callers get the conflicts back without any query; restricted ones cost one item query and one
-     * store view query per type.
-     *
-     * @param array $conflicts
-     * @return array
-     * @phpstan-param list<array{severity: string, code: string, message: string, entity_type?: string,
-     *     entity_id?: int, release_ids: list<int>, item_ids: list<int>}> $conflicts
-     * @phpstan-return list<array{severity: string, code: string, message: string, entity_type?: string,
-     *     entity_id?: int, release_ids: list<int>, item_ids: list<int>}>
-     */
-    public function withinCallerScope(array $conflicts): array
-    {
-        if ($conflicts === [] || !$this->contentLocator->isScopeRestricted()) {
-            return $conflicts;
-        }
-        $items = $this->scheduleService->getItems(['status' => 'pending']);
-        $this->contentLocator->prefetchScope(array_map(
-            static fn (array $item): array => ['entity_type' => $item['entity_type'], 'id' => $item['entity_id']],
-            $items
-        ));
-        $hidden = [];
-        foreach ($items as $item) {
-            if (!$this->contentLocator->allowsRead($item['entity_type'], $item['entity_id'])) {
-                $hidden[$item['item_id']] = true;
-            }
-        }
-        return array_values(array_filter(
-            $conflicts,
-            static fn (array $conflict): bool => array_filter(
-                $conflict['item_ids'],
-                static fn (int $itemId): bool => isset($hidden[$itemId])
-            ) === []
-        ));
     }
 
     /**
@@ -81,10 +50,75 @@ class ConflictReport
      * @param string|null $entityType Only conflicts touching this entity.
      * @param int|null $entityId
      * @return array
-     * @phpstan-return list<array{severity: string, code: string, message: string, entity_type?: string,
-     *     entity_id?: int, release_ids: list<int>, item_ids: list<int>}>
+     * @phpstan-return list<Conflict>
      */
     public function getConflicts(int $windowMinutes = 60, ?string $entityType = null, ?int $entityId = null): array
+    {
+        $items = $this->pendingItems();
+        return $this->detect($items, $this->getEntities($items), $windowMinutes, $entityType, $entityId);
+    }
+
+    /**
+     * Conflicts, without those naming a scheduled item of content outside the MCP caller's website/store view
+     * restriction, and how many were dropped.
+     *
+     * Release-level conflicts and identifier collisions, which carry no single entity, are judged by their items.
+     * The scope check reuses the items and the page/block store views the detection read; only menu items cost one
+     * more store view query, and only for a restricted caller.
+     *
+     * @param int $windowMinutes
+     * @param string|null $entityType Only conflicts touching this entity.
+     * @param int|null $entityId
+     * @return array
+     * @phpstan-return array{conflicts: list<Conflict>, hidden: int}
+     */
+    public function getConflictsWithinCallerScope(
+        int $windowMinutes = 60,
+        ?string $entityType = null,
+        ?int $entityId = null
+    ): array {
+        $items = $this->pendingItems();
+        $entities = $this->getEntities($items);
+        $conflicts = $this->detect($items, $entities, $windowMinutes, $entityType, $entityId);
+        if ($conflicts === [] || !$this->contentLocator->isScopeRestricted()) {
+            return ['conflicts' => $conflicts, 'hidden' => 0];
+        }
+        $menus = array_values(array_filter(
+            $items,
+            static fn (array $item): bool => $item['entity_type'] === ContentLocator::TYPE_MENU
+        ));
+        $this->contentLocator->prefetchScope(array_map(
+            static fn (array $item): array => ['entity_type' => $item['entity_type'], 'id' => $item['entity_id']],
+            $menus
+        ));
+        $hidden = [];
+        foreach ($items as $item) {
+            $entity = $entities[$item['entity_type'] . ':' . $item['entity_id']] ?? ['exists' => false];
+            // Menus come without store views here (the detector treats them as every store view).
+            $readable = $item['entity_type'] === ContentLocator::TYPE_MENU
+                ? $this->contentLocator->allowsRead($item['entity_type'], $item['entity_id'])
+                : $entity['exists'] && $this->storeScopeGuard->allowsRead($entity['store_ids'] ?? []);
+            if (!$readable) {
+                $hidden[$item['item_id']] = true;
+            }
+        }
+        $visible = array_values(array_filter(
+            $conflicts,
+            static fn (array $conflict): bool => array_filter(
+                $conflict['item_ids'],
+                static fn (int $itemId): bool => isset($hidden[$itemId])
+            ) === []
+        ));
+        return ['conflicts' => $visible, 'hidden' => count($conflicts) - count($visible)];
+    }
+
+    /**
+     * Pending schedule items.
+     *
+     * @return array
+     * @phpstan-return list<Item>
+     */
+    private function pendingItems(): array
     {
         $items = [];
         foreach ($this->scheduleService->getItems(['status' => 'pending']) as $row) {
@@ -96,10 +130,33 @@ class ConflictReport
                 'name' => $row['name'],
             ];
         }
+        return $items;
+    }
+
+    /**
+     * Run the detector, optionally keeping only conflicts touching one entity.
+     *
+     * @param array $items
+     * @param array $entities
+     * @param int $windowMinutes
+     * @param string|null $entityType
+     * @param int|null $entityId
+     * @return array
+     * @phpstan-param list<Item> $items
+     * @phpstan-param array<string, Entity> $entities
+     * @phpstan-return list<Conflict>
+     */
+    private function detect(
+        array $items,
+        array $entities,
+        int $windowMinutes,
+        ?string $entityType,
+        ?int $entityId
+    ): array {
         $conflicts = $this->detector->detect(
             $items,
             $this->scheduleService->getReleases('pending'),
-            $this->getEntities($items),
+            $entities,
             time(),
             $windowMinutes
         );
@@ -115,9 +172,8 @@ class ConflictReport
      *
      * @param array $items
      * @return array
-     * @phpstan-param list<array{item_id: int, release_id: int, entity_type: string, entity_id: int,
-     *     name: string}> $items
-     * @phpstan-return array<string, array{exists: bool, identifier?: string, store_ids?: list<int>}>
+     * @phpstan-param list<Item> $items
+     * @phpstan-return array<string, Entity>
      */
     private function getEntities(array $items): array
     {
