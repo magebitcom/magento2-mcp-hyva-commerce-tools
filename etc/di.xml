@@ -255,6 +255,13 @@
         </arguments>
     </type>
 
+    <!-- The widgets only need the write set on a cache miss; MenuHealth/MediaHealth never need it. -->
+    <type name="Magebit\McpHyvaCommerceTools\Model\Audit\McpActivityReader">
+        <arguments>
+            <argument name="toolRegistry" xsi:type="object">Magebit\Mcp\Api\ToolRegistryInterface\Proxy</argument>
+        </arguments>
+    </type>
+
     <!-- Keep the dashboard cache lazy so CLI tool listing does not touch the dashboard framework. -->
     <type name="Magebit\McpHyvaCommerceTools\Tool\HyvaDashboard\Widget\WidgetRefresh">
         <arguments>

@@ -92,7 +92,7 @@ class McpActivity extends AbstractHealthWidget
                     'title' => (string) __('AI-generated drafts'),
                     'rows' => $toRows(
                         $this->activityReader->getRows(
-                            ['tools' => McpActivityReader::DRAFT_WRITE_TOOLS, 'status' => 'ok'],
+                            ['tools' => $this->activityReader->getDraftWriteTools(), 'status' => 'ok'],
                             $limit
                         )
                     ),
@@ -106,7 +106,10 @@ class McpActivity extends AbstractHealthWidget
                 [
                     'title' => (string) __('Publish and destructive actions'),
                     'rows' => $toRows(
-                        $this->activityReader->getRows(['tools' => McpActivityReader::DESTRUCTIVE_TOOLS], $limit)
+                        $this->activityReader->getRows(
+                            ['tools' => $this->activityReader->getDestructiveTools()],
+                            $limit
+                        )
                     ),
                     'empty' => (string) __('None.'),
                 ],

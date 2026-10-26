@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Widget;
 
 use Hyva\AdminDashboardApi\Api\V1\WidgetContextInterface;
+use Magebit\Mcp\Api\ToolRegistryInterface;
 use Magebit\McpHyvaCommerceTools\Model\Audit\McpActivityReader;
 use Magebit\McpHyvaCommerceTools\Model\Widget\McpActivity;
 use Magento\Backend\Model\UrlInterface;
@@ -50,7 +51,11 @@ class McpActivityAclTest extends TestCase
     {
         $connection = $this->createMock(ResourceConnection::class);
         $connection->expects($this->never())->method('getConnection');
-        $reader = new McpActivityReader($connection, $this->authorization(false));
+        $reader = new McpActivityReader(
+            $connection,
+            $this->authorization(false),
+            $this->createMock(ToolRegistryInterface::class)
+        );
 
         $this->assertSame([], $reader->getRows(['tool_prefix' => 'hyva_media.'], 5));
         $this->assertSame(['calls' => 0, 'errors' => 0, 'writes' => 0, 'admins' => 0], $reader->getTotals('2026-01-01'));
@@ -62,7 +67,11 @@ class McpActivityAclTest extends TestCase
      */
     private function reader(bool $audit): McpActivityReader
     {
-        return new McpActivityReader($this->createMock(ResourceConnection::class), $this->authorization($audit));
+        return new McpActivityReader(
+            $this->createMock(ResourceConnection::class),
+            $this->authorization($audit),
+            $this->createMock(ToolRegistryInterface::class)
+        );
     }
 
     /**
