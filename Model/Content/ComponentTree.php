@@ -684,15 +684,20 @@ class ComponentTree
     }
 
     /**
-     * Whether a link field value has the `type` and `value` Hyvä reads.
+     * Whether a link field value has the `type` and `value` Hyvä reads, or a `src` it falls back to.
      *
      * @param mixed $value
      * @return bool
      */
     private function isUsableLink(mixed $value): bool
     {
-        return is_array($value)
-            && is_string($value['type'] ?? null) && $value['type'] !== ''
+        if (!is_array($value)) {
+            return false;
+        }
+        if (is_string($value['src'] ?? null) && $value['src'] !== '') {
+            return true;
+        }
+        return is_string($value['type'] ?? null) && $value['type'] !== ''
             && isset($value['value']) && $value['value'] !== '';
     }
 

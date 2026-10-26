@@ -199,6 +199,18 @@ class ComponentTreeTest extends TestCase
         $this->assertSame('bad', $issues[0]['uid']);
     }
 
+    public function testLinkWithOnlyANonEmptySrcIsUsableLikeInHyva(): void
+    {
+        $document = $this->tree->newDocument('cms_page', 1);
+        $document = $this->tree->insertNode($document, $this->node('cta', 'src', ['link' => ['src' => '/sale']]));
+        $document = $this->tree->insertNode($document, $this->node('cta', 'blank', ['link' => ['src' => '']]));
+
+        $issues = $this->tree->validate($document);
+
+        $this->assertSame(['invalid_link'], array_column($issues, 'code'));
+        $this->assertSame('blank', $issues[0]['uid']);
+    }
+
     public function testValidDocumentHasNoIssues(): void
     {
         $document = $this->tree->newDocument('cms_page', 1);
