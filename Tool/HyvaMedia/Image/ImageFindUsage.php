@@ -54,8 +54,9 @@ class ImageFindUsage extends AbstractMediaTool
     {
         return 'Find everywhere an image is used: Hyvä CMS pages and blocks (draft and published, with component uid '
             . 'and field), Menu Builder rich content, Magento CMS / Page Builder content, product and category '
-            . 'descriptions. Use before replacing or deleting an image. Pages, blocks and menus outside your role\'s '
-            . 'websites/store views are left out and counted in usages_hidden_by_permissions.';
+            . 'descriptions. Use before replacing or deleting an image. Pages, blocks, menus, products and '
+            . 'categories outside your role\'s websites/store views are left out and counted in '
+            . 'usages_hidden_by_permissions.';
     }
 
     /**

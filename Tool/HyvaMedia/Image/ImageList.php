@@ -59,8 +59,8 @@ class ImageList extends AbstractMediaTool
         return 'List images from the Media Gallery and a media folder (default wysiwyg) with size, dimensions, type, '
             . 'whether and where they are used (Hyvä CMS, menus, Magento CMS, product/category descriptions) and '
             . 'missing alt text. Filter by folder, type, size (KB), dimensions, used/unused, usage source. Usages in '
-            . 'pages, blocks and menus outside your role\'s websites/store views are only counted '
-            . '(usages_hidden_by_permissions); an image used there still counts as used.';
+            . 'pages, blocks, menus, products and categories outside your role\'s websites/store views are only '
+            . 'counted (usages_hidden_by_permissions); an image used there still counts as used.';
     }
 
     /**

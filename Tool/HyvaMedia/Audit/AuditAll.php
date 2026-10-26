@@ -46,8 +46,9 @@ class AuditAll extends AbstractMediaTool
         return 'Audit every image referenced in storefront content (Hyvä CMS, menus, Magento CMS, product/category '
             . 'descriptions): oversized files and dimensions, missing alt text, broken references, unsupported '
             . 'formats, large PNGs, heavy hero/banner images, missing optimized variants, plus Media Optimization '
-            . 'settings (disabled optimization, automatic replacement off). Usages in pages, blocks and menus outside '
-            . 'your role\'s websites/store views are not checked (usages_hidden_by_permissions).';
+            . 'settings (disabled optimization, automatic replacement off). Usages in pages, blocks, menus, products '
+            . 'and categories outside your role\'s websites/store views are not checked '
+            . '(usages_hidden_by_permissions).';
     }
 
     /**

@@ -58,8 +58,8 @@ class ImageValidate extends AbstractMediaTool
     {
         return 'Validate one image: file exists, supported web format, file size and dimensions, alt text on every '
             . 'usage, hero/banner weight, missing optimized/WebP/AVIF variants, Image Editor support, transparent '
-            . 'PNG and animated GIF. Usages in pages, blocks and menus outside your role\'s websites/store views are '
-            . 'not checked; they are counted in usages_hidden_by_permissions.';
+            . 'PNG and animated GIF. Usages in pages, blocks, menus, products and categories outside your role\'s '
+            . 'websites/store views are not checked; they are counted in usages_hidden_by_permissions.';
     }
 
     /**

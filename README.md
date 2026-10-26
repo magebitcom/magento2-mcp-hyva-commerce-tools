@@ -42,10 +42,11 @@ bin/magento cache:flush
 - **Drafts only.** Page, block, menu, migration, import, image-replace and alt-text tools save drafts
   (`saveContent(..., publish: false)`) plus a version-history entry. The storefront changes only after
   `hyva_cms.publish` (or a scheduled release). `settings` arguments (title, active flag, store views, meta) are Magento
-  fields and apply immediately, so a setting that changes the live storefront needs `"confirm": true`: the active
-  flag, store views and URL key / identifier always, and any setting of an active page, block or menu. Without
-  `confirm` nothing is written (not even the draft part of the call) and the reply lists each change with its
-  storefront effect. `hyva_cms.page.create` / `hyva_cms.block.create` with `is_active=true` need `"confirm": true`
+  fields and apply immediately, so a setting that changes the live storefront needs `"confirm": true`: the active flag,
+  store views and URL key / identifier always, and any other setting of an active page, block or menu (a menu's
+  `preview_url_key` only picks the page the editor previews it on and never needs confirm). Without `confirm` nothing is
+  written (not even the draft part of the call) and the reply lists each change with its storefront effect.
+  `hyva_cms.page.create` / `hyva_cms.block.create` with `is_active=true` need `"confirm": true`
   too: without it nothing is created and the reply shows what would go live. An inactive create needs no confirm,
   whatever its identifier and store views, because an inactive page or block is not served.
 - **Explicit confirm.** Creating an active page or block, live `settings` changes (above), replacing unpublished draft changes, removing a menu item with
@@ -76,10 +77,19 @@ bin/magento cache:flush
   `schedule.detect_conflicts` (and the conflicts `schedule.create` returns) hide items and conflicts of content outside
   the role, including content that no longer exists, and count them in `items_hidden_by_permissions` /
   `conflicts_hidden_by_permissions`; `hyva_form.delivery.audit` without a form audits only the role's forms
-  (`forms_hidden_by_permissions`); `migration.scan` lists only the role's pages and blocks. Not filtered by scope:
-  the usage lists of `hyva_media.image.find_usage`, `hyva_menu.find_usage` and the image tools (`image.list`,
-  `image.validate`, `asset.resolve`, `sync.status`), the `hyva_commerce.audit.*`, `hyva_media.audit*` and
-  `hyva_menu.audit_all` audits, `hyva_email.audit.coverage`, and the dashboard widgets.
+  (`forms_hidden_by_permissions`); `migration.scan` lists only the role's pages and blocks.
+  Usage lists, previews and audits (`hyva_media.image.find_usage`, `image.list`, `image.validate`, `asset.resolve`, the
+  `asset.move` / `asset.trash` previews, the `usage` field of `image.get`, `cms_block.get` and `hyva_menu.get`,
+  `hyva_menu.find_usage`, the `hyva_commerce.audit.*`, `hyva_media.audit*` and `hyva_menu.audit_all` audits, the forms
+  lens of `audit.overview`) leave out pages, blocks, menus and widget instances outside the role's store views, products
+  outside its websites and categories outside its store views' category trees, as Hyvä's guards do, and count them in
+  `*_hidden_by_permissions`. An image or menu used only there still counts as used. A product assigned to no website
+  stays listed, as in the Hyvä admin. The dashboard widgets apply the logged-in admin's restriction, with a separate
+  widget cache entry per restriction. Not filtered by scope: Media Gallery files, folders, trash and sync status (the
+  Hyvä Media Gallery has no scope), configuration values (menu placements, email assignments in
+  `hyva_email.audit.coverage`, store credit websites in `audit.overview`), email and newsletter templates, and the MCP
+  audit log (MCP Activity widget, which needs `Magebit_Mcp::mcp_audit`). Menu Health and Media Health show MCP activity
+  and the audit log link only with that permission.
 - **Refusals.** Hyvä's save refusals come back as soft errors with a `status`: 422 with `field_errors` (per component
   uid and field) when a provider refuses content or Hyvä's content guard rejects it (3 MB, 5000 components, depth 50),
   409 when the draft changed since you read it (pass `base_version_uid` to the update tools to get this check; reload
