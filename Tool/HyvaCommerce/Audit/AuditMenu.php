@@ -135,7 +135,11 @@ class AuditMenu extends AbstractTool
             ];
         }
         ksort($codes);
-        $media = $this->auditor->audit('menu', 500, 20);
+        $media = $this->auditor->audit(
+            'menu',
+            $this->intArg($arguments, 'max_kb', 500) ?? 500,
+            $this->intArg($arguments, 'limit', 20) ?? 20
+        );
         return $this->jsonResult(
             $this->scopeFilter->withHidden(
                 ['totals' => $totals, 'issue_counts' => $codes, 'menus' => $menus, 'media' => $media],
