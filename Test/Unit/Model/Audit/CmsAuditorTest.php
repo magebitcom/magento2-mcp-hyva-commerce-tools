@@ -13,7 +13,6 @@ use Hyva\CmsLiveviewEditor\Model\Component\Provider as ComponentProvider;
 use Magebit\McpHyvaCommerceTools\Model\Audit\CmsAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
-use Magebit\McpHyvaCommerceTools\Model\Content\ContentScanner;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
@@ -86,7 +85,6 @@ class CmsAuditorTest extends TestCase
         $extractor = new ImageReferenceExtractor($tree, $this->createMock(ImageAssetPathResolverInterface::class));
         return new CmsAuditor(
             new ContentIndex($this->createMock(ResourceConnection::class)),
-            $this->createMock(ContentScanner::class),
             $tree,
             $extractor,
             $this->createMock(MediaFileInfo::class),

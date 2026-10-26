@@ -17,6 +17,8 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Model\Migration\MigrationAnalyzer;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magento\Framework\Exception\LocalizedException;
 
 /**
  * Hyvä CMS content health: counts per state, broken/invalid content, image problems, schedule problems.
@@ -28,9 +30,10 @@ use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
  */
 class CmsAuditor
 {
+    private const SEVERITY_RANK = ['error' => 0, 'warning' => 1, 'info' => 2];
+
     /**
      * @param ContentIndex $contentIndex
-     * @param ContentScanner $contentScanner
      * @param ComponentTree $componentTree
      * @param ImageReferenceExtractor $imageReferenceExtractor
      * @param MediaFileInfo $mediaFileInfo
@@ -40,7 +43,6 @@ class CmsAuditor
      */
     public function __construct(
         private readonly ContentIndex $contentIndex,
-        private readonly ContentScanner $contentScanner,
         private readonly ComponentTree $componentTree,
         private readonly ImageReferenceExtractor $imageReferenceExtractor,
         private readonly MediaFileInfo $mediaFileInfo,
@@ -53,6 +55,10 @@ class CmsAuditor
     /**
      * Audit.
      *
+     * Each content type is read once: the same rows feed the counts and the document scan. The issue list keeps at
+     * most $issueLimit entries per severity while scanning, so the work held in memory stays bounded on the
+     * dashboard path whatever the size of the catalogue, and each image path is checked on disk once.
+     *
      * @param int $issueLimit
      * @return array
      * @phpstan-return array{counts: array<string, EntityCounts>, scheduling: array<string, int>,
@@ -60,12 +66,16 @@ class CmsAuditor
      */
     public function audit(int $issueLimit = 100): array
     {
+        $issueLimit = max(0, $issueLimit);
         $counts = [];
+        $documents = [];
         foreach ([ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK] as $type) {
-            $counts[$type] = $this->countRows($this->contentIndex->getRows($type, true));
+            $rows = $this->contentIndex->getRows($type, true);
+            $counts[$type] = $this->countRows($rows);
+            array_push($documents, ...$this->documentsOf($type, $rows));
         }
 
-        $issues = [];
+        $buckets = [];
         $contentIssues = [
             'invalid_json' => 0,
             'validation_errors' => 0,
@@ -74,7 +84,7 @@ class CmsAuditor
             'missing_alt' => 0,
             'broken_images' => 0,
         ];
-        $documents = $this->contentScanner->getDocuments([ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK]);
+        $fileExists = [];
         $this->imageReferenceExtractor->prefetchAssetIds(array_column($documents, 'document'));
         foreach ($documents as $entry) {
             $where = [
@@ -85,11 +95,11 @@ class CmsAuditor
             ];
             if ($entry['document'] === null) {
                 $contentIssues['invalid_json']++;
-                $issues[] = $where + [
+                $this->addIssue($buckets, $issueLimit, $where + [
                     'code' => 'invalid_json',
                     'severity' => 'error',
                     'message' => (string) $entry['error'],
-                ];
+                ]);
                 continue;
             }
             foreach ($this->componentTree->validate($entry['document']) as $issue) {
@@ -99,31 +109,32 @@ class CmsAuditor
                 $contentIssues['validation_errors']++;
                 $contentIssues['unknown_components'] += $issue['code'] === 'unknown_component' ? 1 : 0;
                 $contentIssues['disabled_components'] += $issue['code'] === 'disabled_component' ? 1 : 0;
-                $issues[] = $where + [
+                $this->addIssue($buckets, $issueLimit, $where + [
                     'code' => $issue['code'],
                     'severity' => 'error',
                     'uid' => $issue['uid'],
                     'message' => $issue['message'],
-                ];
+                ]);
             }
             foreach ($this->imageReferenceExtractor->fromDocument($entry['document']) as $image) {
                 if (!$image['has_alt']) {
                     $contentIssues['missing_alt']++;
-                    $issues[] = $where + [
+                    $this->addIssue($buckets, $issueLimit, $where + [
                         'code' => 'missing_alt',
                         'severity' => 'warning',
                         'uid' => $image['uid'],
                         'message' => sprintf('Image %s has no alt text.', $image['path']),
-                    ];
+                    ]);
                 }
-                if (!$this->mediaFileInfo->exists($image['path'])) {
+                $fileExists[$image['path']] ??= $this->mediaFileInfo->exists($image['path']);
+                if (!$fileExists[$image['path']]) {
                     $contentIssues['broken_images']++;
-                    $issues[] = $where + [
+                    $this->addIssue($buckets, $issueLimit, $where + [
                         'code' => 'broken_image',
                         'severity' => 'error',
                         'uid' => $image['uid'],
                         'message' => sprintf('Image %s does not exist in pub/media.', $image['path']),
-                    ];
+                    ]);
                 }
             }
         }
@@ -144,25 +155,81 @@ class CmsAuditor
         ];
         foreach ($conflicts as $conflict) {
             if ($conflict['severity'] !== 'info') {
-                $issues[] = [
+                $this->addIssue($buckets, $issueLimit, [
                     'code' => 'schedule_' . $conflict['code'],
                     'severity' => $conflict['severity'],
                     'message' => $conflict['message'],
-                ];
+                ]);
             }
         }
 
-        $rank = ['error' => 0, 'warning' => 1, 'info' => 2];
-        usort(
-            $issues,
-            static fn (array $a, array $b): int => ($rank[$a['severity']] ?? 3) <=> ($rank[$b['severity']] ?? 3)
-        );
+        ksort($buckets);
         return [
             'counts' => $counts,
             'scheduling' => $scheduling,
             'content_issues' => $contentIssues,
-            'issues' => array_slice($issues, 0, $issueLimit),
+            'issues' => array_slice(array_merge([], ...array_values($buckets)), 0, $issueLimit),
         ];
+    }
+
+    /**
+     * Keep an issue in its severity bucket while the bucket holds fewer than $limit issues.
+     *
+     * @param array $buckets
+     * @param int $limit
+     * @param array $issue
+     * @return void
+     * @phpstan-param array<int, list<array<string, mixed>>> $buckets
+     * @phpstan-param array<string, mixed> $issue
+     */
+    private function addIssue(array &$buckets, int $limit, array $issue): void
+    {
+        $rank = self::SEVERITY_RANK[Cast::string($issue['severity'] ?? '')] ?? count(self::SEVERITY_RANK);
+        if (count($buckets[$rank] ?? []) < $limit) {
+            $buckets[$rank][] = $issue;
+        }
+    }
+
+    /**
+     * Parsed Hyvä CMS documents (draft and published edition) of rows already read with their content.
+     *
+     * @param string $type
+     * @param array $rows
+     * @return array
+     * @phpstan-param list<ContentRow> $rows
+     * @phpstan-return list<array{entity_type: string, id: int, identifier: string, edition: string,
+     *     document: array<string, mixed>|null, error: string|null}>
+     */
+    private function documentsOf(string $type, array $rows): array
+    {
+        $documents = [];
+        foreach ($rows as $row) {
+            $editions = [
+                ContentScanner::EDITION_DRAFT => $row['draft_content'] ?? null,
+                ContentScanner::EDITION_PUBLISHED => $row['published_content'] ?? null,
+            ];
+            foreach ($editions as $edition => $json) {
+                if (!is_string($json) || trim($json) === '' || trim($json) === '[]') {
+                    continue;
+                }
+                $document = null;
+                $error = null;
+                try {
+                    $document = $this->componentTree->parse($json, $type, $row['id']);
+                } catch (LocalizedException $e) {
+                    $error = $e->getMessage();
+                }
+                $documents[] = [
+                    'entity_type' => $type,
+                    'id' => $row['id'],
+                    'identifier' => $row['identifier'],
+                    'edition' => $edition,
+                    'document' => $document,
+                    'error' => $error,
+                ];
+            }
+        }
+        return $documents;
     }
 
     /**
