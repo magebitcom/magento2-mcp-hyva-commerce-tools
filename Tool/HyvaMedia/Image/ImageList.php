@@ -121,7 +121,7 @@ class ImageList extends AbstractMediaTool
                 fn (string $path): bool => $this->matchesUsage(
                     $allUsages['visible'][$path] ?? [],
                     $allUsages['hidden'][$path] ?? 0,
-                    $filterUsed ? $this->boolArg($arguments, 'used') : null,
+                    $filterUsed ? $this->boolArg($arguments, 'used') : ($usedIn !== null ? true : null),
                     $filterMissingAlt
                 )
             ));

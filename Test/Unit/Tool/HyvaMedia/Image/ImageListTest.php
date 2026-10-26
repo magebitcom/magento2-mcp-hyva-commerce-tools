@@ -168,6 +168,25 @@ class ImageListTest extends TestCase
     }
 
     /**
+     * used_in without used keeps only the images used in that source.
+     *
+     * @return void
+     */
+    public function testUsedInAloneFiltersBySource(): void
+    {
+        $this->inventory->method('getGalleryAssets')->willReturn([]);
+        $this->usageIndex->method('all')->willReturn([
+            'wysiwyg/a.jpg' => [$this->usageIn('cms_page', 2)],
+            'wysiwyg/c.jpg' => [$this->usageIn('product', 5, 'product')],
+        ]);
+
+        $result = $this->tool->execute(['used_in' => 'product', 'types' => ['jpg'], 'sort' => 'path']);
+
+        $this->assertSame(['wysiwyg/c.jpg'], array_column($this->arrayAt($result, 'items'), 'path'));
+        $this->assertSame(1, $this->at($result, 'total'));
+    }
+
+    /**
      * A restricted caller sees only its own usages, but an image used elsewhere still counts as used.
      *
      * @return void
