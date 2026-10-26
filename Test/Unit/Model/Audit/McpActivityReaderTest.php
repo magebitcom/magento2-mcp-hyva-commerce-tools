@@ -206,6 +206,42 @@ class McpActivityReaderTest extends TestCase
         $this->assertSame([], $this->reader([], $connection)->getRows(['tools' => []], 5));
     }
 
+    public function testDryRunsAreNotCountedAsWritesAndCanBeLeftOut(): void
+    {
+        $connection = $this->createMock(AdapterInterface::class);
+        $connection->method('isTableExists')->willReturn(true);
+        $where = [];
+        $select = $this->createMock(Select::class);
+        $select->method('from')->willReturnSelf();
+        $select->method('joinLeft')->willReturnSelf();
+        $select->method('order')->willReturnSelf();
+        $select->method('limit')->willReturnSelf();
+        $select->method('where')->willReturnCallback(
+            function (string $condition) use (&$where, $select): Select {
+                $where[] = $condition;
+                return $select;
+            }
+        );
+        $connection->method('select')->willReturn($select);
+        $quotedText = '';
+        $connection->method('quoteInto')->willReturnCallback(
+            static function (string $text) use (&$quotedText): string {
+                $quotedText = $text;
+                return $text;
+            }
+        );
+        $connection->method('fetchAll')->willReturn([]);
+        $connection->method('fetchRow')->willReturn([]);
+        $reader = $this->reader(['hyva_menu.update' => true], $connection);
+
+        $reader->getRows(['tools' => ['hyva_menu.update'], 'exclude_dry_run' => true], 5);
+        $reader->getTotals('2026-01-01 00:00:00');
+
+        $dryRun = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(%s, '$.dry_run')), '') <> 'true'";
+        $this->assertContains(sprintf($dryRun, 'l.result_summary_json'), $where);
+        $this->assertStringContainsString(sprintf($dryRun, 'result_summary_json'), $quotedText);
+    }
+
     /**
      * @param array<string, bool> $tools name => is write
      * @param AdapterInterface $connection

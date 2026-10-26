@@ -186,6 +186,12 @@ class McpActivityReader
     }
 
     /**
+     * SQL condition (sprintf the summary column in) that is true unless the call was a dry run: a preview or a
+     * confirmation request whose result summary carries `dry_run: true`, which changed nothing.
+     */
+    private const NOT_DRY_RUN_SQL = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(%s, '$.dry_run')), '') <> 'true'";
+
+    /**
      * Whether the current admin may read the MCP audit log.
      *
      * @return bool
@@ -202,7 +208,7 @@ class McpActivityReader
      * @param int $limit
      * @return array
      * @phpstan-param array{since?: string|null, tool_prefix?: string|null, tools?: list<string>,
-     *     status?: string|null} $filters
+     *     status?: string|null, exclude_dry_run?: bool} $filters
      * @phpstan-return list<ActivityRow>
      */
     public function getRows(array $filters = [], int $limit = 10): array
@@ -243,6 +249,9 @@ class McpActivityReader
         }
         if (!empty($filters['status'])) {
             $select->where('l.response_status = ?', $filters['status']);
+        }
+        if (!empty($filters['exclude_dry_run'])) {
+            $select->where(sprintf(self::NOT_DRY_RUN_SQL, 'l.result_summary_json'));
         }
         $rows = [];
         foreach ($connection->fetchAll($select) as $row) {
@@ -286,7 +295,10 @@ class McpActivityReader
                     'errors' => "SUM(response_status <> 'ok')",
                     'writes' => $writeTools === []
                         ? 'SUM(0)'
-                        : $connection->quoteInto('SUM(tool_name IN (?))', $writeTools),
+                        : $connection->quoteInto(
+                            'SUM(tool_name IN (?) AND ' . sprintf(self::NOT_DRY_RUN_SQL, 'result_summary_json') . ')',
+                            $writeTools
+                        ),
                     'admins' => 'COUNT(DISTINCT admin_user_id)',
                 ])
                 ->where('method = ?', 'tools/call')

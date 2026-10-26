@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Widget;
 
 use Hyva\AdminDashboardApi\Api\V1\WidgetContextInterface;
+use Hyva\AdminDashboardFramework\Api\V1\WidgetInstance\WidgetInstanceInterface;
 use Magebit\Mcp\Api\ToolRegistryInterface;
 use Magebit\McpHyvaCommerceTools\Model\Audit\McpActivityReader;
 use Magebit\McpHyvaCommerceTools\Model\Widget\McpActivity;
@@ -58,7 +59,36 @@ class McpActivityAclTest extends TestCase
         );
 
         $this->assertSame([], $reader->getRows(['tool_prefix' => 'hyva_media.'], 5));
-        $this->assertSame(['calls' => 0, 'errors' => 0, 'writes' => 0, 'admins' => 0], $reader->getTotals('2026-01-01'));
+        $this->assertSame(
+            ['calls' => 0, 'errors' => 0, 'writes' => 0, 'admins' => 0],
+            $reader->getTotals('2026-01-01')
+        );
+    }
+
+    public function testDraftAndLiveListsLeaveDryRunsOut(): void
+    {
+        $reader = $this->createMock(McpActivityReader::class);
+        $reader->method('getTotals')->willReturn(['calls' => 0, 'errors' => 0, 'writes' => 0, 'admins' => 0]);
+        $reader->method('getDraftWriteTools')->willReturn(['hyva_menu.update']);
+        $reader->method('getLiveWriteTools')->willReturn(['hyva_cms.publish']);
+        $filters = [];
+        $reader->method('getRows')->willReturnCallback(static function (array $filter) use (&$filters): array {
+            $filters[] = $filter;
+            return [];
+        });
+
+        (new McpActivity($reader, $this->createMock(UrlInterface::class)))->getDisplayData(
+            $this->createMock(WidgetContextInterface::class),
+            $this->createMock(WidgetInstanceInterface::class)
+        );
+
+        $byTools = [];
+        foreach ($filters as $filter) {
+            if (isset($filter['tools'])) {
+                $byTools[implode(',', $filter['tools'])] = $filter['exclude_dry_run'] ?? false;
+            }
+        }
+        $this->assertSame(['hyva_menu.update' => true, 'hyva_cms.publish' => true], $byTools);
     }
 
     /**
