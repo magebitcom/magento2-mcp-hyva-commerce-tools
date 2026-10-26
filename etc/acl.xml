@@ -1,0 +1,287 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * @author    Magebit <info@magebit.com>
+ * @copyright Copyright (c) Magebit, Ltd. (https://magebit.com)
+ * @license   MIT
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Acl/etc/acl.xsd">
+    <acl>
+        <resources>
+            <resource id="Magento_Backend::admin">
+                <resource id="Magento_Backend::system">
+                    <resource id="Magebit_Mcp::mcp">
+                        <resource id="Magebit_Mcp::tools">
+                            <resource id="Magebit_McpHyvaCommerceTools::tools" title="Hyvä Commerce Tools" sortOrder="500">
+                                <!-- Read tools -->
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_commerce_audit_overview"
+                                          title="Tool: Audit Hyvä Commerce Installation" sortOrder="100"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_commerce_audit_cms"
+                                          title="Tool: Audit Hyvä CMS Content" sortOrder="101"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_page_list"
+                                          title="Tool: List Hyvä CMS Pages" sortOrder="102"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_page_get"
+                                          title="Tool: Get Hyvä CMS Page" sortOrder="103"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_block_list"
+                                          title="Tool: List Hyvä CMS Blocks" sortOrder="104"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_block_get"
+                                          title="Tool: Get Hyvä CMS Block" sortOrder="105"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_preview"
+                                          title="Tool: Preview Hyvä CMS Content" sortOrder="106"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_version_list"
+                                          title="Tool: List Hyvä CMS Versions" sortOrder="107"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_component_list"
+                                          title="Tool: List Hyvä CMS Components" sortOrder="108"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_component_schema"
+                                          title="Tool: Get Hyvä CMS Component Schema" sortOrder="109"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_component_validate"
+                                          title="Tool: Validate Hyvä CMS Components" sortOrder="110"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_schedule_list"
+                                          title="Tool: List Hyvä CMS Schedules" sortOrder="111"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_schedule_detect_conflicts"
+                                          title="Tool: Detect Hyvä CMS Schedule Conflicts" sortOrder="112"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_migration_scan"
+                                          title="Tool: Scan Legacy CMS Content" sortOrder="113"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_migration_analyze"
+                                          title="Tool: Analyze Legacy CMS Content" sortOrder="114"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_export"
+                                          title="Tool: Export Hyvä CMS Content" sortOrder="115"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_status"
+                                          title="Tool: Menu Builder Status" sortOrder="116"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_status"
+                                          title="Tool: Media Optimization Status" sortOrder="117"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_list"
+                                          title="Tool: List Hyvä Menus" sortOrder="118"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_get"
+                                          title="Tool: Get Hyvä Menu" sortOrder="119"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_validate"
+                                          title="Tool: Validate Hyvä Menu" sortOrder="120"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_audit_all"
+                                          title="Tool: Audit All Hyvä Menus" sortOrder="121"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_find_usage"
+                                          title="Tool: Find Hyvä Menu Usage" sortOrder="122"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_preview"
+                                          title="Tool: Preview Hyvä Menu" sortOrder="123"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_render_check"
+                                          title="Tool: Check Hyvä Menu Rendering" sortOrder="124"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_category_sync_preview"
+                                          title="Tool: Preview Category Import into Hyvä Menu" sortOrder="125"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_dashboard_widget_refresh"
+                                          title="Tool: Refresh Dashboard Widget Data" sortOrder="126"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_template_list"
+                                          title="Tool: List Hyvä Email Templates" sortOrder="127"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_template_get"
+                                          title="Tool: Get Hyvä Email Template" sortOrder="128"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_template_preview"
+                                          title="Tool: Preview Hyvä Email Template" sortOrder="129"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_newsletter_list"
+                                          title="Tool: List Hyvä Newsletter Templates" sortOrder="130"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_newsletter_get"
+                                          title="Tool: Get Hyvä Newsletter Template" sortOrder="131"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_newsletter_preview"
+                                          title="Tool: Preview Hyvä Newsletter Template" sortOrder="132"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_audit_coverage"
+                                          title="Tool: Audit Hyvä Email Coverage" sortOrder="133"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_asset_search"
+                                          title="Tool: Search Media Gallery Assets" sortOrder="134"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_asset_resolve"
+                                          title="Tool: Resolve Media Gallery Asset" sortOrder="135"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_trash_list"
+                                          title="Tool: List Media Gallery Trash" sortOrder="136"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_sync_status"
+                                          title="Tool: Media Gallery Sync Status" sortOrder="137"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_audit_literal_urls"
+                                          title="Tool: Audit Literal Media URLs" sortOrder="138"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_version_list"
+                                          title="Tool: List Hyvä Menu Versions" sortOrder="139"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_permission_check"
+                                          title="Tool: Check Hyvä CMS Permissions" sortOrder="140"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_form_form_list"
+                                          title="Tool: List Hyvä Forms" sortOrder="141"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_form_form_get"
+                                          title="Tool: Get Hyvä Form" sortOrder="142"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_form_form_validate"
+                                          title="Tool: Validate Hyvä Form" sortOrder="143"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_form_version_list"
+                                          title="Tool: List Hyvä Form Versions" sortOrder="144"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_form_delivery_audit"
+                                          title="Tool: Audit Hyvä Form Delivery" sortOrder="145"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_commerce_audit_media"
+                                          title="Tool: Audit Hyvä Commerce Media" sortOrder="146"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_commerce_audit_menu"
+                                          title="Tool: Audit Hyvä Commerce Menus" sortOrder="147"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_image_list"
+                                          title="Tool: List Media Images" sortOrder="148"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_image_get"
+                                          title="Tool: Get Media Image" sortOrder="149"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_image_find_usage"
+                                          title="Tool: Find Media Image Usage" sortOrder="150"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_image_validate"
+                                          title="Tool: Validate Media Image" sortOrder="151"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_audit_all"
+                                          title="Tool: Audit Storefront Media" sortOrder="152"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_audit_cms"
+                                          title="Tool: Audit Hyvä CMS Media" sortOrder="153"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_audit_menu"
+                                          title="Tool: Audit Menu Media" sortOrder="154"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_optimization_status"
+                                          title="Tool: Media Optimization Status for Image" sortOrder="155"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_optimization_preview_picture"
+                                          title="Tool: Preview Responsive Picture" sortOrder="156"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_optimization_config_get"
+                                          title="Tool: Get Media Optimization Config" sortOrder="157"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_optimization_config_validate"
+                                          title="Tool: Validate Media Optimization Config" sortOrder="158"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_store_credit_status"
+                                          title="Tool: Hyvä Store Credit Status" sortOrder="159"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_store_credit_balance_get"
+                                          title="Tool: Get Store Credit Balance" sortOrder="160"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_store_credit_history_list"
+                                          title="Tool: List Store Credit History" sortOrder="161"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_linked_group_list"
+                                          title="Tool: List Linked Product Groups" sortOrder="162"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_linked_group_get"
+                                          title="Tool: Get Linked Product Group" sortOrder="163"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_linked_group_validate"
+                                          title="Tool: Validate Linked Product Group" sortOrder="164"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_translation_status"
+                                          title="Tool: Hyvä CMS Translation Status" sortOrder="165"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_ai_worker_status"
+                                          title="Tool: Hyvä AI Worker Status" sortOrder="166"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_ai_job_list"
+                                          title="Tool: List Hyvä AI Worker Jobs" sortOrder="167"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_ai_job_get"
+                                          title="Tool: Get Hyvä AI Worker Job" sortOrder="168"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_ai_usage_summary"
+                                          title="Tool: Hyvä AI Worker Token Usage" sortOrder="169"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_ai_error_list"
+                                          title="Tool: List Hyvä AI Worker Errors" sortOrder="170"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_merch_category_positions_get"
+                                          title="Tool: Get Category Product Order" sortOrder="171"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_admin_perm_effective_get"
+                                          title="Tool: Get Effective Admin Permissions" sortOrder="172"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_admin_perm_audit_list"
+                                          title="Tool: List Admin Role Assignment Audit" sortOrder="173"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_dashboard_view_list"
+                                          title="Tool: List Hyvä Dashboard Views" sortOrder="174"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_dashboard_widget_list"
+                                          title="Tool: List Hyvä Dashboard Widgets" sortOrder="175"/>
+                                <!-- Write tools -->
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_template_create_draft"
+                                          title="Tool: Create Hyvä Email Template" sortOrder="200"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_template_update_draft"
+                                          title="Tool: Update Hyvä Email Template Draft" sortOrder="201"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_template_publish"
+                                          title="Tool: Publish Hyvä Email Template" sortOrder="202"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_template_send_test"
+                                          title="Tool: Send Hyvä Email Template Test" sortOrder="203"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_newsletter_create_draft"
+                                          title="Tool: Create Hyvä Newsletter Template" sortOrder="204"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_newsletter_update_draft"
+                                          title="Tool: Update Hyvä Newsletter Template Draft" sortOrder="205"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_newsletter_publish"
+                                          title="Tool: Publish Hyvä Newsletter Template" sortOrder="206"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_asset_move"
+                                          title="Tool: Move Media Gallery Assets" sortOrder="207"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_asset_trash"
+                                          title="Tool: Trash Media Gallery Assets" sortOrder="208"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_trash_restore"
+                                          title="Tool: Restore Media Gallery Trash" sortOrder="209"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_folder_create"
+                                          title="Tool: Create Media Gallery Folder" sortOrder="210"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_publish"
+                                          title="Tool: Publish Hyvä Menu" sortOrder="211"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_version_restore"
+                                          title="Tool: Restore Hyvä Menu Version" sortOrder="212"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_schedule_create"
+                                          title="Tool: Schedule Hyvä Menu" sortOrder="213"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_schedule_cancel"
+                                          title="Tool: Cancel Hyvä Menu Schedule" sortOrder="214"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_form_form_create"
+                                          title="Tool: Create Hyvä Form" sortOrder="215"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_form_form_update_draft"
+                                          title="Tool: Update Hyvä Form Draft" sortOrder="216"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_form_form_publish"
+                                          title="Tool: Publish Hyvä Form" sortOrder="217"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_form_version_restore"
+                                          title="Tool: Restore Hyvä Form Version" sortOrder="218"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_page_create"
+                                          title="Tool: Create Hyvä CMS Page" sortOrder="219"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_page_update"
+                                          title="Tool: Update Hyvä CMS Page" sortOrder="220"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_block_create"
+                                          title="Tool: Create Hyvä CMS Block" sortOrder="221"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_block_update"
+                                          title="Tool: Update Hyvä CMS Block" sortOrder="222"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_draft_create"
+                                          title="Tool: Create Hyvä CMS Draft" sortOrder="223"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_draft_update"
+                                          title="Tool: Update Hyvä CMS Draft" sortOrder="224"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_publish"
+                                          title="Tool: Publish Hyvä CMS Content" sortOrder="225"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_version_restore"
+                                          title="Tool: Restore Hyvä CMS Version" sortOrder="226"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_schedule_create"
+                                          title="Tool: Schedule Hyvä CMS Content" sortOrder="227"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_schedule_cancel"
+                                          title="Tool: Cancel Hyvä CMS Schedule" sortOrder="228"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_migration_convert_to_draft"
+                                          title="Tool: Convert Legacy CMS Content to Draft" sortOrder="229"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_import"
+                                          title="Tool: Import Hyvä CMS Content" sortOrder="230"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_create"
+                                          title="Tool: Create Hyvä Menu" sortOrder="231"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_update"
+                                          title="Tool: Update Hyvä Menu" sortOrder="232"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_item_add"
+                                          title="Tool: Add Hyvä Menu Item" sortOrder="233"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_item_update"
+                                          title="Tool: Update Hyvä Menu Item" sortOrder="234"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_item_remove"
+                                          title="Tool: Remove Hyvä Menu Item" sortOrder="235"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_category_import"
+                                          title="Tool: Import Categories into Hyvä Menu" sortOrder="236"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_image_replace"
+                                          title="Tool: Replace Media Image" sortOrder="237"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_image_update_alt"
+                                          title="Tool: Update Media Image Alt Text" sortOrder="238"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_media_optimization_clear"
+                                          title="Tool: Clear Optimized Images" sortOrder="239"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_store_credit_balance_credit"
+                                          title="Tool: Credit Store Credit" sortOrder="240"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_store_credit_balance_debit"
+                                          title="Tool: Debit Store Credit" sortOrder="241"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_linked_group_save"
+                                          title="Tool: Save Linked Product Group" sortOrder="242"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_translation_run"
+                                          title="Tool: Run Hyvä CMS AI Translation" sortOrder="243"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_merch_category_positions_set"
+                                          title="Tool: Reorder Category Products" sortOrder="244"/>
+                            </resource>
+                        </resource>
+                    </resource>
+                </resource>
+                <resource id="Hyva_AdminDashboardFramework::dashboard">
+                    <resource id="Magebit_McpHyvaCommerceTools::widgets" title="Magebit / AI / MCP Widgets" sortOrder="900">
+                        <resource id="Magebit_McpHyvaCommerceTools::widget_mcp_activity"
+                                  title="Widget: MCP Activity" sortOrder="10"/>
+                        <resource id="Magebit_McpHyvaCommerceTools::widget_content_health"
+                                  title="Widget: Hyvä Content Health" sortOrder="20"/>
+                        <resource id="Magebit_McpHyvaCommerceTools::widget_menu_health"
+                                  title="Widget: Hyvä Menu Health" sortOrder="30"/>
+                        <resource id="Magebit_McpHyvaCommerceTools::widget_media_health"
+                                  title="Widget: Media Health" sortOrder="40"/>
+                        <resource id="Magebit_McpHyvaCommerceTools::widget_campaign_calendar"
+                                  title="Widget: Campaign Calendar" sortOrder="50"/>
+                        <resource id="Magebit_McpHyvaCommerceTools::widget_migration_status"
+                                  title="Widget: Page Builder Migration Status" sortOrder="60"/>
+                        <resource id="Magebit_McpHyvaCommerceTools::widget_campaign_asset_readiness"
+                                  title="Widget: Campaign Asset Readiness" sortOrder="70"/>
+                    </resource>
+                </resource>
+            </resource>
+        </resources>
+    </acl>
+</config>

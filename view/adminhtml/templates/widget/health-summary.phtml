@@ -1,0 +1,105 @@
+<?php
+/**
+ * @author    Magebit <info@magebit.com>
+ * @copyright Copyright (c) Magebit, Ltd. (https://magebit.com)
+ * @license   MIT
+ */
+declare(strict_types=1);
+
+use Magento\Backend\Block\Template;
+use Magento\Framework\Escaper;
+
+/**
+ * Shared template of the Magebit MCP dashboard widgets (display shape documented in AbstractHealthWidget).
+ * Static markup only: no Alpine state, so it is CSP-safe by construction.
+ *
+ * @var Template $block
+ * @var Escaper $escaper
+ */
+
+$widgetInstance = $block->getData('widget_instance');
+$data = $widgetInstance ? $widgetInstance->getDisplayData() : null;
+if (!is_array($data)) {
+    return;
+}
+$badgeClass = static fn ($severity): string => in_array(
+    $severity,
+    ['success', 'warning', 'danger'],
+    true
+) ? ' ' . $severity : '';
+$stats = is_array($data['stats'] ?? null) ? $data['stats'] : [];
+$sections = is_array($data['sections'] ?? null) ? $data['sections'] : [];
+$links = is_array($data['links'] ?? null) ? $data['links'] : [];
+?>
+<div class="magebit-mcp-widget flex flex-col gap-sm w-full">
+    <?php if ($stats): ?>
+        <div class="grid cols-3 gap-sm">
+            <?php foreach ($stats as $stat): ?>
+                <div class="flex flex-col">
+                    <span class="text-sm"><?= $escaper->escapeHtml($stat['label'] ?? '') ?></span>
+                    <span class="text-xl font-semibold">
+                        <span class="<?= $escaper->escapeHtmlAttr($badgeClass($stat['severity'] ?? null)) ?>">
+                            <?= $escaper->escapeHtml((string) ($stat['value'] ?? '')) ?>
+                        </span>
+                    </span>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+
+    <?php foreach ($sections as $index => $section): ?>
+        <details <?= $index === 0 ? 'open' : '' ?>>
+            <summary class="font-semibold">
+                <?= $escaper->escapeHtml($section['title'] ?? '') ?>
+                (<?= (int) count($section['rows'] ?? []) ?>)
+            </summary>
+            <?php if (empty($section['rows'])): ?>
+                <p class="text-sm"><?= $escaper->escapeHtml($section['empty'] ?? '') ?></p>
+            <?php else: ?>
+                <table class="w-full">
+                    <tbody>
+                        <?php foreach ($section['rows'] as $row): ?>
+                            <tr>
+                                <td class="text-sm">
+                                    <?php if (!empty($row['url'])): ?>
+                                        <a href="<?= $escaper->escapeUrl($row['url']) ?>">
+                                            <?= $escaper->escapeHtml($row['label'] ?? '') ?>
+                                        </a>
+                                    <?php else: ?>
+                                        <?= $escaper->escapeHtml($row['label'] ?? '') ?>
+                                    <?php endif; ?>
+                                    <?php if (!empty($row['detail'])): ?>
+                                        <br><span class="text-xs"><?= $escaper->escapeHtml($row['detail']) ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="text-right">
+                                    <?php if (!empty($row['badge'])): ?>
+                                        <?php $rowBadge = $badgeClass($row['severity'] ?? null); ?>
+                                        <span class="<?= $escaper->escapeHtmlAttr($rowBadge) ?>">
+                                            <?= $escaper->escapeHtml($row['badge']) ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+        </details>
+    <?php endforeach; ?>
+
+    <?php if (!empty($data['notice'])): ?>
+        <p class="text-xs"><?= $escaper->escapeHtml($data['notice']) ?></p>
+    <?php endif; ?>
+
+    <div class="flex flex-wrap items-center justify-between gap-sm text-xs">
+        <span>
+            <?php foreach ($links as $link): ?>
+                <a href="<?= $escaper->escapeUrl($link['url'] ?? '') ?>">
+                    <?= $escaper->escapeHtml($link['label'] ?? '') ?>
+                </a>
+            <?php endforeach; ?>
+        </span>
+        <span><?= $escaper->escapeHtml(__('Updated %1', $data['generated_at'] ?? '')) ?></span>
+    </div>
+</div>

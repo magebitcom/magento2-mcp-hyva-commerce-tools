@@ -1,0 +1,146 @@
+<?php
+/**
+ * @author    Magebit <info@magebit.com>
+ * @copyright Copyright (c) Magebit, Ltd. (https://magebit.com)
+ * @license   MIT
+ */
+declare(strict_types=1);
+
+namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu;
+
+use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
+use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
+use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
+use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Menu\AbstractMenuTool;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ContentSchema;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magebit\Mcp\Api\ToolResultInterface;
+use Magebit\Mcp\Model\Tool\Schema\Builder\ArrayBuilder;
+use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
+use Magebit\Mcp\Model\Tool\Schema\Builder\ObjectBuilder;
+use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
+use Magebit\Mcp\Model\Tool\Schema\Schema;
+
+/**
+ * `hyva_menu.update` MCP tool.
+ */
+class MenuUpdate extends AbstractMenuTool
+{
+    public const TOOL_NAME = 'hyva_menu.update';
+    public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_menu_update';
+    public const UNDERLYING_ACL_RESOURCE = 'Hyva_MenuBuilder::menu_save';
+    public const IS_WRITE = true;
+
+    /**
+     * @param FeatureCheckerInterface $featureChecker
+     * @param MenuService $menuService
+     * @param MenuGatewayInterface $menuGateway
+     * @param ContentService $contentService
+     * @param DraftEditor $draftEditor
+     * @param LiveSettings $liveSettings
+     */
+    public function __construct(
+        FeatureCheckerInterface $featureChecker,
+        MenuService $menuService,
+        private readonly MenuGatewayInterface $menuGateway,
+        private readonly ContentService $contentService,
+        private readonly DraftEditor $draftEditor,
+        private readonly LiveSettings $liveSettings
+    ) {
+        parent::__construct($featureChecker, $menuService);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getTitle(): string
+    {
+        return 'Update Hyvä Menu';
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getDescription(): string
+    {
+        return 'Update a menu: settings (title, identifier, store_ids, is_active, preview_url_key) apply IMMEDIATELY, '
+            . 'and those that change the live storefront (active flag, store views, identifier; any setting of an '
+            . 'active menu) need "confirm": true, otherwise nothing is written and the reply lists what would change; '
+            . 'structure edits (operations, same as hyva_cms.draft.update: '
+            . 'add/remove/move/set_field/set_fields/replace_node/replace_text) are saved as a DRAFT. Prefer '
+            . 'hyva_menu.item.* for single items.';
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getInputSchema(): array
+    {
+        return Schema::object()
+            ->with(EntityTarget::fixed())
+            ->object('settings', fn (ObjectBuilder $o) => $o
+                ->string('title', fn (StringBuilder $s) => $s->minLength(2))
+                ->string('identifier', fn (StringBuilder $s) => $s->pattern('^[a-z0-9_]+$'))
+                ->array('store_ids', fn (ArrayBuilder $a) => $a->ofIntegers()->minItems(1))
+                ->boolean('is_active', fn (BooleanBuilder $b) => $b)
+                ->string('preview_url_key', fn (StringBuilder $s) => $s)
+                ->description('Menu settings, applied immediately. Live changes need confirm.'))
+            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description('Apply settings that change the live '
+                . 'storefront, after reviewing the preview.'))
+            ->rawProperty('operations', ContentSchema::OPERATIONS)
+            ->string('version_name', fn (StringBuilder $s) => $s->maxLength(100))
+            ->string('base_version_uid', fn (StringBuilder $s) => $s->description(
+                'Optional: draft version uid you read (draft.version.uid, or version_uid of your last write). The '
+                . 'save is refused (status 409) when the draft changed since you read it.'
+            ))
+            ->toArray();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function executeMenu(array $arguments): ToolResultInterface
+    {
+        $menu = $this->menuService->locate($arguments);
+        $menuId = Cast::int($menu['id']);
+        $settings = $this->arrayArg($arguments, 'settings');
+        $operations = $this->arrayArg($arguments, 'operations');
+        if ($settings === [] && $operations === []) {
+            return $this->softError('Nothing to update: pass settings and/or operations.');
+        }
+        $live = $this->liveSettings->changes($menu, $settings);
+        if ($live !== [] && !$this->boolArg($arguments, 'confirm')) {
+            return $this->confirmationRequired('apply_live_settings', $live);
+        }
+        $result = ['id' => $menuId];
+        if ($operations !== []) {
+            $document = $this->contentService->getWorkingDocument(ContentLocator::TYPE_MENU, $menuId);
+            $applied = $this->draftEditor->apply($document, $operations);
+            $result['draft'] = $this->contentService->saveDraft(
+                ContentLocator::TYPE_MENU,
+                $menuId,
+                $applied['document'],
+                $this->stringArg($arguments, 'version_name'),
+                $this->stringArg($arguments, 'base_version_uid')
+            );
+            $result['applied_operations'] = $applied['applied'];
+            $result['published'] = false;
+        }
+        if ($settings !== []) {
+            $stringKeyed = [];
+            foreach ($settings as $key => $value) {
+                $stringKeyed[(string) $key] = $value;
+            }
+            $result['settings_changed'] = $this->menuGateway->update($menuId, $stringKeyed);
+        }
+        return $this->jsonResult(
+            $result,
+            ['id' => $menuId, 'operations' => count($operations), 'settings' => array_keys($settings)]
+        );
+    }
+}

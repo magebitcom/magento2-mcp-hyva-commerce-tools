@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * @author    Magebit <info@magebit.com>
+ * @copyright Copyright (c) Magebit, Ltd. (https://magebit.com)
+ * @license   MIT
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
+    <module name="Magebit_McpHyvaCommerceTools">
+        <sequence>
+            <module name="Magebit_Mcp"/>
+            <module name="Magento_Cms"/>
+            <module name="Hyva_CmsLiveviewEditor"/>
+            <module name="Hyva_CmsMagento"/>
+            <module name="Hyva_CmsScheduling"/>
+            <module name="Hyva_AdminDashboardApi"/>
+            <module name="Hyva_AdminDashboardFramework"/>
+        </sequence>
+    </module>
+</config>
