@@ -50,8 +50,9 @@ bin/magento cache:flush
   too: without it nothing is created and the reply shows what would go live. An inactive create needs no confirm,
   whatever its identifier and store views, because an inactive page or block is not served.
 - **Explicit confirm.** Creating an active page or block, live `settings` changes (above), replacing unpublished draft changes, removing a menu item with
-  children, a global image replacement and clearing every optimized image need `"confirm": true`; without it the tool
-  returns a dry-run preview of what would change.
+  children (also through `hyva_menu.update` / `hyva_cms.draft.update` operations that remove or replace one), a global
+  image replacement and clearing every optimized image need `"confirm": true`; without it the tool returns a dry-run
+  preview of what would change.
 - **ACL (Hyvä Commerce 1.4).** A call passes three checks, all against the token's admin role:
   1. the tool's own resource under *System → MCP → MCP Tools → Hyvä Commerce Tools*;
   2. the Hyvä resource in the "Listed with" column (e.g. `Hyva_Cms::page_view`), which also hides the tool from
@@ -78,6 +79,9 @@ bin/magento cache:flush
   the role, including content that no longer exists, and count them in `items_hidden_by_permissions` /
   `conflicts_hidden_by_permissions`; `hyva_form.delivery.audit` without a form audits only the role's forms
   (`forms_hidden_by_permissions`); `migration.scan` lists only the role's pages and blocks.
+  `hyva_menu.find_usage` leaves out the design configuration scopes the role may not open (Default, websites it does
+  not fully hold, other store views) and counts them in `usages_hidden_by_permissions`; category import keeps to the
+  role's category roots.
   Usage lists, previews and audits (`hyva_media.image.find_usage`, `image.list`, `image.validate`, `asset.resolve`, the
   `asset.move` / `asset.trash` previews, the `usage` field of `image.get`, `cms_block.get` and `hyva_menu.get`,
   `hyva_menu.find_usage`, the `hyva_commerce.audit.*`, `hyva_media.audit*` and `hyva_menu.audit_all` audits, the forms
@@ -190,7 +194,7 @@ Not covered, on purpose:
 | `hyva_cms.import` | write | `Hyva_Cms::cms` | entity_type → save + `Hyva_Cms::transfer` | Import Hyvä CMS Content |
 | `hyva_cms.migration.analyze` | read | `Hyva_Cms::cms` | entity_type → view | Analyze Legacy CMS Content |
 | `hyva_cms.migration.convert_to_draft` | write | `Hyva_Cms::cms` | entity_type → save | Convert Legacy CMS Content to Draft |
-| `hyva_cms.migration.scan` | read | `Hyva_Cms::cms` | entity_type → view | Scan Legacy CMS Content |
+| `hyva_cms.migration.scan` | read | `Hyva_Cms::cms` | entity_type → view | Scan Legacy CMS Content (at most `limit` items, default 50, max 500; summary.total counts all) |
 | `hyva_cms.page.create` | write | `Hyva_Cms::page_save` | copy_from.entity_type → view | Create Hyvä CMS Page |
 | `hyva_cms.page.get` | read | `Hyva_Cms::page_view` | fields with versions → version_history | Get Hyvä CMS Page |
 | `hyva_cms.page.list` | read | `Hyva_Cms::page_view` |  | List Hyvä CMS Pages |
@@ -343,7 +347,7 @@ Not covered, on purpose:
 |---|---|---|---|---|
 | `hyva_commerce.audit.cms` | read | `Hyva_Cms::cms` | entity_type → view | Audit Hyvä CMS Content |
 | `hyva_commerce.audit.media` | read | `Hyva_MediaGallery::asset_view` |  | Audit Hyvä Commerce Media |
-| `hyva_commerce.audit.menu` | read | `Hyva_MenuBuilder::menu_view` |  | Audit Hyvä Commerce Menus |
+| `hyva_commerce.audit.menu` | read | `Hyva_MenuBuilder::menu_view` |  | Audit Hyvä Commerce Menus (accepts `max_kb` and `limit`) |
 | `hyva_commerce.audit.overview` | read | `-` |  | Audit Hyvä Commerce Installation |
 | `hyva_dashboard.view.list` | read | `Hyva_AdminDashboardFramework::dashboard` |  | List Hyvä Dashboard Views |
 | `hyva_dashboard.widget.list` | read | `Hyva_AdminDashboardFramework::dashboard` |  | List Hyvä Dashboard Widgets |
@@ -368,7 +372,7 @@ reuses the same services as the audit tools. Templates are static markup (no Alp
 
 | Widget | Shows |
 |---|---|
-| `magebit_mcp_activity_widget` | MCP calls, failures, writes (every registered write tool), AI-generated drafts (this module's tools that only save drafts: `create_draft`, `update_draft`, `convert_to_draft`, `update_alt`, and create/update/add/run on pages, blocks, drafts, menus, menu items, forms and translations), publish, live and destructive actions (every other write tool: publish, delete, trash, remove, clear, restore, import, replace, cancel, move, flush, reset, disable, and immediate changes such as `system.config.set`, the core CMS tools, category positions or store credit), link to the MCP audit log |
+| `magebit_mcp_activity_widget` | MCP calls, failures, writes (every registered write tool), AI-generated drafts (this module's tools that only save drafts: `create_draft`, `update_draft`, `convert_to_draft`, `update_alt`, and create/update/add/run on pages, blocks, drafts, menus, menu items, forms and translations), publish, live and destructive actions (every other write tool: publish, delete, trash, remove, clear, restore, import, replace, cancel, move, flush, reset, disable, and immediate changes such as `system.config.set`, the core CMS tools, category positions or store credit), link to the MCP audit log. Dry runs and confirmation previews are not counted |
 | `magebit_content_health_widget` | Missing alt text, broken images, invalid/disabled components, unpublished drafts, schedule problems, legacy pages |
 | `magebit_menu_health_widget` | Menus with broken links, disabled targets, empty columns, placement, last MCP menu actions |
 | `magebit_media_health_widget` | Oversized images, missing alt, broken references, missing WebP/AVIF, optimization and engine status |
@@ -376,7 +380,7 @@ reuses the same services as the audit tools. Templates are static markup (no Alp
 | `magebit_migration_status_widget` | Hyvä vs Page Builder/WYSIWYG pages, complexity, converted drafts waiting |
 | `magebit_campaign_asset_readiness_widget` | Media and link problems in the content of pending scheduled items |
 
-`hyva_dashboard.widget.refresh` clears a widget's cached data by type or instance.
+`hyva_dashboard.widget.refresh` clears a widget's cached data by type or instance, for every viewer of the instance.
 
 ## Notes on Hyvä behaviour
 
