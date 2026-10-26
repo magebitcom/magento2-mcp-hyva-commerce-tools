@@ -13,6 +13,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
+use Magebit\McpHyvaCommerceTools\Model\Menu\MenuItemBuilder;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractContentTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ContentSchema;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
@@ -37,13 +38,15 @@ class DraftUpdate extends AbstractContentTool
      * @param ComponentTree $componentTree
      * @param DraftEditor $draftEditor
      * @param ContentAcl $contentAcl
+     * @param MenuItemBuilder $menuItemBuilder
      */
     public function __construct(
         private readonly ContentLocator $contentLocator,
         private readonly ContentService $contentService,
         private readonly ComponentTree $componentTree,
         private readonly DraftEditor $draftEditor,
-        private readonly ContentAcl $contentAcl
+        private readonly ContentAcl $contentAcl,
+        private readonly MenuItemBuilder $menuItemBuilder
     ) {
     }
 
@@ -62,8 +65,9 @@ class DraftUpdate extends AbstractContentTool
     {
         return 'Apply edits to the draft of a page, block or menu (starts from the published content when there is no '
             . 'draft). Operations run in order and are all-or-nothing; the result is validated before saving. Use '
-            . 'dry_run to see the outline and validation without saving. Never publishes. Get uids from '
-            . 'hyva_cms.page.get (outline).';
+            . 'dry_run to see the outline and validation without saving. On a menu, removing or replacing an item '
+            . 'with children needs "confirm": true; without it the affected items are listed and nothing is saved. '
+            . 'Never publishes. Get uids from hyva_cms.page.get (outline).';
     }
 
     /**
@@ -79,6 +83,8 @@ class DraftUpdate extends AbstractContentTool
             ->string('version_name', fn (StringBuilder $s) => $s->maxLength(100))
             ->boolean('dry_run', fn (BooleanBuilder $b) => $b
                 ->description('Validate and return the result without saving.'))
+            ->boolean('confirm', fn (BooleanBuilder $b) => $b
+                ->description('Menus only: required when an operation removes or replaces an item with children.'))
             ->string('base_version_uid', fn (StringBuilder $s) => $s->description(
                 'Optional: draft version uid you read (draft.version.uid, or version_uid of your last write). The '
                 . 'save is refused (status 409) when the draft changed since you read it.'
@@ -96,6 +102,10 @@ class DraftUpdate extends AbstractContentTool
         $document = $this->contentService->getWorkingDocument($entity['type'], $entity['id']);
         $applied = $this->draftEditor->apply($document, $this->arrayArg($arguments, 'operations'));
 
+        $removed = $entity['type'] === ContentLocator::TYPE_MENU
+            ? array_map([$this->menuItemBuilder, 'describe'], $applied['dropped'])
+            : [];
+
         if ($this->boolArg($arguments, 'dry_run')) {
             return $this->jsonResult([
                 'dry_run' => true,
@@ -103,6 +113,9 @@ class DraftUpdate extends AbstractContentTool
                 'validation' => $this->contentService->validate($applied['document']),
                 'components' => $this->componentTree->countComponents($applied['document']),
             ], ['entity_type' => $entity['type'], 'id' => $entity['id'], 'dry_run' => true]);
+        }
+        if ($removed !== [] && !$this->boolArg($arguments, 'confirm')) {
+            return $this->confirmationRequired('remove_menu_item_with_children', $removed);
         }
 
         $saved = $this->contentService->saveDraft(

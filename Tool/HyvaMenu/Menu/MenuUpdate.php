@@ -13,6 +13,7 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
+use Magebit\McpHyvaCommerceTools\Model\Menu\MenuItemBuilder;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Menu\AbstractMenuTool;
@@ -45,6 +46,7 @@ class MenuUpdate extends AbstractMenuTool
      * @param DraftEditor $draftEditor
      * @param LiveSettings $liveSettings
      * @param StoreScopeGuard $storeScopeGuard
+     * @param MenuItemBuilder $menuItemBuilder
      */
     public function __construct(
         FeatureCheckerInterface $featureChecker,
@@ -53,7 +55,8 @@ class MenuUpdate extends AbstractMenuTool
         private readonly ContentService $contentService,
         private readonly DraftEditor $draftEditor,
         private readonly LiveSettings $liveSettings,
-        private readonly StoreScopeGuard $storeScopeGuard
+        private readonly StoreScopeGuard $storeScopeGuard,
+        private readonly MenuItemBuilder $menuItemBuilder
     ) {
         parent::__construct($featureChecker, $menuService);
     }
@@ -77,7 +80,8 @@ class MenuUpdate extends AbstractMenuTool
             . 'preview_url_key only sets the page the editor previews the menu on and needs no confirm. '
             . 'Structure '
             . 'edits (operations, same as hyva_cms.draft.update: '
-            . 'add/remove/move/set_field/set_fields/replace_node/replace_text) are saved as a DRAFT. Prefer '
+            . 'add/remove/move/set_field/set_fields/replace_node/replace_text) are saved as a DRAFT; removing or '
+            . 'replacing an item with children also needs "confirm": true (the reply lists those items). Prefer '
             . 'hyva_menu.item.* for single items.';
     }
 
@@ -96,7 +100,7 @@ class MenuUpdate extends AbstractMenuTool
                 ->string('preview_url_key', fn (StringBuilder $s) => $s)
                 ->description('Menu settings, applied immediately. Live changes need confirm.'))
             ->boolean('confirm', fn (BooleanBuilder $b) => $b->description('Apply settings that change the live '
-                . 'storefront, after reviewing the preview.'))
+                . 'storefront or operations that remove items with children, after reviewing the preview.'))
             ->rawProperty('operations', ContentSchema::OPERATIONS)
             ->string('version_name', fn (StringBuilder $s) => $s->maxLength(100))
             ->string('base_version_uid', fn (StringBuilder $s) => $s->description(
@@ -126,13 +130,20 @@ class MenuUpdate extends AbstractMenuTool
             );
         }
         $live = $this->liveSettings->changes($menu, $settings);
-        if ($live !== [] && !$this->boolArg($arguments, 'confirm')) {
-            return $this->confirmationRequired('apply_live_settings', $live);
-        }
-        $result = ['id' => $menuId];
+        $applied = null;
+        $removed = [];
         if ($operations !== []) {
             $document = $this->contentService->getWorkingDocument(ContentLocator::TYPE_MENU, $menuId);
             $applied = $this->draftEditor->apply($document, $operations);
+            $removed = array_map([$this->menuItemBuilder, 'describe'], $applied['dropped']);
+        }
+        if (($live !== [] || $removed !== []) && !$this->boolArg($arguments, 'confirm')) {
+            $action = $live === [] ? 'remove_menu_item_with_children'
+                : ($removed === [] ? 'apply_live_settings' : 'apply_live_settings_and_remove_menu_items');
+            return $this->confirmationRequired($action, array_merge($live, $removed));
+        }
+        $result = ['id' => $menuId];
+        if ($applied !== null) {
             $result['draft'] = $this->contentService->saveDraft(
                 ContentLocator::TYPE_MENU,
                 $menuId,

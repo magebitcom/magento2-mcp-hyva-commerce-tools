@@ -32,22 +32,37 @@ class DraftEditor
     /**
      * Apply.
      *
+     * `dropped` lists the nodes taken out by remove / replace_node whose children are no longer in the result (the
+     * subtree was discarded, not moved elsewhere), as they were before the operation.
+     *
      * @param array $document
      * @param array $operations
      * @return array
      * @throws LocalizedException On the first invalid operation; nothing is applied then.
      * @phpstan-param array<string, mixed> $document
      * @phpstan-param array<mixed> $operations
-     * @phpstan-return array{document: array<string, mixed>, applied: list<array<string, mixed>>}
+     * @phpstan-return array{
+     *     document: array<string, mixed>,
+     *     applied: list<array<string, mixed>>,
+     *     dropped: list<array<string, mixed>>
+     * }
      */
     public function apply(array $document, array $operations): array
     {
         $applied = [];
+        $replaced = [];
         foreach (array_values($operations) as $index => $operation) {
             if (!is_array($operation)) {
                 throw new LocalizedException(__('Operation #%1 must be an object.', $index));
             }
             $op = is_string($operation['op'] ?? null) ? $operation['op'] : '';
+            $uid = is_string($operation['uid'] ?? null) ? $operation['uid'] : '';
+            $target = in_array($op, ['remove', 'replace_node'], true) && $uid !== ''
+                ? $this->componentTree->findNode($document, $uid)
+                : null;
+            if ($target !== null && !empty($target['children'])) {
+                $replaced[] = $target;
+            }
             try {
                 [$document, $summary] = $this->applyOne($document, $op, $operation);
             } catch (LocalizedException $e) {
@@ -55,7 +70,63 @@ class DraftEditor
             }
             $applied[] = ['index' => $index, 'op' => $op] + $summary;
         }
-        return ['document' => $document, 'applied' => $applied];
+        return ['document' => $document, 'applied' => $applied, 'dropped' => $this->dropped($document, $replaced)];
+    }
+
+    /**
+     * Nodes whose descendants are not all present in the final document.
+     *
+     * @param array $document
+     * @param array $nodes
+     * @return array
+     * @phpstan-param array<string, mixed> $document
+     * @phpstan-param list<array<string, mixed>> $nodes
+     * @phpstan-return list<array<string, mixed>>
+     */
+    private function dropped(array $document, array $nodes): array
+    {
+        if ($nodes === []) {
+            return [];
+        }
+        $present = [];
+        $this->componentTree->walk($document, function (array $node) use (&$present): void {
+            if (is_string($node['uid'] ?? null)) {
+                $present[$node['uid']] = true;
+            }
+        });
+        $dropped = [];
+        foreach ($nodes as $node) {
+            foreach ($this->descendantUids($node) as $uid) {
+                if (!isset($present[$uid])) {
+                    $dropped[] = $node;
+                    break;
+                }
+            }
+        }
+        return $dropped;
+    }
+
+    /**
+     * Uids of every descendant of a node.
+     *
+     * @param array $node
+     * @return array
+     * @phpstan-param array<mixed> $node
+     * @phpstan-return list<string>
+     */
+    private function descendantUids(array $node): array
+    {
+        $uids = [];
+        foreach (is_array($node['children'] ?? null) ? $node['children'] : [] as $child) {
+            if (!is_array($child)) {
+                continue;
+            }
+            if (is_string($child['uid'] ?? null)) {
+                $uids[] = $child['uid'];
+            }
+            $uids = array_merge($uids, $this->descendantUids($child));
+        }
+        return $uids;
     }
 
     /**

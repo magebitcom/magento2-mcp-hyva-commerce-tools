@@ -83,4 +83,41 @@ class DraftEditorTest extends TestCase
         $this->expectException(LocalizedException::class);
         $this->editor->apply($this->tree->newDocument('cms_page', 1), [['op' => 'explode']]);
     }
+
+    public function testRemovingAndReplacingANodeWithChildrenReportsTheDroppedSubtree(): void
+    {
+        $document = $this->editor->apply($this->tree->newDocument('cms_page', 1), [
+            ['op' => 'add', 'component' => 'row', 'uid' => 'r1'],
+            ['op' => 'add', 'component' => 'heading', 'parent_uid' => 'r1', 'uid' => 'h1'],
+            ['op' => 'add', 'component' => 'row', 'uid' => 'r2'],
+            ['op' => 'add', 'component' => 'heading', 'parent_uid' => 'r2', 'uid' => 'h2'],
+            ['op' => 'add', 'component' => 'row', 'uid' => 'r3'],
+        ])['document'];
+
+        $result = $this->editor->apply($document, [
+            ['op' => 'remove', 'uid' => 'r1'],
+            ['op' => 'replace_node', 'uid' => 'r2', 'node' => ['component' => 'row', 'uid' => 'r2b']],
+            ['op' => 'remove', 'uid' => 'r3'],
+        ]);
+
+        $this->assertSame(['r1', 'r2'], array_column($result['dropped'], 'uid'));
+        $children = $result['dropped'][0]['children'] ?? null;
+        $this->assertIsArray($children);
+        $this->assertSame('h1', is_array($children[0] ?? null) ? $children[0]['uid'] ?? null : null);
+    }
+
+    public function testMovingChildrenOutBeforeRemovingTheParentDropsNothing(): void
+    {
+        $document = $this->editor->apply($this->tree->newDocument('cms_page', 1), [
+            ['op' => 'add', 'component' => 'row', 'uid' => 'r1'],
+            ['op' => 'add', 'component' => 'heading', 'parent_uid' => 'r1', 'uid' => 'h1'],
+        ])['document'];
+
+        $result = $this->editor->apply($document, [
+            ['op' => 'move', 'uid' => 'h1'],
+            ['op' => 'remove', 'uid' => 'r1'],
+        ]);
+
+        $this->assertSame([], $result['dropped']);
+    }
 }

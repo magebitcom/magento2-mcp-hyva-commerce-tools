@@ -12,6 +12,7 @@ use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
+use Magebit\McpHyvaCommerceTools\Model\Menu\MenuItemBuilder;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
@@ -90,20 +91,60 @@ class MenuUpdateConfirmTest extends TestCase
         $this->assertSame(['preview_url_key'], $payload['settings_changed'] ?? null);
     }
 
+    public function testRemovingAnItemWithChildrenWithoutConfirmPreviewsTheChildrenAndSavesNothing(): void
+    {
+        $contentService = $this->createMock(ContentService::class);
+        $contentService->method('getWorkingDocument')->willReturn([]);
+        $contentService->expects($this->never())->method('saveDraft');
+        $dropped = ['uid' => 'p1', 'component' => 'menu_item', 'label' => 'Shop',
+            'children' => [['uid' => 'c1', 'component' => 'menu_item', 'label' => 'Shirts']]];
+
+        $result = $this->tool($this->createMock(MenuGatewayInterface::class), $contentService, null, [$dropped])
+            ->execute(['id' => 3, 'operations' => [['op' => 'remove', 'uid' => 'p1']]]);
+        $text = $result->getContent()[0]['text'] ?? '';
+        $this->assertIsString($text);
+        $payload = json_decode($text, true);
+
+        $this->assertIsArray($payload);
+        $this->assertTrue($payload['confirmation_required'] ?? null);
+        $this->assertSame('remove_menu_item_with_children', $payload['action'] ?? null);
+        $this->assertSame('c1', $payload['affected'][0]['children'][0]['uid'] ?? null);
+    }
+
+    public function testConfirmSavesARemovalOfAnItemWithChildren(): void
+    {
+        $contentService = $this->createMock(ContentService::class);
+        $contentService->method('getWorkingDocument')->willReturn([]);
+        $contentService->expects($this->once())->method('saveDraft')->willReturn([]);
+        $dropped = ['uid' => 'p1', 'component' => 'menu_item', 'children' => [['uid' => 'c1']]];
+
+        $result = $this->tool($this->createMock(MenuGatewayInterface::class), $contentService, null, [$dropped])
+            ->execute(['id' => 3, 'operations' => [['op' => 'remove', 'uid' => 'p1']], 'confirm' => true]);
+
+        $this->assertFalse($result->isError());
+    }
+
     /**
      * Menu update over an active menu.
      *
      * @param MenuGatewayInterface $gateway
      * @param ContentService $contentService
      * @param array|null $allowedStoreIds Store views of a restricted caller; null = unrestricted.
+     * @param array $dropped Nodes the draft operations discard with their children.
      * @return MenuUpdate
      * @phpstan-param list<int>|null $allowedStoreIds
+     * @phpstan-param list<array<string, mixed>> $dropped
      */
     private function tool(
         MenuGatewayInterface $gateway,
         ContentService $contentService,
-        ?array $allowedStoreIds = null
+        ?array $allowedStoreIds = null,
+        array $dropped = []
     ): MenuUpdate {
+        $editor = $this->createMock(DraftEditor::class);
+        $editor->method('apply')->willReturn(['document' => [], 'applied' => [], 'dropped' => $dropped]);
+        $builder = $this->createMock(MenuItemBuilder::class);
+        $builder->method('describe')->willReturnArgument(0);
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn(true);
         $menus = $this->createMock(MenuService::class);
@@ -114,9 +155,10 @@ class MenuUpdateConfirmTest extends TestCase
             $menus,
             $gateway,
             $contentService,
-            $this->createMock(DraftEditor::class),
+            $editor,
             new LiveSettings(),
-            $this->storeScope($allowedStoreIds)
+            $this->storeScope($allowedStoreIds),
+            $builder
         );
     }
 }
