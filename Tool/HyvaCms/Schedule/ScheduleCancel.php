@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule;
 
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractContentTool;
 use Magebit\Mcp\Api\ToolResultInterface;
@@ -29,10 +30,12 @@ class ScheduleCancel extends AbstractContentTool
     /**
      * @param ScheduleService $scheduleService
      * @param ContentAcl $contentAcl
+     * @param ContentLocator $contentLocator
      */
     public function __construct(
         private readonly ScheduleService $scheduleService,
-        private readonly ContentAcl $contentAcl
+        private readonly ContentAcl $contentAcl,
+        private readonly ContentLocator $contentLocator
     ) {
     }
 
@@ -80,9 +83,12 @@ class ScheduleCancel extends AbstractContentTool
         $result = $this->scheduleService->cancel(
             $itemIds,
             $releaseId,
-            // A variant bound to one content type (hyva_menu.schedule.cancel) cancels nothing else.
-            fn (string $type): bool => (static::FIXED_CONTENT_TYPE === '' || $type === static::FIXED_CONTENT_TYPE)
+            // A variant bound to one content type (hyva_menu.schedule.cancel) cancels nothing else; a role restricted
+            // to some websites or store views cancels only releases of content it may change.
+            fn (string $type, int $entityId): bool => (static::FIXED_CONTENT_TYPE === ''
+                    || $type === static::FIXED_CONTENT_TYPE)
                 && $this->contentAcl->isAllowed($type, ContentAcl::VERB_SCHEDULE_CANCEL)
+                && $this->contentLocator->allowsWrite($type, $entityId)
         );
         return $this->jsonResult($result + ['content_changed' => false], [
             'items' => count($result['cancelled_items']),

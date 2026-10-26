@@ -21,6 +21,7 @@ class FormList extends AbstractFormTool
 {
     public const TOOL_NAME = 'hyva_form.form.list';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_form_form_list';
+    private const SCAN_PAGE_SIZE = 200;
 
     /**
      * @inheritDoc
@@ -58,12 +59,33 @@ class FormList extends AbstractFormTool
      */
     protected function executeForm(array $arguments): ToolResultInterface
     {
-        $result = $this->formGateway->getList(
-            $this->stringArg($arguments, 'search'),
-            $this->intArg($arguments, 'store_id'),
-            $this->intArg($arguments, 'page', 1) ?? 1,
-            $this->intArg($arguments, 'page_size', 50) ?? 50
-        );
+        $search = $this->stringArg($arguments, 'search');
+        $storeId = $this->intArg($arguments, 'store_id');
+        $page = $this->intArg($arguments, 'page', 1) ?? 1;
+        $pageSize = $this->intArg($arguments, 'page_size', 50) ?? 50;
+        if ($this->storeScopeGuard->restrictedStoreIds() === null) {
+            $result = $this->formGateway->getList($search, $storeId, $page, $pageSize);
+            return $this->jsonResult($result, ['total' => $result['total']]);
+        }
+
+        // A restricted role sees only forms of its store views: filter every form, then paginate, so the total is
+        // right. Form counts are admin-scale.
+        $visible = [];
+        $batch = 1;
+        do {
+            $chunk = $this->formGateway->getList($search, $storeId, $batch, self::SCAN_PAGE_SIZE);
+            foreach ($chunk['items'] as $form) {
+                if ($this->storeScopeGuard->allowsRead($form['store_ids'])) {
+                    $visible[] = $form;
+                }
+            }
+            $batch++;
+        } while ($chunk['items'] !== [] && ($batch - 1) * self::SCAN_PAGE_SIZE < $chunk['total']);
+        $pageSize = max(1, min(200, $pageSize));
+        $result = [
+            'total' => count($visible),
+            'items' => array_slice($visible, (max(1, $page) - 1) * $pageSize, $pageSize),
+        ];
         return $this->jsonResult($result, ['total' => $result['total']]);
     }
 }

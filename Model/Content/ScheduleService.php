@@ -283,11 +283,12 @@ class ScheduleService
      *
      * @param array $itemIds
      * @param int|null $releaseId Cancels the release and all of its pending items.
-     * @param callable|null $mayCancel fn(string $entityType): bool; checked for every item before anything changes.
+     * @param callable|null $mayCancel fn(string $entityType, int $entityId): bool; checked for every item before
+     *     anything changes.
      * @return array
      * @throws LocalizedException
      * @phpstan-param list<int> $itemIds
-     * @phpstan-param (callable(string): bool)|null $mayCancel
+     * @phpstan-param (callable(string, int): bool)|null $mayCancel
      * @phpstan-return array{cancelled_items: list<int>, cancelled_releases: list<int>}
      */
     public function cancel(array $itemIds, ?int $releaseId = null, ?callable $mayCancel = null): array
@@ -314,7 +315,7 @@ class ScheduleService
                 throw new LocalizedException(__('Scheduled item #%1 does not exist.', $itemId));
             }
             $type = (string) $items[$itemId]->getEntityType();
-            if ($mayCancel !== null && !$mayCancel($type)) {
+            if ($mayCancel !== null && !$mayCancel($type, (int) $items[$itemId]->getEntityId())) {
                 $refused[] = sprintf('#%d (%s)', $itemId, $type);
             }
         }

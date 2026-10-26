@@ -11,6 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Menu\AbstractMenuTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\Mcp\Api\ToolResultInterface;
@@ -31,11 +32,13 @@ class MenuList extends AbstractMenuTool
      * @param FeatureCheckerInterface $featureChecker
      * @param MenuService $menuService
      * @param MenuGatewayInterface $menuGateway
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         FeatureCheckerInterface $featureChecker,
         MenuService $menuService,
-        private readonly MenuGatewayInterface $menuGateway
+        private readonly MenuGatewayInterface $menuGateway,
+        private readonly StoreScopeGuard $storeScopeGuard
     ) {
         parent::__construct($featureChecker, $menuService);
     }
@@ -85,6 +88,10 @@ class MenuList extends AbstractMenuTool
         $placement = $this->stringArg($arguments, 'placement');
         $items = [];
         foreach ($this->menuGateway->getList($filters) as $menu) {
+            // Menus of store views outside the caller's website/store view restriction are not listed.
+            if (!$this->storeScopeGuard->allowsRead(Cast::intList($menu['store_ids'] ?? []))) {
+                continue;
+            }
             $assignments = $this->menuService->getAssignments(Cast::string($menu['identifier'] ?? ''));
             $locations = array_values(array_unique(array_column($assignments, 'location')));
             if ($placement === 'unassigned' ? $locations !== [] : (

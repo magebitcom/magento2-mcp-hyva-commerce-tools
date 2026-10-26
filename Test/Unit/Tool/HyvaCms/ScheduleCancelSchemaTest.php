@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaCms;
 
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule\ScheduleCancel;
 use PHPUnit\Framework\TestCase;
@@ -19,7 +20,8 @@ class ScheduleCancelSchemaTest extends TestCase
     {
         $tool = new ScheduleCancel(
             $this->createMock(ScheduleService::class),
-            $this->createMock(ContentAcl::class)
+            $this->createMock(ContentAcl::class),
+            $this->createMock(ContentLocator::class)
         );
         $schema = $tool->getInputSchema();
         $properties = $schema['properties'] ?? null;
