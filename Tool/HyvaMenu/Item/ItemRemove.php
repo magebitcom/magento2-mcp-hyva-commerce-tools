@@ -63,7 +63,7 @@ class ItemRemove extends AbstractMenuEditTool
      */
     protected function executeMenu(array $arguments): ToolResultInterface
     {
-        $menu = $this->menuService->locate($arguments);
+        $menu = $this->menuService->locateForWrite($arguments);
         $menuId = Cast::int($menu['id']);
         $uid = $this->requireString($arguments, 'uid');
         $document = $this->contentService->getWorkingDocument(ContentLocator::TYPE_MENU, $menuId);

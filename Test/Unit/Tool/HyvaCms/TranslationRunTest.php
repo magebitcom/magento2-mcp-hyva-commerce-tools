@@ -148,8 +148,10 @@ class TranslationRunTest extends TestCase
     private function tool(bool $moduleEnabled = true): TranslationRun
     {
         $locator = $this->createMock(ContentLocator::class);
-        $locator->method('locate')->willReturn(['type' => 'cms_page', 'id' => 7, 'identifier' => 'x', 'title' => 'X',
-            'is_active' => true, 'store_ids' => [0]]);
+        $locator->method('locateForWrite')->willReturn([
+            'type' => 'cms_page', 'id' => 7, 'identifier' => 'x', 'title' => 'X', 'is_active' => true,
+            'store_ids' => [0],
+        ]);
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn(true);
         $features->method('getStatus')->willReturn(['enabled' => $moduleEnabled]);

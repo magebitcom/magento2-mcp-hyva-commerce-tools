@@ -50,7 +50,7 @@ class DraftCreateConfirmTest extends TestCase
     protected function setUp(): void
     {
         $locator = $this->createMock(ContentLocator::class);
-        $locator->method('locate')->willReturn(self::PAGE);
+        $locator->method('locateForWrite')->willReturn(self::PAGE);
         $this->contentService = $this->createMock(ContentService::class);
         $this->contentService->method('getDocuments')
             ->willReturn(['draft' => self::DRAFT, 'published' => self::PUBLISHED]);

@@ -128,6 +128,25 @@ class ContentLocator
     }
 
     /**
+     * Whether the caller may change the entity (false when it no longer exists and the caller is restricted).
+     *
+     * @param string $type cms_page|cms_block|menu
+     * @param int $id
+     * @return bool
+     */
+    public function allowsWrite(string $type, int $id): bool
+    {
+        if ($this->storeScopeGuard->restrictedStoreIds() === null) {
+            return true;
+        }
+        try {
+            return $this->storeScopeGuard->allowsWrite($this->find($type, ['id' => $id])['store_ids']);
+        } catch (LocalizedException) {
+            return false;
+        }
+    }
+
+    /**
      * Human label of a located entity, e.g. "CMS page #5"
      *
      * @param array $entity

@@ -10,21 +10,20 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaCms;
 
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
-use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\EntityWriter;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
-use Magebit\McpHyvaCommerceTools\Model\Security\AdminScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageCreate;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use PHPUnit\Framework\TestCase;
 
 class PageCreateConfirmTest extends TestCase
 {
-    private const UNRESTRICTED = ['restricted' => false, 'website_ids' => [], 'store_ids' => []];
+    use StoreScopeStub;
 
     public function testAnActiveCreateWithoutConfirmWritesNothing(): void
     {
@@ -91,7 +90,7 @@ class PageCreateConfirmTest extends TestCase
     {
         $writer = $this->createMock(EntityWriter::class);
         $writer->expects($this->never())->method('create');
-        $scopes = ['restricted' => true, 'website_ids' => [1], 'store_ids' => [1]];
+        $scopes = [1];
 
         $result = $this->tool($writer, $this->contentService(), $scopes)->execute([
             'title' => 'Sale',
@@ -108,7 +107,7 @@ class PageCreateConfirmTest extends TestCase
     {
         $writer = $this->createMock(EntityWriter::class);
         $writer->expects($this->never())->method('create');
-        $scopes = ['restricted' => true, 'website_ids' => [1], 'store_ids' => [1]];
+        $scopes = [1];
 
         $payload = $this->payload($this->tool($writer, $this->contentService(), $scopes)->execute([
             'title' => 'Sale',
@@ -123,12 +122,25 @@ class PageCreateConfirmTest extends TestCase
     {
         $writer = $this->createMock(EntityWriter::class);
         $writer->expects($this->once())->method('create')->willReturn(12);
-        $scopes = ['restricted' => true, 'website_ids' => [1], 'store_ids' => [1, 2]];
+        $scopes = [1, 2];
 
         $payload = $this->payload($this->tool($writer, $this->contentService(), $scopes)->execute([
             'title' => 'Sale',
             'identifier' => 'sale',
             'store_ids' => [2],
+        ]));
+
+        $this->assertTrue($payload['created'] ?? null);
+    }
+
+    public function testARoleHoldingEveryStoreViewCreatesForAllStoreViews(): void
+    {
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->expects($this->once())->method('create')->willReturn(12);
+
+        $payload = $this->payload($this->tool($writer, $this->contentService(), [1, 2])->execute([
+            'title' => 'Sale',
+            'identifier' => 'sale',
         ]));
 
         $this->assertTrue($payload['created'] ?? null);
@@ -151,18 +163,14 @@ class PageCreateConfirmTest extends TestCase
      *
      * @param EntityWriter $writer
      * @param ContentService $contentService
-     * @param array{restricted: bool, website_ids: list<int>, store_ids: list<int>} $scopes
+     * @param list<int>|null $scopes Store views of a restricted caller; null = unrestricted.
      * @return PageCreate
      */
     private function tool(
         EntityWriter $writer,
         ContentService $contentService,
-        array $scopes = self::UNRESTRICTED
+        ?array $scopes = null
     ): PageCreate {
-        $scopeGuard = $this->createMock(AdminScopeGuard::class);
-        $scopeGuard->method('allowedScopes')->with(5)->willReturn($scopes);
-        $callerContext = $this->createMock(CallerContext::class);
-        $callerContext->method('adminUserId')->willReturn(5);
         return new PageCreate(
             $writer,
             $contentService,
@@ -172,8 +180,7 @@ class PageCreateConfirmTest extends TestCase
             $this->createMock(PreviewService::class),
             new LiveSettings(),
             $this->createMock(ContentAcl::class),
-            $scopeGuard,
-            $callerContext
+            $this->storeScope($scopes)
         );
     }
 

@@ -72,7 +72,7 @@ class VersionRestore extends AbstractContentTool
      */
     protected function run(array $arguments): ToolResultInterface
     {
-        $entity = $this->contentLocator->locate($this->requireString($arguments, 'entity_type'), $arguments);
+        $entity = $this->contentLocator->locateForWrite($this->requireString($arguments, 'entity_type'), $arguments);
         $versionId = $this->requireInt($arguments, 'version_id');
         $result = $this->versionHistoryManager->restoreVersion($entity['type'], $entity['id'], $versionId);
         if (empty($result['success'])) {

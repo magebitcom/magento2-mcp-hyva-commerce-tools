@@ -94,7 +94,7 @@ class DraftCreate extends AbstractContentTool
     protected function run(array $arguments): ToolResultInterface
     {
         $type = $this->requireString($arguments, 'entity_type');
-        $entity = $this->contentLocator->locate($type, $arguments);
+        $entity = $this->contentLocator->locateForWrite($type, $arguments);
         $source = $this->requireString($arguments, 'source');
         $documents = $this->contentService->getDocuments($entity['type'], $entity['id']);
 

@@ -109,7 +109,7 @@ class ItemRemoveConfirmTest extends TestCase
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn(true);
         $menus = $this->createMock(MenuService::class);
-        $menus->method('locate')->willReturn(['id' => 3, 'identifier' => 'main', 'title' => 'Main menu',
+        $menus->method('locateForWrite')->willReturn(['id' => 3, 'identifier' => 'main', 'title' => 'Main menu',
             'is_active' => true, 'store_ids' => [0]]);
         $builder = $this->createMock(MenuItemBuilder::class);
         $builder->method('describe')->willReturnCallback(

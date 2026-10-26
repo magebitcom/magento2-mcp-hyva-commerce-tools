@@ -92,7 +92,7 @@ class DraftUpdate extends AbstractContentTool
     protected function run(array $arguments): ToolResultInterface
     {
         $type = $this->requireString($arguments, 'entity_type');
-        $entity = $this->contentLocator->locate($type, $arguments);
+        $entity = $this->contentLocator->locateForWrite($type, $arguments);
         $document = $this->contentService->getWorkingDocument($entity['type'], $entity['id']);
         $applied = $this->draftEditor->apply($document, $this->arrayArg($arguments, 'operations'));
 

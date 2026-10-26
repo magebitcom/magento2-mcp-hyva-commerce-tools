@@ -22,6 +22,8 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ContentSchema;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 /**
  * Shared implementation of hyva_cms.page.update / hyva_cms.block.update.
@@ -41,6 +43,7 @@ abstract class AbstractEntityUpdate extends AbstractTool
      * @param DraftEditor $draftEditor
      * @param EntityWriter $entityWriter
      * @param LiveSettings $liveSettings
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         private readonly ContentLocator $contentLocator,
@@ -48,7 +51,8 @@ abstract class AbstractEntityUpdate extends AbstractTool
         private readonly ComponentTree $componentTree,
         private readonly DraftEditor $draftEditor,
         private readonly EntityWriter $entityWriter,
-        private readonly LiveSettings $liveSettings
+        private readonly LiveSettings $liveSettings,
+        private readonly StoreScopeGuard $storeScopeGuard
     ) {
     }
 
@@ -117,12 +121,21 @@ abstract class AbstractEntityUpdate extends AbstractTool
      */
     protected function run(array $arguments): ToolResultInterface
     {
-        $entity = $this->contentLocator->locate(static::ENTITY_TYPE, $arguments);
+        $entity = $this->contentLocator->locateForWrite(static::ENTITY_TYPE, $arguments);
         $components = $this->arrayArg($arguments, 'components');
         $operations = $this->arrayArg($arguments, 'operations');
         $settings = $this->arrayArg($arguments, 'settings');
         if ($components === [] && $operations === [] && $settings === []) {
             return $this->softError('Nothing to update: pass components, operations and/or settings.');
+        }
+
+        if (array_key_exists('store_ids', $settings) && $settings['store_ids'] !== null) {
+            $storeIds = $settings['store_ids'];
+            $this->storeScopeGuard->assertAssignable(
+                $this->contentLocator->label($entity),
+                $entity['store_ids'],
+                Cast::intList(is_array($storeIds) ? $storeIds : [$storeIds])
+            );
         }
 
         $live = $this->liveSettings->changes($entity, $settings);

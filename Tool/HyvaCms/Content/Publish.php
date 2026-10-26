@@ -79,7 +79,7 @@ class Publish extends AbstractContentTool
     protected function run(array $arguments): ToolResultInterface
     {
         $type = $this->requireString($arguments, 'entity_type');
-        $entity = $this->contentLocator->locate($type, $arguments);
+        $entity = $this->contentLocator->locateForWrite($type, $arguments);
         $before = $this->contentService->getDocuments($entity['type'], $entity['id'])['published'];
         $result = $this->contentService->publish(
             $entity['type'],

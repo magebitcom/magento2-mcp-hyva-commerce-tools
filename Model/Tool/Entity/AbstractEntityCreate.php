@@ -17,14 +17,13 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\ObjectBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
-use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\EntityWriter;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
-use Magebit\McpHyvaCommerceTools\Model\Security\AdminScopeGuard;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ContentSchema;
@@ -52,8 +51,7 @@ abstract class AbstractEntityCreate extends AbstractTool implements ContextualAc
      * @param PreviewService $previewService
      * @param LiveSettings $liveSettings
      * @param ContentAcl $contentAcl
-     * @param AdminScopeGuard $scopeGuard
-     * @param CallerContext $callerContext
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         private readonly EntityWriter $entityWriter,
@@ -64,8 +62,7 @@ abstract class AbstractEntityCreate extends AbstractTool implements ContextualAc
         private readonly PreviewService $previewService,
         private readonly LiveSettings $liveSettings,
         private readonly ContentAcl $contentAcl,
-        private readonly AdminScopeGuard $scopeGuard,
-        private readonly CallerContext $callerContext
+        private readonly StoreScopeGuard $storeScopeGuard
     ) {
     }
 
@@ -222,10 +219,10 @@ abstract class AbstractEntityCreate extends AbstractTool implements ContextualAc
     }
 
     /**
-     * Requested store views the caller's Advanced Admin Permissions scope may not write to.
+     * Requested store views the caller's website/store view restriction may not write to (StoreScopeGuard rule).
      *
-     * The default (all store views, 0) is refused for a restricted role: content saved there shows in every store
-     * view, including those outside the role's scope.
+     * Without store_ids the entity goes to all store views (0), which a restricted role may only write when it holds
+     * every store view: content saved there shows in all of them.
      *
      * @param array $fields
      * @return array
@@ -234,14 +231,17 @@ abstract class AbstractEntityCreate extends AbstractTool implements ContextualAc
      */
     private function deniedStoreIds(array $fields): array
     {
-        $scopes = $this->scopeGuard->allowedScopes($this->callerContext->adminUserId());
-        if (!$scopes['restricted']) {
-            return [];
-        }
         $requested = $fields['store_ids'] ?? null;
         $ids = is_array($requested) ? $requested : [$requested ?? 0];
         $ids = array_map(static fn (mixed $id): int => is_numeric($id) ? (int) $id : 0, $ids);
-        return array_values(array_unique(array_diff($ids === [] ? [0] : $ids, $scopes['store_ids'])));
+        $ids = array_values(array_unique($ids === [] ? [0] : $ids));
+        if ($this->storeScopeGuard->allowsAssignment([], $ids)) {
+            return [];
+        }
+        return array_values(array_filter(
+            $ids,
+            fn (int $id): bool => !$this->storeScopeGuard->allowsWrite([$id])
+        ));
     }
 
     /**

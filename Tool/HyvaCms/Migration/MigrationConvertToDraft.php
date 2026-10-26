@@ -87,7 +87,7 @@ class MigrationConvertToDraft extends AbstractContentTool
      */
     protected function run(array $arguments): ToolResultInterface
     {
-        $entity = $this->contentLocator->locate($this->requireString($arguments, 'entity_type'), $arguments);
+        $entity = $this->contentLocator->locateForWrite($this->requireString($arguments, 'entity_type'), $arguments);
         $existing = $this->contentService->getDocuments($entity['type'], $entity['id']);
         if ($existing['draft'] !== null && !$this->boolArg($arguments, 'confirm')) {
             return $this->confirmationRequired('replace_hyva_draft_with_migration', [[

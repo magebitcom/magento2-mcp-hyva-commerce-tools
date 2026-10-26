@@ -87,7 +87,7 @@ class CategoryImport extends AbstractMenuEditTool
      */
     protected function executeMenu(array $arguments): ToolResultInterface
     {
-        $menu = $this->menuService->locate($arguments);
+        $menu = $this->menuService->locateForWrite($arguments);
         $menuId = Cast::int($menu['id']);
         $storeId = $this->intArg(
             $arguments,

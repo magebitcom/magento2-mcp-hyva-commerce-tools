@@ -103,7 +103,7 @@ class ScheduleCreate extends AbstractContentTool
      */
     protected function run(array $arguments): ToolResultInterface
     {
-        $entity = $this->contentLocator->locate($this->requireString($arguments, 'entity_type'), $arguments);
+        $entity = $this->contentLocator->locateForWrite($this->requireString($arguments, 'entity_type'), $arguments);
         $releaseId = $this->intArg($arguments, 'release_id');
         $release = ['release_id' => $releaseId];
         if ($releaseId === null) {

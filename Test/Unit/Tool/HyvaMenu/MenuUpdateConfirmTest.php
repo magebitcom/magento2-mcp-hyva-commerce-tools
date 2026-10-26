@@ -14,11 +14,29 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuUpdate;
 use PHPUnit\Framework\TestCase;
 
 class MenuUpdateConfirmTest extends TestCase
 {
+    use StoreScopeStub;
+
+    public function testARestrictedRoleMayNotAssignAForeignStoreView(): void
+    {
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->expects($this->never())->method('update');
+
+        $result = $this->tool($gateway, $this->createMock(ContentService::class), [1])->execute([
+            'id' => 3,
+            'settings' => ['store_ids' => [2]],
+            'confirm' => true,
+        ]);
+
+        $this->assertTrue($result->isError());
+        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+    }
+
     public function testRenamingAnActiveMenuWithoutConfirmWritesNothing(): void
     {
         $gateway = $this->createMock(MenuGatewayInterface::class);
@@ -59,14 +77,19 @@ class MenuUpdateConfirmTest extends TestCase
      *
      * @param MenuGatewayInterface $gateway
      * @param ContentService $contentService
+     * @param array|null $allowedStoreIds Store views of a restricted caller; null = unrestricted.
      * @return MenuUpdate
+     * @phpstan-param list<int>|null $allowedStoreIds
      */
-    private function tool(MenuGatewayInterface $gateway, ContentService $contentService): MenuUpdate
-    {
+    private function tool(
+        MenuGatewayInterface $gateway,
+        ContentService $contentService,
+        ?array $allowedStoreIds = null
+    ): MenuUpdate {
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn(true);
         $menus = $this->createMock(MenuService::class);
-        $menus->method('locate')->willReturn(['id' => 3, 'identifier' => 'main', 'title' => 'Main menu',
+        $menus->method('locateForWrite')->willReturn(['id' => 3, 'identifier' => 'main', 'title' => 'Main menu',
             'is_active' => true, 'store_ids' => [0]]);
         return new MenuUpdate(
             $features,
@@ -74,7 +97,8 @@ class MenuUpdateConfirmTest extends TestCase
             $gateway,
             $contentService,
             $this->createMock(DraftEditor::class),
-            new LiveSettings()
+            new LiveSettings(),
+            $this->storeScope($allowedStoreIds)
         );
     }
 }

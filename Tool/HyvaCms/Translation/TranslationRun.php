@@ -103,7 +103,7 @@ class TranslationRun extends AbstractTranslationTool
      */
     protected function executeTranslation(array $arguments): ToolResultInterface
     {
-        $entity = $this->contentLocator->locate($this->requireString($arguments, 'entity_type'), $arguments);
+        $entity = $this->contentLocator->locateForWrite($this->requireString($arguments, 'entity_type'), $arguments);
         $writeDraft = $this->boolArg($arguments, 'write_draft');
         if ($writeDraft && !$this->contentAcl->isAllowed($entity['type'], ContentAcl::VERB_SAVE)) {
             throw new AuthorizationException(__('Your admin role may not save %1 drafts; run without write_draft '

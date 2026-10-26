@@ -20,6 +20,7 @@ use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Menu\AbstractMenuTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ContentSchema;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\ArrayBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
@@ -53,6 +54,7 @@ class MenuCreate extends AbstractMenuTool
      * @param MenuItemBuilder $menuItemBuilder
      * @param DraftEditor $draftEditor
      * @param PreviewService $previewService
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         FeatureCheckerInterface $featureChecker,
@@ -62,7 +64,8 @@ class MenuCreate extends AbstractMenuTool
         private readonly ComponentTree $componentTree,
         private readonly MenuItemBuilder $menuItemBuilder,
         private readonly DraftEditor $draftEditor,
-        private readonly PreviewService $previewService
+        private readonly PreviewService $previewService,
+        private readonly StoreScopeGuard $storeScopeGuard
     ) {
         parent::__construct($featureChecker, $menuService);
     }
@@ -122,6 +125,7 @@ class MenuCreate extends AbstractMenuTool
      */
     protected function executeMenu(array $arguments): ToolResultInterface
     {
+        $this->storeScopeGuard->assertAssignable('the new menu', [], $this->intListArg($arguments, 'store_ids'));
         $document = $this->componentTree->newDocument(ContentLocator::TYPE_MENU, 0);
         $components = $this->arrayArg($arguments, 'components');
         $roots = $components !== []

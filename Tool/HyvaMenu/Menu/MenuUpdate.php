@@ -19,6 +19,7 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\Menu\AbstractMenuTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ContentSchema;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\ArrayBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
@@ -43,6 +44,7 @@ class MenuUpdate extends AbstractMenuTool
      * @param ContentService $contentService
      * @param DraftEditor $draftEditor
      * @param LiveSettings $liveSettings
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         FeatureCheckerInterface $featureChecker,
@@ -50,7 +52,8 @@ class MenuUpdate extends AbstractMenuTool
         private readonly MenuGatewayInterface $menuGateway,
         private readonly ContentService $contentService,
         private readonly DraftEditor $draftEditor,
-        private readonly LiveSettings $liveSettings
+        private readonly LiveSettings $liveSettings,
+        private readonly StoreScopeGuard $storeScopeGuard
     ) {
         parent::__construct($featureChecker, $menuService);
     }
@@ -106,12 +109,19 @@ class MenuUpdate extends AbstractMenuTool
      */
     protected function executeMenu(array $arguments): ToolResultInterface
     {
-        $menu = $this->menuService->locate($arguments);
+        $menu = $this->menuService->locateForWrite($arguments);
         $menuId = Cast::int($menu['id']);
         $settings = $this->arrayArg($arguments, 'settings');
         $operations = $this->arrayArg($arguments, 'operations');
         if ($settings === [] && $operations === []) {
             return $this->softError('Nothing to update: pass settings and/or operations.');
+        }
+        if (is_array($settings['store_ids'] ?? null)) {
+            $this->storeScopeGuard->assertAssignable(
+                'menu #' . $menuId,
+                Cast::intList($menu['store_ids'] ?? []),
+                Cast::intList($settings['store_ids'])
+            );
         }
         $live = $this->liveSettings->changes($menu, $settings);
         if ($live !== [] && !$this->boolArg($arguments, 'confirm')) {

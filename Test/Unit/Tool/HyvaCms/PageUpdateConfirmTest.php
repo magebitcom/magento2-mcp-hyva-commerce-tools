@@ -15,11 +15,14 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\EntityWriter;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageUpdate;
 use PHPUnit\Framework\TestCase;
 
 class PageUpdateConfirmTest extends TestCase
 {
+    use StoreScopeStub;
+
     private const PAGE = ['type' => 'cms_page', 'id' => 7, 'identifier' => 'sale', 'title' => 'Sale',
         'is_active' => false, 'store_ids' => [1]];
 
@@ -70,24 +73,58 @@ class PageUpdateConfirmTest extends TestCase
         $this->assertArrayNotHasKey('confirmation_required', $payload);
     }
 
+    public function testARestrictedRoleMayNotMoveAPageToAllStoreViews(): void
+    {
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->expects($this->never())->method('update');
+
+        $result = $this->tool($this->createMock(ContentService::class), $writer, [1])->execute([
+            'identifier' => 'sale',
+            'settings' => ['store_ids' => [0]],
+            'confirm' => true,
+        ]);
+
+        $this->assertTrue($result->isError());
+        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+    }
+
+    public function testARestrictedRoleChangesAPageOfItsOwnStoreView(): void
+    {
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->expects($this->once())->method('update')->willReturn(['title']);
+
+        $payload = $this->payload($this->tool($this->createMock(ContentService::class), $writer, [1])->execute([
+            'identifier' => 'sale',
+            'settings' => ['title' => 'Summer sale', 'store_ids' => [1]],
+        ]));
+
+        $this->assertSame(['title'], $payload['settings_changed'] ?? null);
+    }
+
     /**
      * Page update over an inactive page.
      *
      * @param ContentService $contentService
      * @param EntityWriter $writer
+     * @param array|null $allowedStoreIds Store views of a restricted caller; null = unrestricted.
      * @return PageUpdate
+     * @phpstan-param list<int>|null $allowedStoreIds
      */
-    private function tool(ContentService $contentService, EntityWriter $writer): PageUpdate
-    {
+    private function tool(
+        ContentService $contentService,
+        EntityWriter $writer,
+        ?array $allowedStoreIds = null
+    ): PageUpdate {
         $locator = $this->createMock(ContentLocator::class);
-        $locator->method('locate')->willReturn(self::PAGE);
+        $locator->method('locateForWrite')->willReturn(self::PAGE);
         return new PageUpdate(
             $locator,
             $contentService,
             $this->createMock(ComponentTree::class),
             $this->createMock(DraftEditor::class),
             $writer,
-            new LiveSettings()
+            new LiveSettings(),
+            $this->storeScope($allowedStoreIds)
         );
     }
 

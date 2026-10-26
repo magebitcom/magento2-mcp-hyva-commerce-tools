@@ -88,7 +88,7 @@ class ItemAdd extends AbstractMenuEditTool
      */
     protected function executeMenu(array $arguments): ToolResultInterface
     {
-        $menu = $this->menuService->locate($arguments);
+        $menu = $this->menuService->locateForWrite($arguments);
         $menuId = Cast::int($menu['id']);
         $document = $this->contentService->getWorkingDocument(ContentLocator::TYPE_MENU, $menuId);
         $spec = $this->arrayArg($arguments, 'item');
