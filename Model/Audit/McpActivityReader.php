@@ -18,8 +18,17 @@ use Magento\Framework\AuthorizationInterface;
  * Reads the Magebit_Mcp audit log (magebit_mcp_audit_log) for dashboard widgets.
  *
  * The audit log is the core's data and the core guards it with Magebit_Mcp::mcp_audit; this reader returns nothing
- * to an admin without that permission, whichever widget asks. Write and destructive tools are derived from the
- * core tool registry (WriteMode::WRITE), so every registered write tool counts, the core's and other satellites' too.
+ * to an admin without that permission, whichever widget asks. Write tools are derived from the core tool registry
+ * (WriteMode::WRITE), so every registered write tool counts, the core's and other satellites' too.
+ *
+ * Every write tool is either a draft write or a live write, by its `<area>.<entity>.<verb>` name:
+ * - draft write: a tool of this module (`hyva_` area) that only saves Hyvä drafts, i.e. its verb is one of
+ *   DRAFT_VERBS, or one of DRAFT_ENTITY_VERBS on an entity in DRAFT_ENTITIES (page, block, draft, menu, menu item,
+ *   form, translation), and it is not destructive. Their settings changes that go live need "confirm".
+ * - live write: every other write tool, i.e. destructive tools (DESTRUCTIVE_VERBS), immediate changes such as
+ *   system.config.set, cache/index writes, the core's cms.page.create/update, category positions, store credit,
+ *   linked groups, schedules and folders, and any write tool the rule does not know. Unknown tools land here on
+ *   purpose: a write is shown as a draft only when its name says so.
  *
  * @phpstan-type ActivityRow array{id: int, tool: string, admin: string, status: string, error_code: int|null,
  *     created_at: string, summary: array<mixed>}
@@ -36,10 +45,25 @@ class McpActivityReader
         'flush', 'reset', 'disable',
     ];
 
+    /**
+     * Last segments of this module's tools that only ever write drafts.
+     */
+    public const DRAFT_VERBS = ['create_draft', 'update_draft', 'convert_to_draft', 'update_alt'];
+
+    /**
+     * Last segments that write drafts when the entity (the segment before) holds Hyvä CMS content.
+     */
+    public const DRAFT_ENTITY_VERBS = ['create', 'update', 'add', 'run'];
+
+    /**
+     * Entities whose create/update/add/run tools save Hyvä content as a draft (`hyva_menu` = hyva_menu.create).
+     */
+    public const DRAFT_ENTITIES = ['page', 'block', 'draft', 'hyva_menu', 'item', 'form', 'translation'];
+
     public const AUDIT_RESOURCE = 'Magebit_Mcp::mcp_audit';
 
     /**
-     * @var array{write: list<string>, destructive: list<string>}|null
+     * @var array{write: list<string>, destructive: list<string>, draft: list<string>}|null
      */
     private ?array $toolSets = null;
 
@@ -76,13 +100,43 @@ class McpActivityReader
     }
 
     /**
-     * Registered write tools that are not destructive: drafts, creates, saves and other additive writes.
+     * Registered write tools that only save drafts (see the class docblock).
      *
      * @return list<string>
      */
     public function getDraftWriteTools(): array
     {
-        return array_values(array_diff($this->getWriteTools(), $this->getDestructiveTools()));
+        return $this->getToolSets()['draft'];
+    }
+
+    /**
+     * Registered write tools that are not draft writes: publish, immediate (live) and destructive actions.
+     *
+     * @return list<string>
+     */
+    public function getLiveWriteTools(): array
+    {
+        return array_values(array_diff($this->getWriteTools(), $this->getDraftWriteTools()));
+    }
+
+    /**
+     * Whether a write tool's name marks it as a draft write (see the class docblock).
+     *
+     * @param string $toolName
+     * @return bool
+     */
+    public function isDraftWriteName(string $toolName): bool
+    {
+        if (!str_starts_with($toolName, 'hyva_') || $this->isDestructiveName($toolName)) {
+            return false;
+        }
+        $segments = explode('.', $toolName);
+        $verb = (string) array_pop($segments);
+        if (in_array($verb, self::DRAFT_VERBS, true)) {
+            return true;
+        }
+        return in_array($verb, self::DRAFT_ENTITY_VERBS, true)
+            && in_array((string) end($segments), self::DRAFT_ENTITIES, true);
     }
 
     /**
@@ -106,13 +160,14 @@ class McpActivityReader
     /**
      * Read the registry once per request.
      *
-     * @return array{write: list<string>, destructive: list<string>}
+     * @return array{write: list<string>, destructive: list<string>, draft: list<string>}
      */
     private function getToolSets(): array
     {
         if ($this->toolSets === null) {
             $write = [];
             $destructive = [];
+            $draft = [];
             foreach ($this->toolRegistry->all() as $tool) {
                 if ($tool->getWriteMode() !== WriteMode::WRITE) {
                     continue;
@@ -121,9 +176,11 @@ class McpActivityReader
                 $write[] = $name;
                 if ($this->isDestructiveName($name)) {
                     $destructive[] = $name;
+                } elseif ($this->isDraftWriteName($name)) {
+                    $draft[] = $name;
                 }
             }
-            $this->toolSets = ['write' => $write, 'destructive' => $destructive];
+            $this->toolSets = ['write' => $write, 'destructive' => $destructive, 'draft' => $draft];
         }
         return $this->toolSets;
     }

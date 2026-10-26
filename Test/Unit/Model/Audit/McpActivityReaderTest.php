@@ -21,7 +21,8 @@ use ReflectionClass;
 use SimpleXMLElement;
 
 /**
- * The MCP Activity widget counts writes and destructive actions from the tool registry, not from a fixed list.
+ * The MCP Activity widget counts writes, draft writes and live/destructive actions from the tool registry, not from
+ * a fixed list.
  */
 class McpActivityReaderTest extends TestCase
 {
@@ -64,11 +65,70 @@ class McpActivityReaderTest extends TestCase
         }
         $this->assertContains('cms.page.delete', $quoted, 'core write tools count too');
         $this->assertNotContains('system.store_info', $quoted);
-        $this->assertSame(
-            array_values(array_diff($reader->getWriteTools(), $reader->getDestructiveTools())),
-            $reader->getDraftWriteTools()
+        // Draft and live writes split the write tools; every destructive tool is a live write.
+        $this->assertSame([], array_intersect($reader->getDraftWriteTools(), $reader->getLiveWriteTools()));
+        $this->assertEqualsCanonicalizing(
+            $reader->getWriteTools(),
+            array_merge($reader->getDraftWriteTools(), $reader->getLiveWriteTools())
         );
+        $this->assertSame([], array_diff($reader->getDestructiveTools(), $reader->getLiveWriteTools()));
         $this->assertSame([], array_diff($reader->getDestructiveTools(), $reader->getWriteTools()));
+    }
+
+    /**
+     * @return array<string, array{string, bool}>
+     */
+    public static function draftNames(): array
+    {
+        return [
+            'hyva draft create' => ['hyva_cms.draft.create', true],
+            'hyva draft update' => ['hyva_cms.draft.update', true],
+            'hyva page create' => ['hyva_cms.page.create', true],
+            'hyva block update' => ['hyva_cms.block.update', true],
+            'menu create' => ['hyva_menu.create', true],
+            'menu item add' => ['hyva_menu.item.add', true],
+            'menu item update' => ['hyva_menu.item.update', true],
+            'form create' => ['hyva_form.form.create', true],
+            'form update draft' => ['hyva_form.form.update_draft', true],
+            'email create draft' => ['hyva_email.template.create_draft', true],
+            'convert to draft' => ['hyva_cms.migration.convert_to_draft', true],
+            'alt text' => ['hyva_media.image.update_alt', true],
+            'translation run' => ['hyva_cms.translation.run', true],
+            'config set' => ['system.config.set', false],
+            'cache clean' => ['system.cache.clean', false],
+            'cache enable' => ['system.cache.enable', false],
+            'reindex' => ['system.index.reindex', false],
+            'index mode' => ['system.index.set_mode', false],
+            'core page create' => ['cms.page.create', false],
+            'core page update' => ['cms.page.update', false],
+            'core block create' => ['cms.block.create', false],
+            'positions set' => ['hyva_merch.category.positions_set', false],
+            'store credit debit' => ['hyva_store_credit.balance.debit', false],
+            'store credit credit' => ['hyva_store_credit.balance.credit', false],
+            'linked group save' => ['hyva_linked.group.save', false],
+            'schedule create' => ['hyva_cms.schedule.create', false],
+            'menu schedule create' => ['hyva_menu.schedule.create', false],
+            'folder create' => ['hyva_media.folder.create', false],
+            'send test email' => ['hyva_email.template.send_test', false],
+            'widget refresh' => ['hyva_dashboard.widget.refresh', false],
+            'publish' => ['hyva_cms.publish', false],
+            'menu item remove' => ['hyva_menu.item.remove', false],
+        ];
+    }
+
+    /**
+     * @dataProvider draftNames
+     * @param string $name
+     * @param bool $draft
+     * @return void
+     */
+    public function testDraftWriteClassification(string $name, bool $draft): void
+    {
+        $reader = $this->reader([$name => true], $this->createMock(AdapterInterface::class));
+
+        $this->assertSame($draft, $reader->isDraftWriteName($name));
+        $this->assertSame($draft, in_array($name, $reader->getDraftWriteTools(), true));
+        $this->assertSame(!$draft, in_array($name, $reader->getLiveWriteTools(), true));
     }
 
     /**

@@ -15,7 +15,7 @@ use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Backend\Model\UrlInterface;
 
 /**
- * magebit_mcp_activity_widget: recent MCP tool calls, failures, AI drafts and destructive actions.
+ * magebit_mcp_activity_widget: recent MCP tool calls, failures, AI drafts and publish, live and destructive actions.
  */
 class McpActivity extends AbstractHealthWidget
 {
@@ -104,10 +104,10 @@ class McpActivity extends AbstractHealthWidget
                     'empty' => (string) __('No failed calls.'),
                 ],
                 [
-                    'title' => (string) __('Publish and destructive actions'),
+                    'title' => (string) __('Publish, live and destructive actions'),
                     'rows' => $toRows(
                         $this->activityReader->getRows(
-                            ['tools' => $this->activityReader->getDestructiveTools()],
+                            ['tools' => $this->activityReader->getLiveWriteTools()],
                             $limit
                         )
                     ),
