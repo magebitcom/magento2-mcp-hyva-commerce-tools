@@ -135,7 +135,9 @@ class ScheduleCreate extends AbstractContentTool
             'published_now' => false,
             'note' => 'JIT Tailwind CSS is not generated server-side; classes not already compiled for the theme may '
                 . 'be missing when this release publishes.',
-            'conflicts' => $this->conflictReport->getConflicts(60, $entity['type'], $entity['id']),
+            'conflicts' => $this->conflictReport->withinCallerScope(
+                $this->conflictReport->getConflicts(60, $entity['type'], $entity['id'])
+            ),
         ] + $result, ['entity_type' => $entity['type'], 'id' => $entity['id'], 'release_id' => $result['release_id']]);
     }
 

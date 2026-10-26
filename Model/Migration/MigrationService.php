@@ -40,16 +40,22 @@ class MigrationService
      * Pages/blocks still rendered from Magento content, plus converted drafts not yet published.
      *
      * @param array $types
+     * @param callable|null $includeStores fn(list<int> $storeIds): bool; entities it refuses are skipped.
      * @return array
      * @phpstan-param list<string> $types
+     * @phpstan-param (callable(list<int>): bool)|null $includeStores
      * @phpstan-return list<array<string, mixed>>
      */
-    public function scan(array $types = [ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK]): array
-    {
+    public function scan(
+        array $types = [ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK],
+        ?callable $includeStores = null
+    ): array {
         $rows = [];
         foreach ($types as $type) {
             foreach ($this->contentIndex->getRows($type, true) as $row) {
-                if (!$this->contentIndex->isLegacy($row)) {
+                if (!$this->contentIndex->isLegacy($row)
+                    || ($includeStores !== null && !$includeStores($row['store_ids']))
+                ) {
                     continue;
                 }
                 $analysis = $this->analyzer->analyze($row['magento_content'] ?? '');

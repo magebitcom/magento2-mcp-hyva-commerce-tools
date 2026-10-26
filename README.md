@@ -72,8 +72,14 @@ bin/magento cache:flush
   views although the Hyvä admin does not scope them. Email and newsletter templates, linked product groups and
   category positions belong to no store view: a restricted role can read them but not change them.
   `image.replace` and `image.update_alt` skip content outside the role, `schedule.cancel` refuses items of content
-  outside it, and store credit is checked against the customer's website. Image usage lists, `image.list` and the
-  audits are not filtered by scope.
+  outside it, and store credit is checked against the customer's website. `schedule.list` and
+  `schedule.detect_conflicts` (and the conflicts `schedule.create` returns) hide items and conflicts of content outside
+  the role, including content that no longer exists, and count them in `items_hidden_by_permissions` /
+  `conflicts_hidden_by_permissions`; `hyva_form.delivery.audit` without a form audits only the role's forms
+  (`forms_hidden_by_permissions`); `migration.scan` lists only the role's pages and blocks. Not filtered by scope:
+  the usage lists of `hyva_media.image.find_usage`, `hyva_menu.find_usage` and the image tools (`image.list`,
+  `image.validate`, `asset.resolve`, `sync.status`), the `hyva_commerce.audit.*`, `hyva_media.audit*` and
+  `hyva_menu.audit_all` audits, `hyva_email.audit.coverage`, and the dashboard widgets.
 - **Refusals.** Hyvä's save refusals come back as soft errors with a `status`: 422 with `field_errors` (per component
   uid and field) when a provider refuses content or Hyvä's content guard rejects it (3 MB, 5000 components, depth 50),
   409 when the draft changed since you read it (pass `base_version_uid` to the update tools to get this check; reload
@@ -352,7 +358,7 @@ reuses the same services as the audit tools. Templates are static markup (no Alp
 
 | Widget | Shows |
 |---|---|
-| `magebit_mcp_activity_widget` | MCP calls, failures, writes (every registered write tool), AI-generated drafts, publish/destructive actions (write tools named publish, delete, trash, remove, clear, restore, import, replace, cancel, move, flush, reset or disable), link to the MCP audit log |
+| `magebit_mcp_activity_widget` | MCP calls, failures, writes (every registered write tool), AI-generated drafts (this module's tools that only save drafts: `create_draft`, `update_draft`, `convert_to_draft`, `update_alt`, and create/update/add/run on pages, blocks, drafts, menus, menu items, forms and translations), publish, live and destructive actions (every other write tool: publish, delete, trash, remove, clear, restore, import, replace, cancel, move, flush, reset, disable, and immediate changes such as `system.config.set`, the core CMS tools, category positions or store credit), link to the MCP audit log |
 | `magebit_content_health_widget` | Missing alt text, broken images, invalid/disabled components, unpublished drafts, schedule problems, legacy pages |
 | `magebit_menu_health_widget` | Menus with broken links, disabled targets, empty columns, placement, last MCP menu actions |
 | `magebit_media_health_widget` | Oversized images, missing alt, broken references, missing WebP/AVIF, optimization and engine status |

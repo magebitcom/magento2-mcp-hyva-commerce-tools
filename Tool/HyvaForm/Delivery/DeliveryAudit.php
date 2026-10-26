@@ -53,12 +53,18 @@ class DeliveryAudit extends AbstractFormTool
     protected function executeForm(array $arguments): ToolResultInterface
     {
         $total = 1;
+        $hidden = 0;
         if (isset($arguments['id']) || isset($arguments['identifier'])) {
             $forms = [$this->locateForm($arguments)];
         } else {
             $list = $this->formGateway->getList(null, null, 1, 200);
-            $forms = $list['items'];
-            $total = $list['total'];
+            // Forms of store views outside the caller's website/store view restriction are not audited.
+            $forms = array_values(array_filter(
+                $list['items'],
+                fn (array $form): bool => $this->storeScopeGuard->allowsRead($form['store_ids'])
+            ));
+            $hidden = count($list['items']) - count($forms);
+            $total = $list['total'] - $hidden;
         }
         $report = [];
         $counts = ['error' => 0, 'warning' => 0, 'info' => 0];
@@ -82,6 +88,7 @@ class DeliveryAudit extends AbstractFormTool
             'forms_checked' => count($report),
             'forms_total' => $total,
             'truncated' => $total > count($report),
+            'forms_hidden_by_permissions' => $hidden,
             'counts' => $counts,
             'forms' => $report,
         ], $counts);

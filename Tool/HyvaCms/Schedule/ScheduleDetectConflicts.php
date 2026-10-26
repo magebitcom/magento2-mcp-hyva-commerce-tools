@@ -87,10 +87,12 @@ class ScheduleDetectConflicts extends AbstractContentTool
             $type,
             $entityId
         );
+        // Conflicts of content types the role may not schedule, or naming content outside its website/store view
+        // restriction, are hidden.
         $visible = array_values(array_filter(
-            $conflicts,
+            $this->conflictReport->withinCallerScope($conflicts),
             fn (array $c): bool => !isset($c['entity_type'])
-                || $this->contentAcl->isAllowed((string) $c['entity_type'], ContentAcl::VERB_SCHEDULING)
+                || $this->contentAcl->isAllowed($c['entity_type'], ContentAcl::VERB_SCHEDULING)
         ));
         $hidden = count($conflicts) - count($visible);
         $conflicts = $visible;

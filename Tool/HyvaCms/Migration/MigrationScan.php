@@ -11,6 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Migration;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Migration\MigrationService;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractContentTool;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
@@ -28,10 +29,12 @@ class MigrationScan extends AbstractContentTool
     /**
      * @param MigrationService $migrationService
      * @param ContentAcl $contentAcl
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         private readonly MigrationService $migrationService,
-        private readonly ContentAcl $contentAcl
+        private readonly ContentAcl $contentAcl,
+        private readonly StoreScopeGuard $storeScopeGuard
     ) {
     }
 
@@ -72,7 +75,9 @@ class MigrationScan extends AbstractContentTool
     {
         $type = $this->stringArg($arguments, 'entity_type');
         $rows = $this->migrationService->scan(
-            $type !== null ? [$type] : [ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK]
+            $type !== null ? [$type] : [ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK],
+            // Pages and blocks outside the caller's website/store view restriction are not listed.
+            fn (array $storeIds): bool => $this->storeScopeGuard->allowsRead($storeIds)
         );
         $kind = $this->stringArg($arguments, 'kind');
         if ($kind !== null) {

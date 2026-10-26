@@ -24,13 +24,54 @@ class ConflictReport
      * @param ScheduleConflictDetector $detector
      * @param ContentIndex $contentIndex
      * @param ContentScanner $contentScanner
+     * @param ContentLocator $contentLocator
      */
     public function __construct(
         private readonly ScheduleService $scheduleService,
         private readonly ScheduleConflictDetector $detector,
         private readonly ContentIndex $contentIndex,
-        private readonly ContentScanner $contentScanner
+        private readonly ContentScanner $contentScanner,
+        private readonly ContentLocator $contentLocator
     ) {
+    }
+
+    /**
+     * Drop conflicts naming a scheduled item of content outside the MCP caller's website/store view restriction.
+     *
+     * Release-level conflicts and identifier collisions, which carry no single entity, are judged by their items.
+     * Unrestricted callers get the conflicts back without any query; restricted ones cost one item query and one
+     * store view query per type.
+     *
+     * @param array $conflicts
+     * @return array
+     * @phpstan-param list<array{severity: string, code: string, message: string, entity_type?: string,
+     *     entity_id?: int, release_ids: list<int>, item_ids: list<int>}> $conflicts
+     * @phpstan-return list<array{severity: string, code: string, message: string, entity_type?: string,
+     *     entity_id?: int, release_ids: list<int>, item_ids: list<int>}>
+     */
+    public function withinCallerScope(array $conflicts): array
+    {
+        if ($conflicts === [] || !$this->contentLocator->isScopeRestricted()) {
+            return $conflicts;
+        }
+        $items = $this->scheduleService->getItems(['status' => 'pending']);
+        $this->contentLocator->prefetchScope(array_map(
+            static fn (array $item): array => ['entity_type' => $item['entity_type'], 'id' => $item['entity_id']],
+            $items
+        ));
+        $hidden = [];
+        foreach ($items as $item) {
+            if (!$this->contentLocator->allowsRead($item['entity_type'], $item['entity_id'])) {
+                $hidden[$item['item_id']] = true;
+            }
+        }
+        return array_values(array_filter(
+            $conflicts,
+            static fn (array $conflict): bool => array_filter(
+                $conflict['item_ids'],
+                static fn (int $itemId): bool => isset($hidden[$itemId])
+            ) === []
+        ));
     }
 
     /**

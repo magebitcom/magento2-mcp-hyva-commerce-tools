@@ -99,8 +99,17 @@ class ScheduleList extends AbstractContentTool
 
         $releases = [];
         $hidden = 0;
-        foreach ($this->scheduleService->getItems($filters) as $item) {
-            if (!$this->contentAcl->isAllowed((string) $item['entity_type'], ContentAcl::VERB_SCHEDULING)) {
+        $items = $this->scheduleService->getItems($filters);
+        // Items of content outside the caller's website/store view restriction are hidden like those of content
+        // types the role may not schedule; one store view lookup per type covers all items.
+        $this->contentLocator->prefetchScope(array_map(
+            static fn (array $item): array => ['entity_type' => $item['entity_type'], 'id' => $item['entity_id']],
+            $items
+        ));
+        foreach ($items as $item) {
+            if (!$this->contentAcl->isAllowed($item['entity_type'], ContentAcl::VERB_SCHEDULING)
+                || !$this->contentLocator->allowsRead($item['entity_type'], $item['entity_id'])
+            ) {
                 $hidden++;
                 continue;
             }
