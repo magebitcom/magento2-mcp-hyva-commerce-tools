@@ -89,47 +89,78 @@ class ImageList extends AbstractMediaTool
     {
         $folder = array_key_exists('folder', $arguments) ? Cast::string($arguments['folder']) : 'wysiwyg';
         $assets = $this->inventory->getGalleryAssets();
-        $paths = array_values(
+        $paths = array_map('strval', array_values(
             array_unique(array_merge(array_keys($assets), $folder !== '' ? $this->inventory->scanFolder($folder) : []))
-        );
+        ));
         $types = array_map('strtolower', $this->stringListArg($arguments, 'types'));
+        if ($types !== []) {
+            $paths = array_values(array_filter(
+                $paths,
+                static fn (string $path): bool => in_array(
+                    strtolower(pathinfo($path, PATHINFO_EXTENSION)),
+                    $types,
+                    true
+                )
+            ));
+        }
+
+        // The full usage index (every Hyvä document plus a catalog scan) only when a filter depends on usage.
+        $usedIn = $this->stringArg($arguments, 'used_in');
+        $filterUsed = array_key_exists('used', $arguments);
+        $filterMissingAlt = $this->boolArg($arguments, 'missing_alt');
+        $allUsages = null;
+        if ($filterUsed || $usedIn !== null || $filterMissingAlt) {
+            $allUsages = $this->usageIndex->all();
+            $paths = array_values(array_filter(
+                $paths,
+                fn (string $path): bool => $this->matchesUsage(
+                    $this->usagesFor($allUsages[$path] ?? [], $usedIn),
+                    $filterUsed ? $this->boolArg($arguments, 'used') : null,
+                    $filterMissingAlt
+                )
+            ));
+        }
+
+        // File info (stat + image size) for every candidate only when a size filter or the size sort needs it.
+        $files = [];
+        $sizeSort = ($this->stringArg($arguments, 'sort', 'size_desc') ?? 'size_desc') === 'size_desc';
         $minKb = $this->intArg($arguments, 'min_size_kb');
         $maxKb = $this->intArg($arguments, 'max_size_kb');
-        $usedIn = $this->stringArg($arguments, 'used_in');
+        $minWidth = $this->intArg($arguments, 'min_width');
+        $minHeight = $this->intArg($arguments, 'min_height');
+        if ($sizeSort || $minKb !== null || $maxKb !== null || $minWidth !== null || $minHeight !== null) {
+            $kept = [];
+            foreach ($paths as $path) {
+                $file = $this->fileInfo->describe($path);
+                $kb = (int) round(($file['size'] ?? 0) / 1024);
+                if (($minKb !== null && $kb < $minKb) || ($maxKb !== null && $kb > $maxKb)
+                    || ($file['width'] ?? 0) < ($minWidth ?? 0) || ($file['height'] ?? 0) < ($minHeight ?? 0)
+                ) {
+                    continue;
+                }
+                $files[$path] = $file;
+                $kept[] = $path;
+            }
+            $paths = $kept;
+        }
+        if ($sizeSort) {
+            usort($paths, static fn (string $a, string $b): int => (int) round(($files[$b]['size'] ?? 0) / 1024)
+                <=> (int) round(($files[$a]['size'] ?? 0) / 1024));
+        } else {
+            sort($paths);
+        }
 
-        $allUsages = $this->usageIndex->all();
+        $total = count($paths);
+        $page = array_slice($paths, 0, $this->intArg($arguments, 'limit', 100) ?? 100);
+        $pageUsages = $allUsages ?? $this->usageIndex->usagesOfMany($page);
         $items = [];
-        foreach ($paths as $path) {
-            $path = (string) $path;
-            $file = $this->fileInfo->describe($path);
-            if ($types !== [] && !in_array($file['extension'], $types, true)) {
-                continue;
-            }
-            $kb = (int) round(($file['size'] ?? 0) / 1024);
-            if (($minKb !== null && $kb < $minKb) || ($maxKb !== null && $kb > $maxKb)) {
-                continue;
-            }
-            if (($file['width'] ?? 0) < ($this->intArg($arguments, 'min_width') ?? 0) || ($file['height'] ?? 0) < (
-                    $this->intArg($arguments, 'min_height') ?? 0
-                )
-            ) {
-                continue;
-            }
-            $usages = $allUsages[$path] ?? [];
-            if ($usedIn !== null) {
-                $usages = array_values(array_filter($usages, static fn (array $u): bool => $u['source'] === $usedIn));
-            }
-            if (array_key_exists('used', $arguments) && ($usages !== []) !== $this->boolArg($arguments, 'used')) {
-                continue;
-            }
-            $missingAlt = count(array_filter($usages, static fn (array $u): bool => !$u['has_alt']));
-            if ($this->boolArg($arguments, 'missing_alt') && $missingAlt === 0) {
-                continue;
-            }
+        foreach ($page as $path) {
+            $file = $files[$path] ?? $this->fileInfo->describe($path);
+            $usages = $this->usagesFor($pageUsages[$path] ?? [], $usedIn);
             $items[] = [
                 'path' => $path,
                 'exists' => $file['exists'],
-                'size_kb' => $kb,
+                'size_kb' => (int) round(($file['size'] ?? 0) / 1024),
                 'width' => $file['width'],
                 'height' => $file['height'],
                 'type' => $file['extension'],
@@ -137,16 +168,55 @@ class ImageList extends AbstractMediaTool
                 'used' => $usages !== [],
                 'usage_count' => count($usages),
                 'used_in' => array_values(array_unique(array_column($usages, 'source'))),
-                'usages_missing_alt' => $missingAlt,
+                'usages_missing_alt' => $this->missingAlt($usages),
             ];
         }
-        if (($this->stringArg($arguments, 'sort', 'size_desc') ?? 'size_desc') === 'size_desc') {
-            usort($items, static fn (array $a, array $b): int => $b['size_kb'] <=> $a['size_kb']);
+        return $this->jsonResult(['total' => $total, 'items' => $items], ['total' => $total]);
+    }
+
+    /**
+     * Usages limited to one source when used_in is given.
+     *
+     * @param array $usages
+     * @param string|null $usedIn
+     * @return array
+     * @phpstan-param list<array{source: string, has_alt: bool}> $usages
+     * @phpstan-return list<array{source: string, has_alt: bool}>
+     */
+    private function usagesFor(array $usages, ?string $usedIn): array
+    {
+        if ($usedIn === null) {
+            return $usages;
         }
-        $total = count($items);
-        return $this->jsonResult(
-            ['total' => $total, 'items' => array_slice($items, 0, $this->intArg($arguments, 'limit', 100) ?? 100)],
-            ['total' => $total]
-        );
+        return array_values(array_filter($usages, static fn (array $u): bool => $u['source'] === $usedIn));
+    }
+
+    /**
+     * Whether an image's usages pass the used / missing_alt filters.
+     *
+     * @param array $usages
+     * @param bool|null $used Null = no used filter.
+     * @param bool $missingAlt
+     * @return bool
+     * @phpstan-param list<array{source: string, has_alt: bool}> $usages
+     */
+    private function matchesUsage(array $usages, ?bool $used, bool $missingAlt): bool
+    {
+        if ($used !== null && ($usages !== []) !== $used) {
+            return false;
+        }
+        return !$missingAlt || $this->missingAlt($usages) > 0;
+    }
+
+    /**
+     * Number of usages without alt text.
+     *
+     * @param array $usages
+     * @return int
+     * @phpstan-param list<array{source: string, has_alt: bool}> $usages
+     */
+    private function missingAlt(array $usages): int
+    {
+        return count(array_filter($usages, static fn (array $u): bool => !$u['has_alt']));
     }
 }
