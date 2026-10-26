@@ -12,6 +12,7 @@ use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Migration\MigrationService;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Migration\MigrationScan;
+use Magebit\Mcp\Api\ToolResultInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -32,6 +33,52 @@ class MigrationScanScopeTest extends TestCase
     public function testAnUnrestrictedCallerScansEverything(): void
     {
         $this->assertTrue($this->includeCallback(null)([2]));
+    }
+
+    public function testTheItemsAreLimitedButTheSummaryCountsEveryRow(): void
+    {
+        $rows = [];
+        for ($i = 1; $i <= 60; $i++) {
+            $rows[] = ['kind' => 'wysiwyg', 'converted_draft_waiting' => false, 'id' => $i];
+        }
+        $service = $this->createMock(MigrationService::class);
+        $service->method('scan')->willReturn($rows);
+        $acl = $this->createMock(ContentAcl::class);
+        $acl->method('isAllowed')->willReturn(true);
+        $tool = new MigrationScan($service, $acl, $this->storeScope(null));
+
+        $default = $this->payload($tool->execute([]));
+        $summary = $default['summary'] ?? null;
+        $this->assertIsArray($summary);
+        $this->assertSame(60, $summary['total'] ?? null);
+        $this->assertCount(50, $this->payloadList($default, 'items'));
+        $this->assertCount(10, $this->payloadList($this->payload($tool->execute(['limit' => 10])), 'items'));
+    }
+
+    /**
+     * @param array $payload
+     * @param string $key
+     * @return array
+     * @phpstan-param array<string, mixed> $payload
+     * @phpstan-return array<mixed>
+     */
+    private function payloadList(array $payload, string $key): array
+    {
+        $this->assertIsArray($payload[$key] ?? null);
+        return $payload[$key];
+    }
+
+    /**
+     * @param ToolResultInterface $result
+     * @return array
+     * @phpstan-return array<string, mixed>
+     */
+    private function payload(ToolResultInterface $result): array
+    {
+        $text = $result->getContent()[0]['text'] ?? '';
+        $payload = json_decode(is_string($text) ? $text : '', true);
+        $this->assertIsArray($payload);
+        return $payload;
     }
 
     /**

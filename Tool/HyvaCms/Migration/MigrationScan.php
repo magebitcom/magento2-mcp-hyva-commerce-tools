@@ -14,6 +14,7 @@ use Magebit\McpHyvaCommerceTools\Model\Migration\MigrationService;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractContentTool;
 use Magebit\Mcp\Api\ToolResultInterface;
+use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 
@@ -65,6 +66,8 @@ class MigrationScan extends AbstractContentTool
             ->string('entity_type', fn (StringBuilder $s) => $s
                 ->enum([ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK]))
             ->string('kind', fn (StringBuilder $s) => $s->enum(['page_builder', 'wysiwyg', 'empty']))
+            ->integer('limit', fn (IntegerBuilder $i) => $i->minimum(1)->maximum(500)
+                ->description('Maximum items returned (default 50); the summary always counts every legacy row.'))
             ->toArray();
     }
 
@@ -94,7 +97,10 @@ class MigrationScan extends AbstractContentTool
             $summary[$row['kind']]++;
             $summary['converted_drafts_waiting'] += $row['converted_draft_waiting'] ? 1 : 0;
         }
-        return $this->jsonResult(['summary' => $summary, 'items' => $rows], $summary);
+        return $this->jsonResult([
+            'summary' => $summary,
+            'items' => array_slice($rows, 0, $this->intArg($arguments, 'limit', 50) ?? 50),
+        ], $summary);
     }
 
     /**
