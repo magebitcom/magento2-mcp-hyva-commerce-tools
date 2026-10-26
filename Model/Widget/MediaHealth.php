@@ -18,7 +18,8 @@ use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Backend\Model\UrlInterface;
 
 /**
- * magebit_media_health_widget: media problems and Media Optimization state.
+ * magebit_media_health_widget: media problems and Media Optimization state. The MCP activity section and the audit
+ * log link need Magebit_Mcp::mcp_audit.
  */
 class MediaHealth extends AbstractHealthWidget
 {
@@ -72,14 +73,33 @@ class MediaHealth extends AbstractHealthWidget
                 in_array('broken_reference', $codes, true) ? 'danger' : 'warning'
             );
         }
-        $recent = [];
-        foreach ($this->activityReader->getRows(['tool_prefix' => 'hyva_media.'], 5) as $call) {
-            $recent[] = $this->row(
-                $call['tool'],
-                $call['admin'] . ' · ' . $call['created_at'],
-                $call['status'],
-                $call['status'] === 'ok' ? 'success' : 'danger'
-            );
+        $sections = [
+            [
+                'title' => (string) __('Images needing attention'),
+                'rows' => $rows,
+                'empty' => (string) __('No media problems found.'),
+            ],
+        ];
+        $links = [];
+        if ($this->activityReader->isAllowed()) {
+            $recent = [];
+            foreach ($this->activityReader->getRows(['tool_prefix' => 'hyva_media.'], 5) as $call) {
+                $recent[] = $this->row(
+                    $call['tool'],
+                    $call['admin'] . ' · ' . $call['created_at'],
+                    $call['status'],
+                    $call['status'] === 'ok' ? 'success' : 'danger'
+                );
+            }
+            $sections[] = [
+                'title' => (string) __('Last MCP media actions'),
+                'rows' => $recent,
+                'empty' => (string) __('None.'),
+            ];
+            $links[] = [
+                'label' => (string) __('MCP audit log'),
+                'url' => $this->url->getUrl('magebit_mcp/auditlog/index'),
+            ];
         }
         $missingVariants = ($counts['not_optimized'] ?? 0)
             + ($counts['missing_webp'] ?? 0)
@@ -115,18 +135,9 @@ class MediaHealth extends AbstractHealthWidget
                     )
                 ),
             ],
-            'sections' => [
-                [
-                    'title' => (string) __('Images needing attention'),
-                    'rows' => $rows,
-                    'empty' => (string) __('No media problems found.'),
-                ],
-                ['title' => (string) __('Last MCP media actions'), 'rows' => $recent, 'empty' => (string) __('None.')],
-            ],
+            'sections' => $sections,
             'notice' => (string) __('%1 referenced images checked.', $report['images_checked']),
-            'links' => [
-                ['label' => (string) __('MCP audit log'), 'url' => $this->url->getUrl('magebit_mcp/auditlog/index')]
-            ],
+            'links' => $links,
         ];
     }
 }

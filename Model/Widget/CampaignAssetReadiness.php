@@ -12,6 +12,7 @@ use Hyva\AdminDashboardApi\Api\V1\WidgetContextInterface;
 use Hyva\AdminDashboardApi\Api\V1\WidgetInstanceInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageChecker;
@@ -22,7 +23,8 @@ use Magento\Backend\Model\UrlInterface;
 use Magento\Framework\App\ResourceConnection;
 
 /**
- * magebit_campaign_asset_readiness_widget: are scheduled campaign pages, blocks and menus media- and link-ready.
+ * magebit_campaign_asset_readiness_widget: are scheduled campaign pages, blocks and menus media- and link-ready
+ * (those of the admin's websites/store views).
  */
 class CampaignAssetReadiness extends AbstractHealthWidget
 {
@@ -36,6 +38,7 @@ class CampaignAssetReadiness extends AbstractHealthWidget
      * @param MenuValidator $menuValidator
      * @param ResourceConnection $resourceConnection
      * @param UrlInterface $url
+     * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
         private readonly ScheduleService $scheduleService,
@@ -46,7 +49,8 @@ class CampaignAssetReadiness extends AbstractHealthWidget
         private readonly FeatureCheckerInterface $featureChecker,
         private readonly MenuValidator $menuValidator,
         private readonly ResourceConnection $resourceConnection,
-        private readonly UrlInterface $url
+        private readonly UrlInterface $url,
+        private readonly ContentScopeFilter $scopeFilter
     ) {
     }
 
@@ -66,7 +70,11 @@ class CampaignAssetReadiness extends AbstractHealthWidget
     protected function buildData(WidgetContextInterface $ctx, WidgetInstanceInterface $widgetInstance): array
     {
         $maxKb = $this->intProperty($widgetInstance, 'max_kb', 300);
-        $pending = $this->scheduleService->getItems(['status' => 'pending']);
+        $pending = $this->scopeFilter->filter(
+            $this->scheduleService->getItems(['status' => 'pending']),
+            'entity_type',
+            'entity_id'
+        )['visible'];
         $connection = $this->resourceConnection->getConnection();
         $contents = $pending === [] ? [] : $connection->fetchPairs(
             $connection->select()->from(

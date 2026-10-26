@@ -11,6 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Model\Widget;
 use Hyva\AdminDashboardApi\Api\V1\WidgetContextInterface;
 use Hyva\AdminDashboardApi\Api\V1\WidgetInstanceInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ScheduleTime;
@@ -19,7 +20,8 @@ use Magento\Backend\Model\UrlInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 
 /**
- * magebit_campaign_calendar_widget: upcoming and recent Hyvä CMS scheduled releases with conflicts.
+ * magebit_campaign_calendar_widget: upcoming and recent Hyvä CMS scheduled releases with conflicts, for the content
+ * of the admin's websites/store views.
  */
 class CampaignCalendar extends AbstractHealthWidget
 {
@@ -30,6 +32,7 @@ class CampaignCalendar extends AbstractHealthWidget
      * @param ScopeConfigInterface $scopeConfig
      * @param ContentIndex $contentIndex
      * @param UrlInterface $url
+     * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
         private readonly ScheduleService $scheduleService,
@@ -37,7 +40,8 @@ class CampaignCalendar extends AbstractHealthWidget
         private readonly ScheduleTime $scheduleTime,
         private readonly ScopeConfigInterface $scopeConfig,
         private readonly ContentIndex $contentIndex,
-        private readonly UrlInterface $url
+        private readonly UrlInterface $url,
+        private readonly ContentScopeFilter $scopeFilter
     ) {
     }
 
@@ -67,13 +71,17 @@ class CampaignCalendar extends AbstractHealthWidget
             }
         }
         $now = time();
-        $items = $this->scheduleService->getItems(
-            [
-                'status' => 'any',
-                'from' => gmdate('Y-m-d H:i:s', $now - $back * 86400),
-                'to' => gmdate('Y-m-d H:i:s', $now + $ahead * 86400),
-            ]
-        );
+        $items = $this->scopeFilter->filter(
+            $this->scheduleService->getItems(
+                [
+                    'status' => 'any',
+                    'from' => gmdate('Y-m-d H:i:s', $now - $back * 86400),
+                    'to' => gmdate('Y-m-d H:i:s', $now + $ahead * 86400),
+                ]
+            ),
+            'entity_type',
+            'entity_id'
+        )['visible'];
         $upcoming = [];
         $recent = [];
         $homepage = 0;
@@ -111,7 +119,7 @@ class CampaignCalendar extends AbstractHealthWidget
         }
         $conflictRows = [];
         $errors = 0;
-        foreach ($this->conflictReport->getConflicts() as $conflict) {
+        foreach ($this->conflictReport->getConflictsWithinCallerScope()['conflicts'] as $conflict) {
             if ($conflict['severity'] === 'info') {
                 continue;
             }

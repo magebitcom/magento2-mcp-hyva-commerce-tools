@@ -11,12 +11,15 @@ namespace Magebit\McpHyvaCommerceTools\Model\Widget;
 use Hyva\AdminDashboardApi\Api\V1\WidgetContextInterface;
 use Hyva\AdminDashboardApi\Api\V1\WidgetInstanceInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Migration\MigrationService;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Backend\Model\UrlInterface;
 
 /**
- * magebit_migration_status_widget: Page Builder/WYSIWYG to Hyvä CMS migration progress.
+ * magebit_migration_status_widget: Page Builder/WYSIWYG to Hyvä CMS migration progress of the pages and blocks of the
+ * admin's websites/store views.
  */
 class MigrationStatus extends AbstractHealthWidget
 {
@@ -24,11 +27,13 @@ class MigrationStatus extends AbstractHealthWidget
      * @param MigrationService $migrationService
      * @param ContentIndex $contentIndex
      * @param UrlInterface $url
+     * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
         private readonly MigrationService $migrationService,
         private readonly ContentIndex $contentIndex,
-        private readonly UrlInterface $url
+        private readonly UrlInterface $url,
+        private readonly ContentScopeFilter $scopeFilter
     ) {
     }
 
@@ -47,9 +52,14 @@ class MigrationStatus extends AbstractHealthWidget
      */
     protected function buildData(WidgetContextInterface $ctx, WidgetInstanceInterface $widgetInstance): array
     {
-        $pages = $this->contentIndex->getRows('cms_page');
+        $pages = $this->scopeFilter->filterByStoreIds(
+            $this->contentIndex->getRows(ContentLocator::TYPE_PAGE)
+        )['visible'];
         $hyva = count(array_filter($pages, static fn (array $p): bool => $p['liveview_enabled']));
-        $legacy = $this->migrationService->scan();
+        $legacy = $this->migrationService->scan(
+            [ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK],
+            $this->scopeFilter->isRestricted() ? $this->scopeFilter->allowsStores(...) : null
+        );
         $complexity = ['low' => 0, 'medium' => 0, 'high' => 0];
         $kinds = ['page_builder' => 0, 'wysiwyg' => 0];
         $waiting = 0;

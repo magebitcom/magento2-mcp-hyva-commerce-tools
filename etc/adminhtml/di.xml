@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * @author    Magebit <info@magebit.com>
+ * @copyright Copyright (c) Magebit, Ltd. (https://magebit.com)
+ * @license   MIT
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <!-- Dashboard widgets apply the website/store view restriction of the logged-in admin. -->
+    <type name="Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard">
+        <arguments>
+            <argument name="callerContext" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\Auth\AdminSessionCallerContext</argument>
+        </arguments>
+    </type>
+    <!-- Hyvä caches widget data per instance; this module's widgets depend on the viewer. -->
+    <type name="Hyva\AdminDashboardFramework\Model\Cache\Type\AdminDashboard">
+        <plugin name="magebit_mcp_hyva_commerce_viewer_widget_cache_key"
+                type="Magebit\McpHyvaCommerceTools\Plugin\Dashboard\ViewerWidgetCacheKeyPlugin"/>
+    </type>
+</config>
