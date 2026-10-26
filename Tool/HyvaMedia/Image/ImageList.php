@@ -121,31 +121,37 @@ class ImageList extends AbstractMediaTool
             ));
         }
 
-        // File info (stat + image size) for every candidate only when a size filter or the size sort needs it.
+        // Sorting and the size filters use a cheap size (the gallery's size column, else a stat); the full file
+        // info (stat + image read) is needed for every candidate only when a dimension filter is given.
         $files = [];
+        $sizes = [];
         $sizeSort = ($this->stringArg($arguments, 'sort', 'size_desc') ?? 'size_desc') === 'size_desc';
         $minKb = $this->intArg($arguments, 'min_size_kb');
         $maxKb = $this->intArg($arguments, 'max_size_kb');
         $minWidth = $this->intArg($arguments, 'min_width');
         $minHeight = $this->intArg($arguments, 'min_height');
-        if ($sizeSort || $minKb !== null || $maxKb !== null || $minWidth !== null || $minHeight !== null) {
+        $dimensionFilter = $minWidth !== null || $minHeight !== null;
+        if ($sizeSort || $minKb !== null || $maxKb !== null || $dimensionFilter) {
             $kept = [];
             foreach ($paths as $path) {
-                $file = $this->fileInfo->describe($path);
-                $kb = (int) round(($file['size'] ?? 0) / 1024);
-                if (($minKb !== null && $kb < $minKb) || ($maxKb !== null && $kb > $maxKb)
-                    || ($file['width'] ?? 0) < ($minWidth ?? 0) || ($file['height'] ?? 0) < ($minHeight ?? 0)
-                ) {
+                if ($dimensionFilter) {
+                    $file = $this->fileInfo->describe($path);
+                    if (($file['width'] ?? 0) < ($minWidth ?? 0) || ($file['height'] ?? 0) < ($minHeight ?? 0)) {
+                        continue;
+                    }
+                    $files[$path] = $file;
+                }
+                $kb = (int) round($this->cheapSize($path, $assets, $files) / 1024);
+                if (($minKb !== null && $kb < $minKb) || ($maxKb !== null && $kb > $maxKb)) {
                     continue;
                 }
-                $files[$path] = $file;
+                $sizes[$path] = $kb;
                 $kept[] = $path;
             }
             $paths = $kept;
         }
         if ($sizeSort) {
-            usort($paths, static fn (string $a, string $b): int => (int) round(($files[$b]['size'] ?? 0) / 1024)
-                <=> (int) round(($files[$a]['size'] ?? 0) / 1024));
+            usort($paths, static fn (string $a, string $b): int => ($sizes[$b] ?? 0) <=> ($sizes[$a] ?? 0));
         } else {
             sort($paths);
         }
@@ -172,6 +178,29 @@ class ImageList extends AbstractMediaTool
             ];
         }
         return $this->jsonResult(['total' => $total, 'items' => $items], ['total' => $total]);
+    }
+
+    /**
+     * Size in bytes without reading the image.
+     *
+     * The full file info when already read, else the gallery's size column, else a stat.
+     *
+     * @param string $path
+     * @param array $assets
+     * @param array $files
+     * @return int
+     * @phpstan-param array<string, array{size: int}> $assets
+     * @phpstan-param array<string, array{size: int|null}> $files
+     */
+    private function cheapSize(string $path, array $assets, array $files): int
+    {
+        if (isset($files[$path])) {
+            return $files[$path]['size'] ?? 0;
+        }
+        if (($assets[$path]['size'] ?? 0) > 0) {
+            return $assets[$path]['size'];
+        }
+        return $this->fileInfo->size($path) ?? 0;
     }
 
     /**

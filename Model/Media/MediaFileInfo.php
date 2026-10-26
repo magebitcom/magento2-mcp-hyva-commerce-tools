@@ -93,6 +93,26 @@ class MediaFileInfo
     }
 
     /**
+     * File size in bytes from a stat only (no image read), null when the file is missing or unreadable.
+     *
+     * @param string $path
+     * @return int|null
+     */
+    public function size(string $path): ?int
+    {
+        if (!$this->exists($path)) {
+            return null;
+        }
+        try {
+            $stat = $this->media()->stat($path);
+        } catch (Throwable $e) {
+            $this->logger->warning('Hyvä media info: could not stat a file.', ['path' => $path, 'exception' => $e]);
+            return null;
+        }
+        return isset($stat['size']) ? (int) $stat['size'] : null;
+    }
+
+    /**
      * Files under a media directory, recursively (relative paths).
      *
      * @param string $directory

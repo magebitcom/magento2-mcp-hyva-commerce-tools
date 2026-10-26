@@ -74,4 +74,61 @@ class ImageUsageIndexTest extends TestCase
         $this->assertCount(2, $likeFilters);
         $this->assertSame(2, substr_count($likeFilters[0], ' OR '));
     }
+
+    /**
+     * @return void
+     */
+    public function testManyPathsAreChunkedInsteadOfAnUnfilteredScan(): void
+    {
+        $select = $this->createMock(Select::class);
+        $select->method('from')->willReturnSelf();
+        $select->method('join')->willReturnSelf();
+        $likeFilters = [];
+        $select->method('where')->willReturnCallback(
+            function (string $condition) use ($select, &$likeFilters): Select {
+                if (str_contains($condition, 'value LIKE \'%wysiwyg')) {
+                    $likeFilters[] = $condition;
+                }
+                return $select;
+            }
+        );
+        $connection = $this->createMock(AdapterInterface::class);
+        $connection->method('select')->willReturn($select);
+        $connection->method('quoteInto')->willReturnCallback(
+            static fn (string $text, string $value): string => str_replace('?', "'" . $value . "'", $text)
+        );
+        // Attribute ids are read once per entity type, not once per chunk.
+        $connection->expects($this->exactly(2))->method('fetchPairs')->willReturn(['72' => 'description']);
+        // Two chunks (25 + 5 paths) per catalog table; the same row comes back for both product chunks.
+        $row = ['entity_id' => '10', 'attribute_id' => '72', 'value' => 'html'];
+        $connection->expects($this->exactly(4))->method('fetchAll')->willReturnOnConsecutiveCalls(
+            [$row],
+            [$row],
+            [],
+            []
+        );
+        $resource = $this->createMock(ResourceConnection::class);
+        $resource->method('getConnection')->willReturn($connection);
+        $resource->method('getTableName')->willReturnArgument(0);
+
+        $scanner = $this->createMock(ContentScanner::class);
+        $scanner->method('getDocuments')->willReturn([]);
+        $contentIndex = $this->createMock(ContentIndex::class);
+        $contentIndex->method('getRows')->willReturn([]);
+        $extractor = $this->createMock(ImageReferenceExtractor::class);
+        $extractor->method('fromHtml')->willReturn([
+            ['path' => 'wysiwyg/img0.jpg', 'alt' => null, 'kind' => 'img'],
+            ['path' => 'wysiwyg/img29.jpg', 'alt' => null, 'kind' => 'img'],
+        ]);
+        $paths = array_map(static fn (int $i): string => 'wysiwyg/img' . $i . '.jpg', range(0, 29));
+
+        $usages = (new ImageUsageIndex($scanner, $contentIndex, $extractor, $resource))->usagesOfMany($paths);
+
+        $this->assertCount(4, $likeFilters);
+        $this->assertSame(24, substr_count($likeFilters[0], ' OR '));
+        $this->assertSame(4, substr_count($likeFilters[1], ' OR '));
+        $this->assertCount(1, $usages['wysiwyg/img0.jpg']);
+        $this->assertCount(1, $usages['wysiwyg/img29.jpg']);
+        $this->assertSame([], $usages['wysiwyg/img1.jpg']);
+    }
 }

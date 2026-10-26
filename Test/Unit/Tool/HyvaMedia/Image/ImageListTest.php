@@ -31,25 +31,37 @@ class ImageListTest extends TestCase
     private ImageUsageIndex&MockObject $usageIndex;
 
     /**
+     * @var MediaInventory&MockObject
+     */
+    private MediaInventory&MockObject $inventory;
+
+    /**
      * @var ImageList
      */
     private ImageList $tool;
+
+    /**
+     * @var array
+     * @phpstan-var array<string, int>
+     */
+    private array $sizes = ['wysiwyg/a.jpg' => 1024, 'wysiwyg/b.jpg' => 4096, 'wysiwyg/c.jpg' => 2048];
 
     /**
      * @return void
      */
     protected function setUp(): void
     {
-        $inventory = $this->createMock(MediaInventory::class);
-        $inventory->method('getGalleryAssets')->willReturn([]);
+        $this->inventory = $this->createMock(MediaInventory::class);
+        $inventory = $this->inventory;
         $inventory->method('scanFolder')->willReturn(
             ['wysiwyg/d.png', 'wysiwyg/a.jpg', 'wysiwyg/c.jpg', 'wysiwyg/b.jpg']
         );
         $this->fileInfo = $this->createMock(MediaFileInfo::class);
-        $this->fileInfo->method('describe')->willReturnCallback(static fn (string $path): array => [
+        $this->fileInfo->method('size')->willReturnCallback(fn (string $path): int => $this->sizes[$path] ?? 0);
+        $this->fileInfo->method('describe')->willReturnCallback(fn (string $path): array => [
             'path' => $path,
             'exists' => true,
-            'size' => ['wysiwyg/a.jpg' => 1024, 'wysiwyg/b.jpg' => 4096, 'wysiwyg/c.jpg' => 2048][$path] ?? 0,
+            'size' => $this->sizes[$path] ?? 0,
             'width' => 10,
             'height' => 10,
             'mime' => 'image/jpeg',
@@ -65,6 +77,7 @@ class ImageListTest extends TestCase
      */
     public function testWithoutUsageFiltersOnlyThePageIsDescribedAndLookedUp(): void
     {
+        $this->inventory->method('getGalleryAssets')->willReturn([]);
         $this->usageIndex->expects($this->never())->method('all');
         $this->usageIndex->expects($this->once())->method('usagesOfMany')->with(['wysiwyg/a.jpg', 'wysiwyg/b.jpg'])
             ->willReturn(['wysiwyg/b.jpg' => [$this->usage(false)]]);
@@ -82,10 +95,13 @@ class ImageListTest extends TestCase
     /**
      * @return void
      */
-    public function testSizeSortDescribesCandidatesButSkipsTheFullIndex(): void
+    public function testDefaultSizeSortDescribesOnlyThePage(): void
     {
+        $this->inventory->method('getGalleryAssets')->willReturn([]);
         $this->usageIndex->expects($this->never())->method('all');
         $this->usageIndex->expects($this->once())->method('usagesOfMany')->with(['wysiwyg/b.jpg'])->willReturn([]);
+        $this->fileInfo->expects($this->exactly(3))->method('size');
+        $this->fileInfo->expects($this->once())->method('describe')->with('wysiwyg/b.jpg');
 
         $result = $this->tool->execute(['types' => ['jpg'], 'limit' => 1]);
 
@@ -97,8 +113,45 @@ class ImageListTest extends TestCase
     /**
      * @return void
      */
+    public function testSizeSortPrefersTheGallerySizeColumnOverAStat(): void
+    {
+        $this->inventory->method('getGalleryAssets')->willReturn(['wysiwyg/a.jpg' => [
+            'asset_id' => 7, 'title' => 'A', 'description' => null, 'width' => 10, 'height' => 10,
+            'size' => 9216, 'content_type' => 'image/jpeg', 'backup_image_path' => null,
+        ]]);
+        $this->usageIndex->method('usagesOfMany')->willReturn([]);
+        $this->fileInfo->expects($this->exactly(2))->method('size')
+            ->with($this->logicalNot($this->equalTo('wysiwyg/a.jpg')));
+
+        $result = $this->tool->execute(['types' => ['jpg'], 'min_size_kb' => 5, 'limit' => 5]);
+
+        $this->assertSame(1, $this->at($result, 'total'));
+        $this->assertSame('wysiwyg/a.jpg', $this->at($result, 'items.0.path'));
+        $this->assertSame(7, $this->at($result, 'items.0.gallery_asset_id'));
+    }
+
+    /**
+     * @return void
+     */
+    public function testDimensionFiltersDescribeEveryCandidateOnce(): void
+    {
+        $this->inventory->method('getGalleryAssets')->willReturn([]);
+        $this->usageIndex->method('usagesOfMany')->willReturn([]);
+        $this->fileInfo->expects($this->exactly(3))->method('describe');
+        $this->fileInfo->expects($this->never())->method('size');
+
+        $result = $this->tool->execute(['types' => ['jpg'], 'min_width' => 5, 'limit' => 2]);
+
+        $this->assertSame(3, $this->at($result, 'total'));
+        $this->assertSame(['wysiwyg/b.jpg', 'wysiwyg/c.jpg'], array_column($this->arrayAt($result, 'items'), 'path'));
+    }
+
+    /**
+     * @return void
+     */
     public function testUsageFiltersBuildTheIndexOnce(): void
     {
+        $this->inventory->method('getGalleryAssets')->willReturn([]);
         $this->usageIndex->expects($this->once())->method('all')->willReturn([
             'wysiwyg/a.jpg' => [$this->usage(true)],
             'wysiwyg/c.jpg' => [$this->usage(false)],

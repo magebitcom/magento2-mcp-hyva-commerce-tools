@@ -38,15 +38,21 @@ class ImageUsageIndex
     ];
 
     /**
-     * Up to this many paths, the catalog query filters by LIKE per path; above it, one unfiltered scan is cheaper.
+     * Paths per catalog query: more paths are split into several LIKE-filtered queries, never an unfiltered scan.
      */
-    private const MAX_LIKE_PATHS = 25;
+    private const LIKE_PATHS_PER_QUERY = 25;
 
     /**
      * @var array|null
      * @phpstan-var array<string, list<ImageUsage>>|null
      */
     private ?array $index = null;
+
+    /**
+     * @var array
+     * @phpstan-var array<string, array<int|string, mixed>>
+     */
+    private array $attributeIds = [];
 
     /**
      * @param ContentScanner $contentScanner
@@ -184,8 +190,7 @@ class ImageUsageIndex
      */
     private function addCatalog(array &$index, ?array $paths): void
     {
-        $onlyPaths = $paths === null ? null : array_fill_keys($paths, true);
-        $needles = $paths !== null && count($paths) <= self::MAX_LIKE_PATHS ? $paths : [];
+        $chunks = $paths === null ? [null] : array_chunk($paths, self::LIKE_PATHS_PER_QUERY);
         $sources = [
             [
                 self::SOURCE_PRODUCT,
@@ -197,8 +202,12 @@ class ImageUsageIndex
             [self::SOURCE_CATEGORY, 'category', 'catalog_category_entity_text', 'catalog_category', ['description']],
         ];
         foreach ($sources as [$source, $type, $table, $entityTypeCode, $attributes]) {
-            foreach ($this->descriptions($table, $entityTypeCode, $attributes, $needles) as $row) {
-                $this->addHtml($index, $source, $type, $row['id'], $row['code'], $row['value'], $onlyPaths);
+            // Each chunk keeps only its own paths, so a row matched by two chunks adds each usage once.
+            foreach ($chunks as $chunk) {
+                $onlyPaths = $chunk === null ? null : array_fill_keys($chunk, true);
+                foreach ($this->descriptions($table, $entityTypeCode, $attributes, $chunk ?? []) as $row) {
+                    $this->addHtml($index, $source, $type, $row['id'], $row['code'], $row['value'], $onlyPaths);
+                }
             }
         }
     }
@@ -260,7 +269,7 @@ class ImageUsageIndex
     private function descriptions(string $table, string $entityTypeCode, array $attributeCodes, array $needles): array
     {
         $connection = $this->resourceConnection->getConnection();
-        $attributeIds = $connection->fetchPairs(
+        $attributeIds = $this->attributeIds[$entityTypeCode] ??= $connection->fetchPairs(
             $connection->select()
                 ->from(
                     ['a' => $this->resourceConnection->getTableName('eav_attribute')],
