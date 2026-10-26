@@ -37,6 +37,14 @@ class ContentLocator
     public const TYPES = [self::TYPE_PAGE, self::TYPE_BLOCK, self::TYPE_MENU];
 
     /**
+     * Store views per type and id for the scope checks of restricted callers; null = the entity does not exist.
+     *
+     * @var array
+     * @phpstan-var array<string, array<int, list<int>|null>>
+     */
+    private array $scopeStoreIds = [];
+
+    /**
      * @param PageRepositoryInterface $pageRepository
      * @param BlockRepositoryInterface $blockRepository
      * @param PageCollectionFactory $pageCollectionFactory
@@ -44,6 +52,7 @@ class ContentLocator
      * @param MenuGatewayInterface $menuGateway
      * @param FeatureCheckerInterface $featureChecker
      * @param StoreScopeGuard $storeScopeGuard
+     * @param ContentIndex $contentIndex
      */
     public function __construct(
         private readonly PageRepositoryInterface $pageRepository,
@@ -52,7 +61,8 @@ class ContentLocator
         private readonly BlockCollectionFactory $blockCollectionFactory,
         private readonly MenuGatewayInterface $menuGateway,
         private readonly FeatureCheckerInterface $featureChecker,
-        private readonly StoreScopeGuard $storeScopeGuard
+        private readonly StoreScopeGuard $storeScopeGuard,
+        private readonly ContentIndex $contentIndex
     ) {
     }
 
@@ -97,7 +107,8 @@ class ContentLocator
     /**
      * Split entities into those the caller may change and those it may only see; the rest are dropped.
      *
-     * Unrestricted callers get every target back as writable without any lookup.
+     * Unrestricted callers get every target back as writable without any lookup; restricted callers cost one
+     * store view query per entity type.
      *
      * @param array $targets
      * @return array
@@ -107,15 +118,15 @@ class ContentLocator
      */
     public function partitionByScope(array $targets): array
     {
-        if ($this->storeScopeGuard->restrictedStoreIds() === null) {
+        if (!$this->isScopeRestricted()) {
             return ['writable' => $targets, 'read_only' => []];
         }
+        $this->prefetchScope($targets);
         $writable = [];
         $readOnly = [];
         foreach ($targets as $target) {
-            try {
-                $storeIds = $this->find($target['entity_type'], ['id' => $target['id']])['store_ids'];
-            } catch (LocalizedException) {
+            $storeIds = $this->scopeStoreIds($target['entity_type'], $target['id']);
+            if ($storeIds === null) {
                 continue;
             }
             if ($this->storeScopeGuard->allowsWrite($storeIds)) {
@@ -128,6 +139,22 @@ class ContentLocator
     }
 
     /**
+     * Whether the caller may see the entity (false when it no longer exists and the caller is restricted).
+     *
+     * @param string $type cms_page|cms_block|menu
+     * @param int $id
+     * @return bool
+     */
+    public function allowsRead(string $type, int $id): bool
+    {
+        if (!$this->isScopeRestricted()) {
+            return true;
+        }
+        $storeIds = $this->scopeStoreIds($type, $id);
+        return $storeIds !== null && $this->storeScopeGuard->allowsRead($storeIds);
+    }
+
+    /**
      * Whether the caller may change the entity (false when it no longer exists and the caller is restricted).
      *
      * @param string $type cms_page|cms_block|menu
@@ -136,14 +163,66 @@ class ContentLocator
      */
     public function allowsWrite(string $type, int $id): bool
     {
-        if ($this->storeScopeGuard->restrictedStoreIds() === null) {
+        if (!$this->isScopeRestricted()) {
             return true;
         }
-        try {
-            return $this->storeScopeGuard->allowsWrite($this->find($type, ['id' => $id])['store_ids']);
-        } catch (LocalizedException) {
-            return false;
+        $storeIds = $this->scopeStoreIds($type, $id);
+        return $storeIds !== null && $this->storeScopeGuard->allowsWrite($storeIds);
+    }
+
+    /**
+     * Whether the caller's role is restricted to some websites or store views.
+     *
+     * @return bool
+     */
+    public function isScopeRestricted(): bool
+    {
+        return $this->storeScopeGuard->restrictedStoreIds() !== null;
+    }
+
+    /**
+     * Read the store views of many entities for allowsRead() and allowsWrite().
+     *
+     * One query per entity type, each id once per request; nothing for an unrestricted caller.
+     *
+     * @param array $targets
+     * @return void
+     * @phpstan-param list<array{entity_type: string, id: int}> $targets
+     */
+    public function prefetchScope(array $targets): void
+    {
+        if ($targets === [] || !$this->isScopeRestricted()) {
+            return;
         }
+        $missing = [];
+        foreach ($targets as $target) {
+            if (!array_key_exists($target['id'], $this->scopeStoreIds[$target['entity_type']] ?? [])) {
+                $missing[$target['entity_type']][$target['id']] = $target['id'];
+            }
+        }
+        foreach ($missing as $type => $ids) {
+            // Without Hyvä Menu Builder no menu can be loaded, so none counts as existing.
+            $loadable = $type !== self::TYPE_MENU
+                || $this->featureChecker->isAvailable(FeatureCheckerInterface::MENU_BUILDER);
+            $found = $loadable ? $this->contentIndex->getStoreIds($type, array_values($ids)) : [];
+            foreach ($ids as $id) {
+                $this->scopeStoreIds[$type][$id] = $found[$id] ?? null;
+            }
+        }
+    }
+
+    /**
+     * Store views of an entity from the per-request lookup, null when it does not exist.
+     *
+     * @param string $type
+     * @param int $id
+     * @return array|null
+     * @phpstan-return list<int>|null
+     */
+    private function scopeStoreIds(string $type, int $id): ?array
+    {
+        $this->prefetchScope([['entity_type' => $type, 'id' => $id]]);
+        return $this->scopeStoreIds[$type][$id] ?? null;
     }
 
     /**

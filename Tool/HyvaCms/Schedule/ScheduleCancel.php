@@ -80,6 +80,19 @@ class ScheduleCancel extends AbstractContentTool
         if ($itemIds === [] && $releaseId === null) {
             return $this->softError('Pass item_ids and/or release_id.');
         }
+        if ($this->contentLocator->isScopeRestricted()) {
+            // One store view lookup per content type for all items, instead of loading each item's entity.
+            $rows = $itemIds !== []
+                ? $this->scheduleService->getItems(['status' => 'any', 'item_ids' => $itemIds])
+                : [];
+            if ($releaseId !== null) {
+                $rows = array_merge($rows, $this->scheduleService->getItems(['release_id' => $releaseId]));
+            }
+            $this->contentLocator->prefetchScope(array_map(
+                static fn (array $row): array => ['entity_type' => $row['entity_type'], 'id' => $row['entity_id']],
+                $rows
+            ));
+        }
         $result = $this->scheduleService->cancel(
             $itemIds,
             $releaseId,

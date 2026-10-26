@@ -85,10 +85,10 @@ class ScheduleService
      * Scheduled items joined with their release.
      *
      * @param array $filters `status` = pending (item + release pending), any, or an exact item status;
-     *     `from` / `to` are UTC 'Y-m-d H:i:s'.
+     *     `from` / `to` are UTC 'Y-m-d H:i:s'; `item_ids` limits to these items.
      * @return array
      * @phpstan-param array{status?: string|null, entity_type?: string|null, entity_id?: int|null, from?: string|null,
-     *     to?: string|null, release_id?: int|null} $filters
+     *     to?: string|null, release_id?: int|null, item_ids?: list<int>} $filters
      * @phpstan-return list<ScheduleItemRow>
      */
     public function getItems(array $filters = []): array
@@ -120,6 +120,9 @@ class ScheduleService
         }
         if (!empty($filters['release_id'])) {
             $select->where('i.release_id = ?', $filters['release_id']);
+        }
+        if (isset($filters['item_ids'])) {
+            $select->where('i.id IN (?)', $filters['item_ids'] === [] ? [0] : $filters['item_ids']);
         }
         if (!empty($filters['from'])) {
             $select->where('r.time_scheduled >= ?', $filters['from']);

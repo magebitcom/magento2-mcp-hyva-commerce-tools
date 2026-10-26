@@ -61,6 +61,18 @@ class ContentIndex
     ];
 
     /**
+     * Entity and store link tables per type for getStoreIds(); menus only when Hyvä Menu Builder is installed.
+     */
+    private const STORE_LINKS = [
+        ContentLocator::TYPE_PAGE => ['entity' => 'cms_page', 'id' => 'page_id', 'store' => 'cms_page_store',
+            'link' => 'page_id'],
+        ContentLocator::TYPE_BLOCK => ['entity' => 'cms_block', 'id' => 'block_id', 'store' => 'cms_block_store',
+            'link' => 'block_id'],
+        ContentLocator::TYPE_MENU => ['entity' => 'hyva_commerce_cms_menu', 'id' => 'id',
+            'store' => 'hyva_commerce_cms_menu_store', 'link' => 'menu_id'],
+    ];
+
+    /**
      * @param ResourceConnection $resourceConnection
      */
     public function __construct(
@@ -250,6 +262,41 @@ class ContentIndex
             }
         }
         return array_values($rows);
+    }
+
+    /**
+     * Store views of the entities with these ids, in one query; ids that do not exist are absent from the result.
+     *
+     * @param string $type cms_page|cms_block|menu
+     * @param array $ids
+     * @return array
+     * @phpstan-param list<int> $ids
+     * @phpstan-return array<int, list<int>>
+     */
+    public function getStoreIds(string $type, array $ids): array
+    {
+        $tables = self::STORE_LINKS[$type] ?? null;
+        if ($tables === null || $ids === []) {
+            return [];
+        }
+        $connection = $this->resourceConnection->getConnection();
+        $select = $connection->select()
+            ->from(['e' => $this->resourceConnection->getTableName($tables['entity'])], ['id' => $tables['id']])
+            ->joinLeft(
+                ['s' => $this->resourceConnection->getTableName($tables['store'])],
+                sprintf('s.%s = e.%s', $tables['link'], $tables['id']),
+                ['store_id']
+            )
+            ->where('e.' . $tables['id'] . ' IN (?)', array_values(array_unique($ids)));
+        $storeIds = [];
+        foreach ($connection->fetchAll($select) as $row) {
+            $id = Cast::int($row['id']);
+            $storeIds[$id] ??= [];
+            if ($row['store_id'] !== null) {
+                $storeIds[$id][] = Cast::int($row['store_id']);
+            }
+        }
+        return $storeIds;
     }
 
     /**

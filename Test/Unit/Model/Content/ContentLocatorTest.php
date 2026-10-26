@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content;
 
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magento\Cms\Api\BlockRepositoryInterface;
@@ -63,7 +64,8 @@ class ContentLocatorTest extends TestCase
             $collectionFactory,
             $this->createMock(MenuGatewayInterface::class),
             $this->createMock(FeatureCheckerInterface::class),
-            $this->createMock(StoreScopeGuard::class)
+            $this->createMock(StoreScopeGuard::class),
+            $this->createMock(ContentIndex::class)
         );
 
         $result = $locator->locate(ContentLocator::TYPE_BLOCK, ['identifier' => 'promo', 'store_id' => 2]);
@@ -106,7 +108,8 @@ class ContentLocatorTest extends TestCase
             $this->createMock(BlockCollectionFactory::class),
             $this->createMock(MenuGatewayInterface::class),
             $this->createMock(FeatureCheckerInterface::class),
-            $this->createMock(StoreScopeGuard::class)
+            $this->createMock(StoreScopeGuard::class),
+            $this->createMock(ContentIndex::class)
         );
     }
 

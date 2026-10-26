@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content;
 
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magento\Cms\Api\BlockRepositoryInterface;
@@ -104,17 +105,73 @@ class ContentLocatorScopeTest extends TestCase
         );
     }
 
+    public function testScopeChecksLookUpEachTypeOnceForAllTargets(): void
+    {
+        $contentIndex = $this->createMock(ContentIndex::class);
+        $contentIndex->expects($this->exactly(2))->method('getStoreIds')->willReturnCallback(
+            fn (string $type, array $ids): array => $type === ContentLocator::TYPE_PAGE
+                ? $this->contentIndex()->getStoreIds($type, $ids)
+                : [7 => [1]]
+        );
+        $locator = $this->locator([1], [], $contentIndex);
+        $targets = [];
+        foreach ([1, 2, 3, 4, 5] as $id) {
+            $targets[] = ['entity_type' => ContentLocator::TYPE_PAGE, 'id' => $id, 'identifier' => 'p' . $id];
+        }
+        $targets[] = ['entity_type' => ContentLocator::TYPE_BLOCK, 'id' => 7, 'identifier' => 'b7'];
+
+        $partition = $locator->partitionByScope($targets);
+
+        $this->assertSame([1, 7], array_column($partition['writable'], 'id'));
+        $this->assertSame([3, 4], array_column($partition['read_only'], 'id'));
+        // Later checks of the same entities reuse the lookup.
+        $this->assertTrue($locator->allowsWrite(ContentLocator::TYPE_PAGE, 1));
+        $this->assertFalse($locator->allowsRead(ContentLocator::TYPE_PAGE, 2));
+        $this->assertFalse($locator->allowsRead(ContentLocator::TYPE_PAGE, 5));
+        $this->assertTrue($locator->allowsRead(ContentLocator::TYPE_BLOCK, 7));
+    }
+
+    public function testAnUnrestrictedCallerNeedsNoScopeLookup(): void
+    {
+        $contentIndex = $this->createMock(ContentIndex::class);
+        $contentIndex->expects($this->never())->method('getStoreIds');
+        $locator = $this->locator(null, [], $contentIndex);
+
+        $locator->prefetchScope([['entity_type' => ContentLocator::TYPE_PAGE, 'id' => 2]]);
+        $this->assertTrue($locator->allowsWrite(ContentLocator::TYPE_PAGE, 2));
+        $this->assertTrue($locator->allowsRead(ContentLocator::TYPE_PAGE, 2));
+    }
+
+    /**
+     * Content index serving the store views of the pages.
+     *
+     * @return ContentIndex
+     */
+    private function contentIndex(): ContentIndex
+    {
+        $contentIndex = $this->createMock(ContentIndex::class);
+        $contentIndex->method('getStoreIds')->willReturnCallback(fn (string $type, array $ids): array => array_map(
+            fn (int $id): mixed => $this->pages[$id]->getData('store_id'),
+            array_intersect_key(array_combine($ids, $ids), $this->pages)
+        ));
+        return $contentIndex;
+    }
+
     /**
      * Locator over the pages; the identifier lookup finds $identifierIds.
      *
      * @param array|null $allowedStoreIds
      * @param array $identifierIds
+     * @param ContentIndex|null $contentIndex
      * @return ContentLocator
      * @phpstan-param list<int>|null $allowedStoreIds
      * @phpstan-param list<int> $identifierIds
      */
-    private function locator(?array $allowedStoreIds, array $identifierIds): ContentLocator
-    {
+    private function locator(
+        ?array $allowedStoreIds,
+        array $identifierIds,
+        ?ContentIndex $contentIndex = null
+    ): ContentLocator {
         $collection = $this->createMock(PageCollection::class);
         $collection->method('addFieldToFilter')->willReturnSelf();
         $collection->method('getAllIds')->willReturn($identifierIds);
@@ -130,7 +187,8 @@ class ContentLocatorScopeTest extends TestCase
             $this->createMock(BlockCollectionFactory::class),
             $this->createMock(MenuGatewayInterface::class),
             $this->createMock(FeatureCheckerInterface::class),
-            $this->storeScope($allowedStoreIds)
+            $this->storeScope($allowedStoreIds),
+            $contentIndex ?? $this->contentIndex()
         );
     }
 

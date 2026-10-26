@@ -30,6 +30,42 @@ class MenuScheduleCancelTest extends TestCase
         $this->assertFalse($callback('cms_page', 2));
     }
 
+    public function testARestrictedCallerLooksUpTheScopeOfAllItemsAtOnce(): void
+    {
+        $acl = $this->createMock(ContentAcl::class);
+        $acl->method('isAllowed')->willReturn(true);
+        $service = $this->createMock(ScheduleService::class);
+        $service->expects($this->exactly(2))->method('getItems')->willReturnCallback(
+            static fn (array $filters): array => isset($filters['item_ids'])
+                ? [['entity_type' => 'cms_page', 'entity_id' => 1], ['entity_type' => 'menu', 'entity_id' => 4]]
+                : [['entity_type' => 'cms_page', 'entity_id' => 2]]
+        );
+        $service->method('cancel')->willReturn(['cancelled_items' => [], 'cancelled_releases' => []]);
+        $locator = $this->createMock(ContentLocator::class);
+        $locator->method('isScopeRestricted')->willReturn(true);
+        $locator->expects($this->once())->method('prefetchScope')->with([
+            ['entity_type' => 'cms_page', 'id' => 1],
+            ['entity_type' => 'menu', 'id' => 4],
+            ['entity_type' => 'cms_page', 'id' => 2],
+        ]);
+
+        (new ScheduleCancel($service, $acl, $locator))->execute(['item_ids' => [10, 11], 'release_id' => 3]);
+    }
+
+    public function testAnUnrestrictedCallerLoadsNoItemsUpFront(): void
+    {
+        $acl = $this->createMock(ContentAcl::class);
+        $acl->method('isAllowed')->willReturn(true);
+        $service = $this->createMock(ScheduleService::class);
+        $service->expects($this->never())->method('getItems');
+        $service->method('cancel')->willReturn(['cancelled_items' => [], 'cancelled_releases' => []]);
+        $locator = $this->createMock(ContentLocator::class);
+        $locator->method('isScopeRestricted')->willReturn(false);
+        $locator->expects($this->never())->method('prefetchScope');
+
+        (new ScheduleCancel($service, $acl, $locator))->execute(['item_ids' => [10]]);
+    }
+
     /**
      * The per-item permission callback the tool hands to ScheduleService::cancel().
      *
