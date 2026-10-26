@@ -36,11 +36,25 @@ jobs:
           php-version: "8.3"
           composer-auth-user: ${{ secrets.MAGENTO_AUTH_USER }}
           composer-auth-pass: ${{ secrets.MAGENTO_AUTH_PASS }}
+          # The composer.json "suggest" modules: Model/, Tool/ and Test/ reference their classes, so PHPStan and the
+          # unit tests need them installed even though the module itself runs without them.
           extra-packages: >-
             phpstan/phpstan:^2.0
             bitexpert/phpstan-magento:^0.42
             phpstan/extension-installer:^1.4
             phpunit/phpunit:^9.5
+            hyva-themes/commerce-module-menu-builder:^1.1
+            hyva-themes/commerce-module-media-optimization:^1.1
+            hyva-themes/commerce-module-image-editor:^1.1
+            hyva-themes/commerce-module-media-gallery:^1.0
+            hyva-themes/commerce-module-cms-ai-translations:^1.0.2
+            hyva-themes/commerce-module-form-builder:^1.0
+            hyva-themes/commerce-module-email-templates:^1.0
+            hyva-themes/commerce-module-store-credit:^1.0.1
+            hyva-themes/commerce-module-linked-products:^1.0
+            hyva-themes/commerce-module-category-merchandiser:^1.0
+            hyva-themes/commerce-module-ai-worker:^1.0
+            hyva-themes/commerce-module-advanced-admin-permissions:^1.0
 
       - name: Run PHPStan
         working-directory: ${{ steps.magento.outputs.project-path }}
@@ -75,11 +89,25 @@ jobs:
           php-version: "8.3"
           composer-auth-user: ${{ secrets.MAGENTO_AUTH_USER }}
           composer-auth-pass: ${{ secrets.MAGENTO_AUTH_PASS }}
+          # The composer.json "suggest" modules: Model/, Tool/ and Test/ reference their classes, so PHPStan and the
+          # unit tests need them installed even though the module itself runs without them.
           extra-packages: >-
             phpstan/phpstan:^2.0
             bitexpert/phpstan-magento:^0.42
             phpstan/extension-installer:^1.4
             phpunit/phpunit:^9.5
+            hyva-themes/commerce-module-menu-builder:^1.1
+            hyva-themes/commerce-module-media-optimization:^1.1
+            hyva-themes/commerce-module-image-editor:^1.1
+            hyva-themes/commerce-module-media-gallery:^1.0
+            hyva-themes/commerce-module-cms-ai-translations:^1.0.2
+            hyva-themes/commerce-module-form-builder:^1.0
+            hyva-themes/commerce-module-email-templates:^1.0
+            hyva-themes/commerce-module-store-credit:^1.0.1
+            hyva-themes/commerce-module-linked-products:^1.0
+            hyva-themes/commerce-module-category-merchandiser:^1.0
+            hyva-themes/commerce-module-ai-worker:^1.0
+            hyva-themes/commerce-module-advanced-admin-permissions:^1.0
 
       - name: Run unit tests
         working-directory: ${{ steps.magento.outputs.project-path }}
