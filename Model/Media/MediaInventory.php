@@ -13,6 +13,9 @@ use Magento\Framework\App\ResourceConnection;
 
 /**
  * Lists media images from the Media Gallery (media_gallery_asset) and the filesystem.
+ *
+ * @phpstan-type GalleryAsset array{asset_id: int, title: string, description: string|null, width: int, height: int,
+ *     size: int, content_type: string, backup_image_path: string|null}
  */
 class MediaInventory
 {
@@ -29,6 +32,24 @@ class MediaInventory
     ];
 
     /**
+     * @var array|null
+     * @phpstan-var array<string, GalleryAsset>|null
+     */
+    private ?array $assets = null;
+
+    /**
+     * @var array
+     * @phpstan-var array<string, GalleryAsset|null>
+     */
+    private array $assetsByPath = [];
+
+    /**
+     * @var array|false|null
+     * @phpstan-var array{table: string, columns: list<string>, has_backup: bool}|false|null
+     */
+    private array|false|null $tableInfo = null;
+
+    /**
      * @param ResourceConnection $resourceConnection
      * @param MediaFileInfo $mediaFileInfo
      */
@@ -39,26 +60,58 @@ class MediaInventory
     }
 
     /**
-     * Gallery assets keyed by path.
+     * Gallery assets keyed by path, read once per request.
      *
      * @return array
-     * @phpstan-return array<string, array{asset_id: int, title: string, description: string|null, width: int,
-     *     height: int, size: int, content_type: string, backup_image_path: string|null}>
+     * @phpstan-return array<string, GalleryAsset>
      */
     public function getGalleryAssets(): array
     {
-        $connection = $this->resourceConnection->getConnection();
-        $table = $this->resourceConnection->getTableName('media_gallery_asset');
-        if (!$connection->isTableExists($table)) {
+        if ($this->assets !== null) {
+            return $this->assets;
+        }
+        $this->assets = $this->fetch(null);
+        return $this->assets;
+    }
+
+    /**
+     * One gallery asset by path (WHERE path = ?), memoised per path.
+     *
+     * @param string $path
+     * @return array|null
+     * @phpstan-return GalleryAsset|null
+     */
+    public function getGalleryAsset(string $path): ?array
+    {
+        if ($this->assets !== null) {
+            return $this->assets[$path] ?? null;
+        }
+        if (!array_key_exists($path, $this->assetsByPath)) {
+            $this->assetsByPath[$path] = $this->fetch($path)[$path] ?? null;
+        }
+        return $this->assetsByPath[$path];
+    }
+
+    /**
+     * Read media_gallery_asset rows, all or those with one path.
+     *
+     * @param string|null $path
+     * @return array
+     * @phpstan-return array<string, GalleryAsset>
+     */
+    private function fetch(?string $path): array
+    {
+        $info = $this->tableInfo();
+        if ($info === false) {
             return [];
         }
-        $hasBackup = $connection->tableColumnExists($table, 'backup_image_path');
-        $columns = ['id', 'path', 'title', 'description', 'width', 'height', 'size', 'content_type'];
-        if ($hasBackup) {
-            $columns[] = 'backup_image_path';
+        $connection = $this->resourceConnection->getConnection();
+        $select = $connection->select()->from($info['table'], $info['columns']);
+        if ($path !== null) {
+            $select->where('path = ?', $path);
         }
         $assets = [];
-        foreach ($connection->fetchAll($connection->select()->from($table, $columns)) as $row) {
+        foreach ($connection->fetchAll($select) as $row) {
             $assets[Cast::string($row['path'])] = [
                 'asset_id' => Cast::int($row['id']),
                 'title' => Cast::string($row['title']),
@@ -67,10 +120,34 @@ class MediaInventory
                 'height' => Cast::int($row['height']),
                 'size' => Cast::int($row['size']),
                 'content_type' => Cast::string($row['content_type']),
-                'backup_image_path' => $hasBackup ? Cast::nullableString($row['backup_image_path']) : null,
+                'backup_image_path' => $info['has_backup'] ? Cast::nullableString($row['backup_image_path']) : null,
             ];
         }
         return $assets;
+    }
+
+    /**
+     * The media_gallery_asset table and the columns to read, or false when the table is missing.
+     *
+     * @return array|false
+     * @phpstan-return array{table: string, columns: list<string>, has_backup: bool}|false
+     */
+    private function tableInfo(): array|false
+    {
+        if ($this->tableInfo !== null) {
+            return $this->tableInfo;
+        }
+        $connection = $this->resourceConnection->getConnection();
+        $table = $this->resourceConnection->getTableName('media_gallery_asset');
+        if (!$connection->isTableExists($table)) {
+            return $this->tableInfo = false;
+        }
+        $hasBackup = $connection->tableColumnExists($table, 'backup_image_path');
+        $columns = ['id', 'path', 'title', 'description', 'width', 'height', 'size', 'content_type'];
+        if ($hasBackup) {
+            $columns[] = 'backup_image_path';
+        }
+        return $this->tableInfo = ['table' => $table, 'columns' => $columns, 'has_backup' => $hasBackup];
     }
 
     /**

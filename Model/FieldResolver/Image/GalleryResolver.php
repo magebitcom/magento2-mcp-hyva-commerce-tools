@@ -48,7 +48,7 @@ class GalleryResolver implements ImageFieldResolverInterface
     public function resolve(string $path, array $args): mixed
     {
         unset($args);
-        $asset = $this->inventory->getGalleryAssets()[$path] ?? null;
+        $asset = $this->inventory->getGalleryAsset($path);
         if ($asset === null) {
             return null;
         }

@@ -57,7 +57,7 @@ class ImageEditorResolver implements ImageFieldResolverInterface
         if (!$this->featureChecker->isAvailable(FeatureCheckerInterface::IMAGE_EDITOR)) {
             return ['available' => false];
         }
-        $backup = $this->inventory->getGalleryAssets()[$path]['backup_image_path'] ?? null;
+        $backup = $this->inventory->getGalleryAsset($path)['backup_image_path'] ?? null;
         return [
             'available' => true,
             'editable_format' => in_array(
