@@ -430,3 +430,9 @@ constructors, mirroring the core's `Pagination::maxPageSize()`) and a few string
 ## License
 
 Released under the [MIT License](LICENSE).
+- `hyva_cms.schedule.list` with a status other than `pending` reads at most the newest 1000 items and reports
+  `truncated: true` when it cut; `total_releases` counts releases within the items read. Pending is never capped.
+- `hyva_menu.category.import` leaves out new subcategories of a category whose menu item lies outside the targeted
+  roots and lists them in `skipped_outside_targets` (`id`, `name`).
+- `hyva_cms.component.validate` warns (`invalid_link`) about link field values without `type` and `value`, such as
+  `{"url": "..."}`, which render an empty href.
