@@ -9,9 +9,8 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Model\Dashboard;
 
 use Hyva\AdminDashboardFramework\Api\V1\WidgetInstance\WidgetInstanceInterface;
+use Hyva\AdminDashboardFramework\Api\V1\WidgetInstance\WidgetInstanceInterfaceFactory;
 use Hyva\AdminDashboardFramework\Model\WidgetType\WidgetTypeDispatcher;
-use Magento\Framework\Exception\LocalizedException;
-use Magento\Framework\ObjectManagerInterface;
 
 /**
  * Unsaved Hyvä widget instance models for the /mcp (frontend) area.
@@ -24,11 +23,11 @@ use Magento\Framework\ObjectManagerInterface;
 class WidgetInstanceFactory
 {
     /**
-     * @param ObjectManagerInterface $objectManager
+     * @param WidgetInstanceInterfaceFactory $widgetInstanceFactory
      * @param WidgetTypeDispatcher $widgetTypeDispatcher
      */
     public function __construct(
-        private readonly ObjectManagerInterface $objectManager,
+        private readonly WidgetInstanceInterfaceFactory $widgetInstanceFactory,
         private readonly WidgetTypeDispatcher $widgetTypeDispatcher
     ) {
     }
@@ -39,17 +38,11 @@ class WidgetInstanceFactory
      * @param int $instanceId
      * @param string $widgetTypeId
      * @return WidgetInstanceInterface
-     * @throws LocalizedException
      */
     public function create(int $instanceId, string $widgetTypeId): WidgetInstanceInterface
     {
-        $instance = $this->objectManager->create(
-            WidgetInstanceInterface::class,
-            ['widgetTypeDispatcher' => $this->widgetTypeDispatcher]
-        );
-        if (!$instance instanceof WidgetInstanceInterface) {
-            throw new LocalizedException(__('%1 could not be created.', WidgetInstanceInterface::class));
-        }
-        return $instance->setInstanceId($instanceId)->setWidgetTypeId($widgetTypeId);
+        return $this->widgetInstanceFactory->create(['widgetTypeDispatcher' => $this->widgetTypeDispatcher])
+            ->setInstanceId($instanceId)
+            ->setWidgetTypeId($widgetTypeId);
     }
 }

@@ -270,6 +270,12 @@
         </arguments>
     </type>
 
+    <!-- Tag every cached display data variant of a widget instance so widget.refresh can clean them all. -->
+    <type name="Hyva\AdminDashboardFramework\Model\Cache\Type\AdminDashboard">
+        <plugin name="magebit_mcp_hyva_commerce_widget_instance_cache_tag"
+                type="Magebit\McpHyvaCommerceTools\Plugin\Dashboard\WidgetInstanceCacheTagPlugin"/>
+    </type>
+
     <!-- Keep the dashboard cache lazy so CLI tool listing does not touch the dashboard framework. -->
     <type name="Magebit\McpHyvaCommerceTools\Tool\HyvaDashboard\Widget\WidgetRefresh">
         <arguments>

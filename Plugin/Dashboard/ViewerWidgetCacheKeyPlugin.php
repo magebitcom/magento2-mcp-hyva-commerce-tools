@@ -10,14 +10,18 @@ namespace Magebit\McpHyvaCommerceTools\Plugin\Dashboard;
 
 use Hyva\AdminDashboardFramework\Api\V1\WidgetInstance\WidgetInstanceInterface;
 use Hyva\AdminDashboardFramework\Model\Cache\Type\AdminDashboard;
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Audit\McpActivityReader;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 
 /**
  * Hyvä caches a widget's display data per widget instance, and an instance on a shared dashboard view is shown to
  * every role of the view. This module's widgets depend on the viewer (website/store view restriction, MCP audit log
- * permission), so viewers other than an unrestricted admin with that permission get a cache entry of their own; the
- * common case keeps Hyvä's key, which hyva_dashboard.widget.refresh and Hyvä's own invalidation clear.
+ * permission, Menu Builder access, Hyvä CMS scheduling per content type), so viewers other than an unrestricted admin
+ * with all of these get a cache entry of their own; the common case keeps Hyvä's key. hyva_dashboard.widget.refresh
+ * clears every variant through the instance tag of WidgetInstanceCacheTagPlugin.
  */
 class ViewerWidgetCacheKeyPlugin
 {
@@ -36,15 +40,19 @@ class ViewerWidgetCacheKeyPlugin
     /**
      * @param StoreScopeGuard $storeScopeGuard
      * @param McpActivityReader $activityReader
+     * @param FeatureCheckerInterface $featureChecker
+     * @param ContentAcl $contentAcl
      */
     public function __construct(
         private readonly StoreScopeGuard $storeScopeGuard,
-        private readonly McpActivityReader $activityReader
+        private readonly McpActivityReader $activityReader,
+        private readonly FeatureCheckerInterface $featureChecker,
+        private readonly ContentAcl $contentAcl
     ) {
     }
 
     /**
-     * Add the viewer's scope and audit log permission to the key of this module's widgets.
+     * Add the viewer's scope and the permissions the widgets' data depends on to the key of this module's widgets.
      *
      * @param AdminDashboard $subject
      * @param string $result
@@ -68,6 +76,16 @@ class ViewerWidgetCacheKeyPlugin
         }
         if (!$this->activityReader->isAllowed()) {
             $viewer[] = 'no-audit-log';
+        }
+        if (!$this->featureChecker->isAvailable(FeatureCheckerInterface::MENU_BUILDER)) {
+            $viewer[] = 'no-menu';
+        }
+        $unschedulable = array_diff(
+            ContentLocator::TYPES,
+            $this->contentAcl->allowedTypes(ContentLocator::TYPES, ContentAcl::VERB_SCHEDULING)
+        );
+        if ($unschedulable !== []) {
+            $viewer[] = 'no-schedule-' . implode('-', $unschedulable);
         }
         return $viewer === [] ? $result : $result . ':' . implode(':', $viewer);
     }

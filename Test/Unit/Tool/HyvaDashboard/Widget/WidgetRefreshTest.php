@@ -47,10 +47,14 @@ class WidgetRefreshTest extends TestCase
 
         $cache = $this->getMockBuilder(AdminDashboard::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['remove'])
+            ->onlyMethods(['remove', 'clean'])
             ->getMock();
         $cache->expects($this->once())->method('remove')
             ->with('hyva_admin_dashboard:widget:magebit_content_health_widget:display_data:7');
+        // The per-viewer variants of the key carry the instance tag and are cleaned with it.
+        $cache->expects($this->once())->method('clean')
+            ->with(\Zend_Cache::CLEANING_MODE_MATCHING_TAG, ['MAGEBIT_MCP_DASHBOARD_WIDGET_7'])
+            ->willReturn(true);
 
         $instance = $this->createMock(WidgetInstanceInterface::class);
         $instance->method('getInstanceId')->willReturn(7);

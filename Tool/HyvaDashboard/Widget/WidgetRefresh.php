@@ -15,6 +15,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Dashboard\WidgetInstanceFactory;
+use Magebit\McpHyvaCommerceTools\Plugin\Dashboard\WidgetInstanceCacheTagPlugin;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Framework\App\ResourceConnection;
@@ -24,7 +25,9 @@ use Magento\Framework\App\ResourceConnection;
  *
  * Instances are read with SQL: the framework's instance repository depends on WidgetAuthInterface, which only
  * adminhtml DI provides, while /mcp runs in the frontend area. The cache key comes from Hyvä's own
- * AdminDashboard::getWidgetInstanceDisplayDataCacheKey() on an unsaved WidgetInstance model built for the row.
+ * AdminDashboard::getWidgetInstanceDisplayDataCacheKey() on an unsaved WidgetInstance model built for the row; the
+ * per-viewer variants of that key (ViewerWidgetCacheKeyPlugin) are cleaned by the instance tag
+ * WidgetInstanceCacheTagPlugin adds when the data is saved.
  */
 class WidgetRefresh extends AbstractTool
 {
@@ -62,7 +65,8 @@ class WidgetRefresh extends AbstractTool
     {
         return 'Clear the cached data of Hyvä Admin Dashboard widgets so they recalculate (e.g. content health, '
             . 'migration status, campaign calendar after edits). Select by widget_type (e.g. '
-            . 'magebit_content_health_widget) and/or instance_ids. Data is rebuilt on the next dashboard load.';
+            . 'magebit_content_health_widget) and/or instance_ids. Clears the data cached for every viewer of the '
+            . 'instance; it is rebuilt on the next dashboard load.';
     }
 
     /**
@@ -112,6 +116,10 @@ class WidgetRefresh extends AbstractTool
             $this->cache->remove($this->cache->getWidgetInstanceDisplayDataCacheKey(
                 $this->widgetInstanceFactory->create($instanceId, $widgetType)
             ));
+            $this->cache->clean(
+                \Zend_Cache::CLEANING_MODE_MATCHING_TAG,
+                [WidgetInstanceCacheTagPlugin::tag($instanceId)]
+            );
             $refreshed[] = ['instance_id' => $instanceId, 'widget_type' => $widgetType, 'cache_cleared' => true];
         }
         return $this->jsonResult(

@@ -9,9 +9,9 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Dashboard;
 
 use Hyva\AdminDashboardFramework\Api\V1\WidgetInstance\WidgetInstanceInterface;
+use Hyva\AdminDashboardFramework\Api\V1\WidgetInstance\WidgetInstanceInterfaceFactory;
 use Hyva\AdminDashboardFramework\Model\WidgetType\WidgetTypeDispatcher;
 use Magebit\McpHyvaCommerceTools\Model\Dashboard\WidgetInstanceFactory;
-use Magento\Framework\ObjectManagerInterface;
 use PHPUnit\Framework\TestCase;
 
 class WidgetInstanceFactoryTest extends TestCase
@@ -27,11 +27,11 @@ class WidgetInstanceFactoryTest extends TestCase
         $instance = $this->createMock(WidgetInstanceInterface::class);
         $instance->expects($this->once())->method('setInstanceId')->with(7)->willReturnSelf();
         $instance->expects($this->once())->method('setWidgetTypeId')->with('w')->willReturnSelf();
-        $objectManager = $this->createMock(ObjectManagerInterface::class);
-        $objectManager->expects($this->once())->method('create')
-            ->with(WidgetInstanceInterface::class, ['widgetTypeDispatcher' => $dispatcher])
+        $hyvaFactory = $this->createMock(WidgetInstanceInterfaceFactory::class);
+        $hyvaFactory->expects($this->once())->method('create')
+            ->with(['widgetTypeDispatcher' => $dispatcher])
             ->willReturn($instance);
 
-        $this->assertSame($instance, (new WidgetInstanceFactory($objectManager, $dispatcher))->create(7, 'w'));
+        $this->assertSame($instance, (new WidgetInstanceFactory($hyvaFactory, $dispatcher))->create(7, 'w'));
     }
 }
