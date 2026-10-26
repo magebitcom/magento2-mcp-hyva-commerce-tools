@@ -262,6 +262,14 @@
         </arguments>
     </type>
 
+    <!-- Hyvä's widget type dispatcher needs the adminhtml-only WidgetAuthInterface; WidgetRefresh only needs the
+         instance's id and type for the cache key, so the dispatcher stays lazy on /mcp. -->
+    <type name="Magebit\McpHyvaCommerceTools\Model\Dashboard\WidgetInstanceFactory">
+        <arguments>
+            <argument name="widgetTypeDispatcher" xsi:type="object">Hyva\AdminDashboardFramework\Model\WidgetType\WidgetTypeDispatcher\Proxy</argument>
+        </arguments>
+    </type>
+
     <!-- Keep the dashboard cache lazy so CLI tool listing does not touch the dashboard framework. -->
     <type name="Magebit\McpHyvaCommerceTools\Tool\HyvaDashboard\Widget\WidgetRefresh">
         <arguments>

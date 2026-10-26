@@ -14,6 +14,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\ArrayBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Dashboard\WidgetInstanceFactory;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Framework\App\ResourceConnection;
@@ -22,7 +23,8 @@ use Magento\Framework\App\ResourceConnection;
  * `hyva_dashboard.widget.refresh`: drop cached widget data so it is recalculated on the next dashboard load.
  *
  * Instances are read with SQL: the framework's instance repository depends on WidgetAuthInterface, which only
- * adminhtml DI provides, while /mcp runs in the frontend area.
+ * adminhtml DI provides, while /mcp runs in the frontend area. The cache key comes from Hyvä's own
+ * AdminDashboard::getWidgetInstanceDisplayDataCacheKey() on an unsaved WidgetInstance model built for the row.
  */
 class WidgetRefresh extends AbstractTool
 {
@@ -32,19 +34,16 @@ class WidgetRefresh extends AbstractTool
     public const IS_WRITE = true;
 
     /**
-     * Same format as AdminDashboard::getWidgetInstanceDisplayDataCacheKey().
-     */
-    private const CACHE_KEY = 'hyva_admin_dashboard:widget:%s:display_data:%d';
-
-    /**
      * @param FeatureCheckerInterface $featureChecker
      * @param ResourceConnection $resourceConnection
      * @param AdminDashboard $cache
+     * @param WidgetInstanceFactory $widgetInstanceFactory
      */
     public function __construct(
         private readonly FeatureCheckerInterface $featureChecker,
         private readonly ResourceConnection $resourceConnection,
-        private readonly AdminDashboard $cache
+        private readonly AdminDashboard $cache,
+        private readonly WidgetInstanceFactory $widgetInstanceFactory
     ) {
     }
 
@@ -110,7 +109,9 @@ class WidgetRefresh extends AbstractTool
         foreach ($connection->fetchAll($select) as $row) {
             $instanceId = Cast::int($row['instance_id']);
             $widgetType = Cast::string($row['widget_type_id']);
-            $this->cache->remove(sprintf(self::CACHE_KEY, $widgetType, $instanceId));
+            $this->cache->remove($this->cache->getWidgetInstanceDisplayDataCacheKey(
+                $this->widgetInstanceFactory->create($instanceId, $widgetType)
+            ));
             $refreshed[] = ['instance_id' => $instanceId, 'widget_type' => $widgetType, 'cache_cleared' => true];
         }
         return $this->jsonResult(
