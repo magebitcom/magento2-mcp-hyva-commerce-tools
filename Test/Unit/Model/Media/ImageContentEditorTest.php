@@ -138,6 +138,36 @@ class ImageContentEditorTest extends TestCase
         $this->assertCount(1, $targets['not_editable']);
     }
 
+    public function testAFailurePartWayNamesTheDraftsAlreadyRewritten(): void
+    {
+        $tree = $this->createMock(ComponentTree::class);
+        $tree->method('mapNodes')->willReturn(['content' => ['rewritten']]);
+        $content = $this->createMock(ContentService::class);
+        $content->method('getWorkingDocument')->willReturn(['content' => []]);
+        $content->method('saveDraft')->willReturnCallback(
+            static function (string $type, int $id): array {
+                if ($id === 2) {
+                    throw new LocalizedException(__('Draft #2 is locked.'));
+                }
+                return ['version_id' => 11];
+            }
+        );
+        $editor = new ImageContentEditor(
+            $this->createMock(ImageUsageIndex::class),
+            $content,
+            $tree,
+            $this->createMock(ImageReferenceExtractor::class),
+            $this->createMock(Escaper::class)
+        );
+
+        $this->expectException(LocalizedException::class);
+        $this->expectExceptionMessage('Drafts already rewritten before the failure: cms_page #1 (version 11).');
+        $editor->rewrite([
+            ['entity_type' => 'cms_page', 'id' => 1, 'identifier' => 'a'],
+            ['entity_type' => 'cms_page', 'id' => 2, 'identifier' => 'b'],
+        ], static fn (array $node): array => $node, 'Replace image');
+    }
+
     public function testNormalizeRejectsTraversal(): void
     {
         $this->expectException(LocalizedException::class);

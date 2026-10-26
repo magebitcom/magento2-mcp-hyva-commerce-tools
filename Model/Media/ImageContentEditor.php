@@ -95,17 +95,40 @@ class ImageContentEditor
     {
         $results = [];
         foreach ($targets as $target) {
-            $document = $this->contentService->getWorkingDocument($target['entity_type'], $target['id']);
-            $updated = $this->componentTree->mapNodes($document, $rewrite);
-            $changed = $updated !== $document;
-            $versionId = null;
-            if ($changed) {
-                $versionId = $this->contentService->saveDraft(
+            try {
+                $document = $this->contentService->getWorkingDocument($target['entity_type'], $target['id']);
+                $updated = $this->componentTree->mapNodes($document, $rewrite);
+                $changed = $updated !== $document;
+                $versionId = null;
+                if ($changed) {
+                    $versionId = $this->contentService->saveDraft(
+                        $target['entity_type'],
+                        $target['id'],
+                        $updated,
+                        $versionName
+                    )['version_id'];
+                }
+            } catch (LocalizedException $e) {
+                // Drafts saved before the failure stay saved: name them so the caller can review or revert them.
+                $saved = array_filter($results, static fn (array $result): bool => $result['changed']);
+                if ($saved === []) {
+                    throw $e;
+                }
+                throw new LocalizedException(__(
+                    '%1 (at %2 #%3). Drafts already rewritten before the failure: %4.',
+                    $e->getMessage(),
                     $target['entity_type'],
                     $target['id'],
-                    $updated,
-                    $versionName
-                )['version_id'];
+                    implode(', ', array_map(
+                        static fn (array $result): string => sprintf(
+                            '%s #%d (version %s)',
+                            $result['entity_type'],
+                            $result['id'],
+                            (string) $result['version_id']
+                        ),
+                        $saved
+                    ))
+                ), $e);
             }
             $results[] = $target + ['changed' => $changed, 'version_id' => $versionId];
         }
