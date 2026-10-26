@@ -53,10 +53,7 @@ abstract class AbstractTemplatePreview extends AbstractEmailTool
     protected function executeEmail(array $arguments): ToolResultInterface
     {
         $template = $this->locateTemplate($arguments);
-        $storeId = $this->intArg($arguments, 'store_id');
-        if ($storeId !== null) {
-            $this->storeScopeGuard->assertReadable('store view ' . $storeId, [$storeId]);
-        }
+        $storeId = $this->storeScopeGuard->resolveStoreId($this->intArg($arguments, 'store_id'));
         $preview = $this->previewService->getPreview(static::TEMPLATE_TYPE, $template['id'], $storeId);
         // Like send_test: a role restricted to some websites/store views previews only its own store views.
         $preview['stores'] = array_values(array_filter(

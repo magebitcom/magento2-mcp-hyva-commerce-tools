@@ -94,4 +94,32 @@ class StoreScopeGuardTest extends TestCase
         $this->expectException(AuthorizationException::class);
         $guard->assertUnrestricted('Linked product groups');
     }
+
+    public function testResolveStoreIdKeepsTheValueForAnUnrestrictedCaller(): void
+    {
+        $guard = $this->storeScope(null);
+        $this->assertNull($guard->resolveStoreId(null));
+        $this->assertSame(0, $guard->resolveStoreId(0));
+        $this->assertSame(2, $guard->resolveStoreId(2));
+    }
+
+    public function testResolveStoreIdPicksTheFirstReadableStoreViewForARestrictedCaller(): void
+    {
+        $guard = $this->storeScope([2, 1]);
+        $this->assertSame(2, $guard->resolveStoreId(null));
+        $this->assertSame(1, $guard->resolveStoreId(1));
+    }
+
+    public function testResolveStoreIdRefusesZeroAndForeignStoreViewsForARestrictedCaller(): void
+    {
+        $guard = $this->storeScope([1]);
+        foreach ([0, 2] as $storeId) {
+            try {
+                $guard->resolveStoreId($storeId);
+                $this->fail('Store view ' . $storeId . ' must be refused.');
+            } catch (AuthorizationException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
 }

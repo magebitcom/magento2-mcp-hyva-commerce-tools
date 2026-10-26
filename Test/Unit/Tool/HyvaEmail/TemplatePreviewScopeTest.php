@@ -40,6 +40,30 @@ class TemplatePreviewScopeTest extends TestCase
         }
     }
 
+    public function testARestrictedCallerWithoutAStoreViewRendersInItsFirstReadableOne(): void
+    {
+        $gateway = $this->gateway();
+        $gateway->expects($this->once())->method('render')
+            ->with(EmailGatewayInterface::TYPE_EMAIL, 4, 'draft', 1)
+            ->willReturn('<p>x</p>');
+
+        $result = $this->tool(TemplatePreview::class, $gateway)->execute(['id' => 4, 'render' => true]);
+
+        $this->assertFalse($result->isError());
+    }
+
+    public function testStoreViewZeroIsRefusedForARestrictedCaller(): void
+    {
+        $gateway = $this->gateway();
+        $gateway->expects($this->never())->method('render');
+
+        $result = $this->tool(TemplatePreview::class, $gateway)
+            ->execute(['id' => 4, 'store_id' => 0, 'render' => true]);
+
+        $this->assertTrue($result->isError());
+        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+    }
+
     public function testPreviewLinksOfOtherStoreViewsAreLeftOut(): void
     {
         $result = $this->tool(TemplatePreview::class, $this->gateway())->execute(['id' => 4]);

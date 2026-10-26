@@ -65,10 +65,7 @@ class TemplateSendTest extends AbstractEmailTool
             return $this->softError(sprintf('"%s" is not a valid email address.', $recipient));
         }
         $template = $this->locateTemplate($arguments);
-        $storeId = $this->intArg($arguments, 'store_id');
-        if ($storeId !== null) {
-            $this->storeScopeGuard->assertReadable('store view ' . $storeId, [$storeId]);
-        }
+        $storeId = $this->storeScopeGuard->resolveStoreId($this->intArg($arguments, 'store_id'));
         $this->emailGateway->sendTest($template['id'], $recipient, $storeId);
         return $this->jsonResult(
             ['sent' => true, 'id' => $template['id'], 'recipient' => $recipient],

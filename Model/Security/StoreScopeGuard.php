@@ -200,6 +200,38 @@ class StoreScopeGuard
     }
 
     /**
+     * Store view a store-bound render or send runs in: restricted callers never fall back to the default store view
+     *
+     * A restricted caller without a store view gets the first one its role may read; store view 0 ("All Store
+     * Views") and views outside the role are refused. Unrestricted callers keep the given value (null: default).
+     *
+     * @param int|null $storeId
+     * @return int|null
+     * @throws AuthorizationException
+     */
+    public function resolveStoreId(?int $storeId): ?int
+    {
+        $allowed = $this->restrictedStoreIds();
+        if ($allowed === null) {
+            return $storeId;
+        }
+        if ($storeId === null) {
+            if ($allowed === []) {
+                throw new AuthorizationException(__('Your admin role is restricted and has no readable store view.'));
+            }
+            return $allowed[0];
+        }
+        if ($storeId === 0) {
+            throw new AuthorizationException(__(
+                'Your admin role is restricted to some websites or store views; store view 0 ("All Store Views") '
+                . 'is outside it. Pass the store_id of one of your store views.'
+            ));
+        }
+        $this->assertReadable('store view ' . $storeId, [$storeId]);
+        return $storeId;
+    }
+
+    /**
      * Refuse a change to an entity the caller may not change
      *
      * @param string $label
