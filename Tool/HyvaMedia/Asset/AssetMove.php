@@ -74,8 +74,9 @@ class AssetMove extends AbstractMediaGalleryTool
         }
         if (!$this->boolArg($arguments, 'confirm')) {
             $affected = [];
+            $usages = $this->usages($assets);
             foreach ($assets as $asset) {
-                $affected[] = ['asset' => $asset, 'used_in' => $this->usage($asset)];
+                $affected[] = ['asset' => $asset, 'used_in' => $usages[$asset['id']]];
             }
             return $this->confirmationRequired('move_assets', [
                 'target_folder' => $target,

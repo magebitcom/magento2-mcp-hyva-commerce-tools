@@ -94,10 +94,30 @@ abstract class AbstractMediaGalleryTool extends AbstractTool
      */
     protected function usage(array $asset): array
     {
-        return [
-            'hyva_and_catalog' => array_values($this->usageIndex->usagesOf($asset['path'])),
-            'magento_tracked' => $this->gallery->magentoUsage([$asset['id']])[$asset['id']] ?? [],
-        ];
+        return $this->usages([$asset])[$asset['id']];
+    }
+
+    /**
+     * Where each of several assets is used, keyed by asset id (one magentoUsage call and one catalog pass).
+     *
+     * @param array $assets
+     * @return array
+     * @phpstan-param list<array{id: int, path: string}> $assets
+     * @phpstan-return array<int, array{hyva_and_catalog: list<array<string, mixed>>,
+     *     magento_tracked: list<array<string, mixed>>}>
+     */
+    protected function usages(array $assets): array
+    {
+        $byPath = $this->usageIndex->usagesOfMany(array_column($assets, 'path'));
+        $tracked = $this->gallery->magentoUsage(array_column($assets, 'id'));
+        $usages = [];
+        foreach ($assets as $asset) {
+            $usages[$asset['id']] = [
+                'hyva_and_catalog' => $byPath[$asset['path']] ?? [],
+                'magento_tracked' => $tracked[$asset['id']] ?? [],
+            ];
+        }
+        return $usages;
     }
 
     /**

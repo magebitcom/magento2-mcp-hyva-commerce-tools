@@ -66,8 +66,9 @@ class AssetTrash extends AbstractMediaGalleryTool
         }
         $affected = [];
         $inUse = 0;
+        $usages = $this->usages($assets);
         foreach ($assets as $asset) {
-            $usage = $this->usage($asset);
+            $usage = $usages[$asset['id']];
             $inUse += ($usage['hyva_and_catalog'] !== [] || $usage['magento_tracked'] !== []) ? 1 : 0;
             $affected[] = ['asset' => $asset, 'used_in' => $usage];
         }
