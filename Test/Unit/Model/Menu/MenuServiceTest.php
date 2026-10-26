@@ -283,6 +283,25 @@ class MenuServiceTest extends TestCase
         $this->assertSame(['Sale'], array_map(static fn (array $p) => $p['spec']['label'] ?? null, $placements));
     }
 
+    public function testNewChildrenOfItemsOutsideTheTargetedRootsAreReportedAsSkipped(): void
+    {
+        [$document, , ] = $this->menuWithWomen();
+        $mobile = $this->tree->createNode('mobile_menu');
+        $mobileUid = Cast::string($mobile['uid'] ?? '');
+        $document = $this->tree->insertNode($document, $mobile);
+        $plan = $this->service->planCategoryImport($document, 2, 2, 1, false, false);
+        $skipped = [];
+        $this->service->placements(
+            $document,
+            $plan['tree'],
+            [['uid' => $mobileUid, 'component' => 'mobile_menu']],
+            'nested',
+            $skipped
+        );
+
+        $this->assertSame([['id' => 21, 'name' => 'Tops']], $skipped);
+    }
+
     public function testFlatImportListsEveryNewCategoryAtTheTargetLevel(): void
     {
         [$document, $rootUid] = $this->menuWithWomen();

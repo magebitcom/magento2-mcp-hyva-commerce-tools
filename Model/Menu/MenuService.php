@@ -449,20 +449,28 @@ class MenuService
      * Where each imported item goes.
      *
      * New categories go under the target parents; in nested mode, new subcategories of a category that is already
-     * in the menu go under that existing item (inside the targeted roots only).
+     * in the menu go under that existing item (inside the targeted roots only). New subcategories of an item outside
+     * the targeted roots are not placed; they are appended to $skipped as id + name.
      *
      * @param array $document
      * @param array $tree Planned tree from planCategoryImport().
      * @param array $parents Target parents.
      * @param string $mode nested|flat
+     * @param array $skipped Receives the new categories left out because their parent item is outside the targets.
      * @return array
      * @phpstan-param array<string, mixed> $document
      * @phpstan-param list<array<string, mixed>> $tree
      * @phpstan-param list<array{uid: string, component: string}> $parents
+     * @phpstan-param list<array{id: int, name: string}> $skipped
      * @phpstan-return list<array{parent_uid: string, parent_component: string, spec: array<string, mixed>}>
      */
-    public function placements(array $document, array $tree, array $parents, string $mode): array
-    {
+    public function placements(
+        array $document,
+        array $tree,
+        array $parents,
+        string $mode,
+        array &$skipped = []
+    ): array {
         $placements = [];
         if ($mode === 'flat') {
             foreach ($this->treeToItemSpecs($this->flattenNew($tree), 'flat') as $spec) {
@@ -494,16 +502,44 @@ class MenuService
             foreach (Cast::array($node['existing_uids'] ?? []) as $existingUid) {
                 $existingUid = Cast::string($existingUid);
                 $existing = $this->componentTree->findNode($document, $existingUid);
-                if ($existing === null || !$this->isWithin($document, $existingUid, $parentUids)) {
+                if ($existing === null) {
+                    continue;
+                }
+                if (!$this->isWithin($document, $existingUid, $parentUids)) {
+                    foreach ($this->newCategories($children) as $category) {
+                        $skipped[] = $category;
+                    }
                     continue;
                 }
                 $target = [['uid' => $existingUid, 'component' => Cast::string($existing['component'] ?? '')]];
-                foreach ($this->placements($document, $children, $target, 'nested') as $placement) {
+                foreach ($this->placements($document, $children, $target, 'nested', $skipped) as $placement) {
                     $placements[] = $placement;
                 }
             }
         }
         return $placements;
+    }
+
+    /**
+     * Id and name of every category in the subtree that is not in the menu yet.
+     *
+     * @param array $tree
+     * @return array
+     * @phpstan-param list<array<string, mixed>> $tree
+     * @phpstan-return list<array{id: int, name: string}>
+     */
+    private function newCategories(array $tree): array
+    {
+        $result = [];
+        foreach ($tree as $node) {
+            if (empty($node['already_linked'])) {
+                $result[] = ['id' => Cast::int($node['id'] ?? 0), 'name' => Cast::string($node['name'] ?? '')];
+            }
+            foreach ($this->newCategories($this->listOfArrays($node['children'] ?? [])) as $child) {
+                $result[] = $child;
+            }
+        }
+        return $result;
     }
 
     /**

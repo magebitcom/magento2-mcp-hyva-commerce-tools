@@ -139,22 +139,17 @@ class CategoryImport extends AbstractMenuEditTool
                 : 'Footer columns cannot link: each top-level category becomes a column named after it, holding a'
                     . ' link to the category followed by its subcategories.';
         }
+        $skipped = [];
+        $placements = $this->placeCategories($document, $plan['tree'], $parents, $mode, $rootCategoryId, $skipped);
+        $preview['skipped_outside_targets'] = $skipped;
+        if ($skipped !== []) {
+            $preview['warnings'][] = 'New subcategories of categories whose menu item lies outside the targeted roots '
+                . 'are not imported (skipped_outside_targets).';
+        }
         if ($this->isDryRun($arguments)) {
             return $this->jsonResult(['dry_run' => true] + $preview, ['id' => $menuId, 'dry_run' => true] + $summary);
         }
 
-        if ($mode === 'dynamic') {
-            $placements = [];
-            foreach ($parents as $parent) {
-                $placements[] = [
-                    'parent_uid' => $parent['uid'],
-                    'parent_component' => $parent['component'],
-                    'spec' => ['type' => 'category_tree', 'value' => [$rootCategoryId]],
-                ];
-            }
-        } else {
-            $placements = $this->menuService->placements($document, $plan['tree'], $parents, $mode);
-        }
         $added = 0;
         foreach ($placements as $placement) {
             $document = $this->componentTree->insertNode(
@@ -166,7 +161,12 @@ class CategoryImport extends AbstractMenuEditTool
         }
         if ($added === 0) {
             return $this->jsonResult(
-                ['imported' => false, 'reason' => 'Every category is already in the menu.'] + $preview,
+                [
+                    'imported' => false,
+                    'reason' => $skipped === []
+                        ? 'Every category is already in the menu.'
+                        : 'Nothing to add: the new categories sit below menu items outside the targeted roots.',
+                ] + $preview,
                 ['id' => $menuId, 'added' => 0]
             );
         }
@@ -180,6 +180,44 @@ class CategoryImport extends AbstractMenuEditTool
             ['imported' => true, 'items_added' => $added, 'draft' => $saved, 'published' => false] + $preview,
             ['id' => $menuId, 'added' => $added]
         );
+    }
+
+    /**
+     * Where each imported item goes.
+     *
+     * @param array $document
+     * @param array $tree
+     * @param array $parents
+     * @param string $mode
+     * @param int $rootCategoryId
+     * @param array $skipped Receives the new categories left out because their menu parent is outside the targets.
+     * @return array
+     * @phpstan-param array<string, mixed> $document
+     * @phpstan-param list<array<string, mixed>> $tree
+     * @phpstan-param list<array{uid: string, component: string}> $parents
+     * @phpstan-param list<array{id: int, name: string}> $skipped
+     * @phpstan-return list<array{parent_uid: string, parent_component: string, spec: array<string, mixed>}>
+     */
+    private function placeCategories(
+        array $document,
+        array $tree,
+        array $parents,
+        string $mode,
+        int $rootCategoryId,
+        array &$skipped
+    ): array {
+        if ($mode !== 'dynamic') {
+            return $this->menuService->placements($document, $tree, $parents, $mode, $skipped);
+        }
+        $placements = [];
+        foreach ($parents as $parent) {
+            $placements[] = [
+                'parent_uid' => $parent['uid'],
+                'parent_component' => $parent['component'],
+                'spec' => ['type' => 'category_tree', 'value' => [$rootCategoryId]],
+            ];
+        }
+        return $placements;
     }
 
     /**
