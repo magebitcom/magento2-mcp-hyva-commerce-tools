@@ -15,10 +15,13 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentScanner;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Media\LiteralUrlAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaSyncReport;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content\ContentScopeStub;
 use PHPUnit\Framework\TestCase;
 
 class MediaGalleryChecksTest extends TestCase
 {
+    use ContentScopeStub;
+
     public function testSyncReportListsBothDirections(): void
     {
         $report = (new MediaSyncReport())->compare(
@@ -48,7 +51,8 @@ class MediaGalleryChecksTest extends TestCase
             $this->createMock(ContentScanner::class),
             $tree,
             new ImageReferenceExtractor($tree, $resolver),
-            $resolver
+            $resolver,
+            $this->contentScope(null)
         );
 
         $categories = static fn (array $found): array => array_column($found, 'category');

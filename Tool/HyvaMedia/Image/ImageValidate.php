@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image;
 
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageChecker;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageContentEditor;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
@@ -31,12 +32,14 @@ class ImageValidate extends AbstractMediaTool
      * @param ImageUsageIndex $usageIndex
      * @param MediaService $mediaService
      * @param ImageContentEditor $editor
+     * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
         private readonly ImageChecker $checker,
         private readonly ImageUsageIndex $usageIndex,
         private readonly MediaService $mediaService,
-        private readonly ImageContentEditor $editor
+        private readonly ImageContentEditor $editor,
+        private readonly ContentScopeFilter $scopeFilter
     ) {
     }
 
@@ -55,7 +58,8 @@ class ImageValidate extends AbstractMediaTool
     {
         return 'Validate one image: file exists, supported web format, file size and dimensions, alt text on every '
             . 'usage, hero/banner weight, missing optimized/WebP/AVIF variants, Image Editor support, transparent '
-            . 'PNG and animated GIF.';
+            . 'PNG and animated GIF. Usages in pages, blocks and menus outside your role\'s websites/store views are '
+            . 'not checked; they are counted in usages_hidden_by_permissions.';
     }
 
     /**
@@ -79,7 +83,8 @@ class ImageValidate extends AbstractMediaTool
     protected function run(array $arguments): ToolResultInterface
     {
         $path = $this->editor->normalize($this->requireString($arguments, 'path'));
-        $result = $this->checker->check($path, $this->usageIndex->usagesOf($path), [
+        $scoped = $this->scopeFilter->filter($this->usageIndex->usagesOf($path));
+        $result = $this->checker->check($path, $scoped['visible'], [
             'max_kb' => $this->intArg(
                 $arguments,
                 'max_kb',
@@ -96,7 +101,11 @@ class ImageValidate extends AbstractMediaTool
         ]);
         $errors = count(array_filter($result['issues'], static fn (array $i): bool => $i['severity'] === 'error'));
         return $this->jsonResult(
-            ['path' => $path, 'valid' => $errors === 0] + $result,
+            $this->scopeFilter->withHidden(
+                ['path' => $path, 'valid' => $errors === 0] + $result,
+                'usages_hidden_by_permissions',
+                $scoped['hidden']
+            ),
             ['path' => $path, 'issues' => count($result['issues'])]
         );
     }

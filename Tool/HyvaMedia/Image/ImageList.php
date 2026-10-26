@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image;
 
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaInventory;
@@ -32,11 +33,13 @@ class ImageList extends AbstractMediaTool
      * @param MediaInventory $inventory
      * @param MediaFileInfo $fileInfo
      * @param ImageUsageIndex $usageIndex
+     * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
         private readonly MediaInventory $inventory,
         private readonly MediaFileInfo $fileInfo,
-        private readonly ImageUsageIndex $usageIndex
+        private readonly ImageUsageIndex $usageIndex,
+        private readonly ContentScopeFilter $scopeFilter
     ) {
     }
 
@@ -55,7 +58,9 @@ class ImageList extends AbstractMediaTool
     {
         return 'List images from the Media Gallery and a media folder (default wysiwyg) with size, dimensions, type, '
             . 'whether and where they are used (Hyvä CMS, menus, Magento CMS, product/category descriptions) and '
-            . 'missing alt text. Filter by folder, type, size (KB), dimensions, used/unused, usage source.';
+            . 'missing alt text. Filter by folder, type, size (KB), dimensions, used/unused, usage source. Usages in '
+            . 'pages, blocks and menus outside your role\'s websites/store views are only counted '
+            . '(usages_hidden_by_permissions); an image used there still counts as used.';
     }
 
     /**
@@ -110,11 +115,12 @@ class ImageList extends AbstractMediaTool
         $filterMissingAlt = $this->boolArg($arguments, 'missing_alt');
         $allUsages = null;
         if ($filterUsed || $usedIn !== null || $filterMissingAlt) {
-            $allUsages = $this->usageIndex->all();
+            $allUsages = $this->scopedUsages($this->usageIndex->all(), $usedIn);
             $paths = array_values(array_filter(
                 $paths,
                 fn (string $path): bool => $this->matchesUsage(
-                    $this->usagesFor($allUsages[$path] ?? [], $usedIn),
+                    $allUsages['visible'][$path] ?? [],
+                    $allUsages['hidden'][$path] ?? 0,
                     $filterUsed ? $this->boolArg($arguments, 'used') : null,
                     $filterMissingAlt
                 )
@@ -158,12 +164,13 @@ class ImageList extends AbstractMediaTool
 
         $total = count($paths);
         $page = array_slice($paths, 0, $this->intArg($arguments, 'limit', 100) ?? 100);
-        $pageUsages = $allUsages ?? $this->usageIndex->usagesOfMany($page);
+        $pageUsages = $allUsages ?? $this->scopedUsages($this->usageIndex->usagesOfMany($page), $usedIn);
         $items = [];
         foreach ($page as $path) {
             $file = $files[$path] ?? $this->fileInfo->describe($path);
-            $usages = $this->usagesFor($pageUsages[$path] ?? [], $usedIn);
-            $items[] = [
+            $usages = $pageUsages['visible'][$path] ?? [];
+            $hidden = $pageUsages['hidden'][$path] ?? 0;
+            $items[] = $this->scopeFilter->withHidden([
                 'path' => $path,
                 'exists' => $file['exists'],
                 'size_kb' => (int) round(($file['size'] ?? 0) / 1024),
@@ -171,11 +178,11 @@ class ImageList extends AbstractMediaTool
                 'height' => $file['height'],
                 'type' => $file['extension'],
                 'gallery_asset_id' => $assets[$path]['asset_id'] ?? null,
-                'used' => $usages !== [],
+                'used' => $usages !== [] || $hidden > 0,
                 'usage_count' => count($usages),
                 'used_in' => array_values(array_unique(array_column($usages, 'source'))),
                 'usages_missing_alt' => $this->missingAlt($usages),
-            ];
+            ], 'usages_hidden_by_permissions', $hidden);
         }
         return $this->jsonResult(['total' => $total, 'items' => $items], ['total' => $total]);
     }
@@ -221,17 +228,38 @@ class ImageList extends AbstractMediaTool
     }
 
     /**
+     * Usages per path limited to the used_in source and to content the caller may see.
+     *
+     * @param array $byPath
+     * @param string|null $usedIn
+     * @return array Usages left out by the caller's website/store view restriction counted per path.
+     * @phpstan-param array<string, list<array{source: string, has_alt: bool}>> $byPath
+     * @phpstan-return array{visible: array<string, list<array{source: string, has_alt: bool}>>,
+     *     hidden: array<string, int>}
+     */
+    private function scopedUsages(array $byPath, ?string $usedIn): array
+    {
+        return $this->scopeFilter->filterGrouped(array_map(
+            fn (array $usages): array => $this->usagesFor($usages, $usedIn),
+            $byPath
+        ));
+    }
+
+    /**
      * Whether an image's usages pass the used / missing_alt filters.
      *
-     * @param array $usages
+     * An image used only in content outside the caller's restriction still counts as used.
+     *
+     * @param array $usages Usages the caller may see.
+     * @param int $hidden Usages left out by the caller's restriction.
      * @param bool|null $used Null = no used filter.
      * @param bool $missingAlt
      * @return bool
      * @phpstan-param list<array{source: string, has_alt: bool}> $usages
      */
-    private function matchesUsage(array $usages, ?bool $used, bool $missingAlt): bool
+    private function matchesUsage(array $usages, int $hidden, ?bool $used, bool $missingAlt): bool
     {
-        if ($used !== null && ($usages !== []) !== $used) {
+        if ($used !== null && ($usages !== [] || $hidden > 0) !== $used) {
             return false;
         }
         return !$missingAlt || $this->missingAlt($usages) > 0;

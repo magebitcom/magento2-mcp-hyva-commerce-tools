@@ -9,10 +9,12 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Model\FieldResolver\Menu;
 
 use Magebit\McpHyvaCommerceTools\Api\ContentFieldResolverInterface;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 
 /**
- * Where the menu is used (design config, CMS content, widgets, layout/templates).
+ * Where the menu is used (design config, CMS content, widgets, layout/templates); content and widget instances
+ * outside the caller's websites/store views are left out and counted.
  */
 class MenuUsageResolver implements ContentFieldResolverInterface
 {
@@ -20,9 +22,11 @@ class MenuUsageResolver implements ContentFieldResolverInterface
 
     /**
      * @param MenuService $menuService
+     * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
-        private readonly MenuService $menuService
+        private readonly MenuService $menuService,
+        private readonly ContentScopeFilter $scopeFilter
     ) {
     }
 
@@ -48,6 +52,10 @@ class MenuUsageResolver implements ContentFieldResolverInterface
     public function resolve(array $entity, array $args): mixed
     {
         unset($args);
-        return $this->menuService->findUsage($entity['identifier']);
+        return $this->scopeFilter->filterUsageReport(
+            $this->menuService->findUsage($entity['identifier']),
+            ['hyva_cms_content', 'magento_cms_content'],
+            ['widget_instances']
+        );
     }
 }

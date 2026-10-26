@@ -20,6 +20,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Model\Migration\MigrationAnalyzer;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content\ContentScopeStub;
 use Magento\Framework\App\ResourceConnection;
 use PHPUnit\Framework\TestCase;
 
@@ -28,6 +29,8 @@ use PHPUnit\Framework\TestCase;
  */
 class CmsAuditorTest extends TestCase
 {
+    use ContentScopeStub;
+
     /**
      * Rows mixing the editor flag and the content status, the mix that made the old buckets disagree.
      */
@@ -99,7 +102,8 @@ class CmsAuditorTest extends TestCase
                 $tree,
                 $this->createMock(ResourceConnection::class),
                 $this->createMock(FeatureCheckerInterface::class)
-            )
+            ),
+            $this->contentScope(null)
         );
     }
 

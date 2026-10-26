@@ -13,11 +13,13 @@ use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaInventory;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageList;
 use PHPUnit\Framework\MockObject\MockObject;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content\ContentScopeStub;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\ToolPayloadTrait;
 use PHPUnit\Framework\TestCase;
 
 class ImageListTest extends TestCase
 {
+    use ContentScopeStub;
     use ToolPayloadTrait;
 
     /**
@@ -69,7 +71,7 @@ class ImageListTest extends TestCase
             'extension' => strtolower(pathinfo($path, PATHINFO_EXTENSION)),
         ]);
         $this->usageIndex = $this->createMock(ImageUsageIndex::class);
-        $this->tool = new ImageList($inventory, $this->fileInfo, $this->usageIndex);
+        $this->tool = new ImageList($inventory, $this->fileInfo, $this->usageIndex, $this->contentScope(null));
     }
 
     /**
@@ -163,6 +165,98 @@ class ImageListTest extends TestCase
         $this->assertSame(1, $this->at($result, 'total'));
         $this->assertSame('wysiwyg/c.jpg', $this->at($result, 'items.0.path'));
         $this->assertSame(['hyva_cms'], $this->at($result, 'items.0.used_in'));
+    }
+
+    /**
+     * A restricted caller sees only its own usages, but an image used elsewhere still counts as used.
+     *
+     * @return void
+     */
+    public function testARestrictedCallerSeesOnlyUsagesInItsStoreViews(): void
+    {
+        $this->inventory->method('getGalleryAssets')->willReturn([]);
+        $this->usageIndex->method('all')->willReturn([
+            'wysiwyg/a.jpg' => [$this->usageIn('cms_page', 2)],
+            'wysiwyg/c.jpg' => [$this->usageIn('cms_page', 1), $this->usageIn('product', 5, 'product')],
+        ]);
+        $this->tool = $this->restrictedTool();
+
+        $unused = $this->tool->execute(['used' => false, 'types' => ['jpg'], 'sort' => 'path']);
+        $this->assertSame(['wysiwyg/b.jpg'], array_column($this->arrayAt($unused, 'items'), 'path'));
+
+        $used = $this->arrayAt(
+            $this->tool->execute(['used' => true, 'types' => ['jpg'], 'sort' => 'path']),
+            'items'
+        );
+        $this->assertSame(['wysiwyg/a.jpg', 'wysiwyg/c.jpg'], array_column($used, 'path'));
+        $this->assertSame([true, true], array_column($used, 'used'));
+        $this->assertSame([0, 2], array_column($used, 'usage_count'));
+        $this->assertSame([[], ['hyva_cms', 'product']], array_column($used, 'used_in'));
+        $this->assertSame([1, 0], array_column($used, 'usages_hidden_by_permissions'));
+    }
+
+    /**
+     * Without a usage filter the page's usages are scoped the same way.
+     *
+     * @return void
+     */
+    public function testARestrictedCallersPageUsagesAreScoped(): void
+    {
+        $this->inventory->method('getGalleryAssets')->willReturn([]);
+        $this->usageIndex->method('usagesOfMany')->willReturn([
+            'wysiwyg/b.jpg' => [$this->usageIn('cms_page', 2), $this->usageIn('menu', 3, 'menu')],
+        ]);
+        $this->tool = $this->restrictedTool();
+
+        $result = $this->tool->execute(['types' => ['jpg'], 'limit' => 1]);
+
+        $this->assertSame('wysiwyg/b.jpg', $this->at($result, 'items.0.path'));
+        $this->assertSame(1, $this->at($result, 'items.0.usage_count'));
+        $this->assertSame(['menu'], $this->at($result, 'items.0.used_in'));
+        $this->assertSame(1, $this->at($result, 'items.0.usages_hidden_by_permissions'));
+    }
+
+    /**
+     * An unrestricted caller gets no hidden counter.
+     *
+     * @return void
+     */
+    public function testAnUnrestrictedCallersItemsHaveNoHiddenCounter(): void
+    {
+        $this->inventory->method('getGalleryAssets')->willReturn([]);
+        $this->usageIndex->method('usagesOfMany')->willReturn(['wysiwyg/b.jpg' => [$this->usageIn('cms_page', 2)]]);
+
+        $item = $this->arrayAt($this->tool->execute(['types' => ['jpg'], 'limit' => 1]), 'items.0');
+
+        $this->assertSame(1, $item['usage_count']);
+        $this->assertArrayNotHasKey('usages_hidden_by_permissions', $item);
+    }
+
+    /**
+     * Tool for a caller restricted to store view 1: page 1 and menu 3 are its own, page 2 is store view 2's.
+     *
+     * @return ImageList
+     */
+    private function restrictedTool(): ImageList
+    {
+        return new ImageList($this->inventory, $this->fileInfo, $this->usageIndex, $this->contentScope(
+            [1],
+            ['cms_page' => [1 => [1], 2 => [2]], 'menu' => [3 => [0]]]
+        ));
+    }
+
+    /**
+     * Usage in an entity.
+     *
+     * @param string $type
+     * @param int $id
+     * @param string $source
+     * @return array
+     * @phpstan-return array<string, mixed>
+     */
+    private function usageIn(string $type, int $id, string $source = 'hyva_cms'): array
+    {
+        return ['entity_type' => $type, 'id' => $id, 'source' => $source] + $this->usage(true);
     }
 
     /**

@@ -44,7 +44,8 @@ class AuditMenu extends AbstractMediaTool
     public function getDescription(): string
     {
         return 'Audit only images used in Hyvä Menu Builder menus (promo banners in rich content blocks): missing alt '
-            . 'text, oversized banners, broken references, unoptimized images.';
+            . 'text, oversized banners, broken references, unoptimized images. Menus outside your role\'s '
+            . 'websites/store views are not checked (usages_hidden_by_permissions).';
     }
 
     /**

@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu;
 
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Menu\AbstractMenuTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
@@ -25,6 +26,19 @@ class MenuFindUsage extends AbstractMenuTool
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_menu_find_usage';
 
     /**
+     * @param FeatureCheckerInterface $featureChecker
+     * @param MenuService $menuService
+     * @param ContentScopeFilter $scopeFilter
+     */
+    public function __construct(
+        FeatureCheckerInterface $featureChecker,
+        MenuService $menuService,
+        private readonly ContentScopeFilter $scopeFilter
+    ) {
+        parent::__construct($featureChecker, $menuService);
+    }
+
+    /**
      * @inheritDoc
      */
     public function getTitle(): string
@@ -39,7 +53,9 @@ class MenuFindUsage extends AbstractMenuTool
     {
         return 'Find where a menu is used: header/footer design configuration per scope, hyva_menu_widget components '
             . 'in Hyvä CMS pages/blocks/menus, hyva_cms_menu widget instances and widget directives in Magento CMS '
-            . 'content, and layout XML / PHTML files that mention it. Use before deleting or renaming a menu.';
+            . 'content, and layout XML / PHTML files that mention it. Use before deleting or renaming a menu. Content '
+            . 'and widget instances outside your role\'s websites/store views are left out and counted in '
+            . 'usages_hidden_by_permissions.';
     }
 
     /**
@@ -58,10 +74,14 @@ class MenuFindUsage extends AbstractMenuTool
     protected function executeMenu(array $arguments): ToolResultInterface
     {
         $menu = $this->menuService->locate($arguments);
-        $usage = $this->menuService->findUsage(Cast::string($menu['identifier']));
+        $usage = $this->scopeFilter->filterUsageReport(
+            $this->menuService->findUsage(Cast::string($menu['identifier'])),
+            ['hyva_cms_content', 'magento_cms_content'],
+            ['widget_instances']
+        );
         return $this->jsonResult(
             ['id' => $menu['id']] + $usage,
-            ['id' => Cast::int($menu['id']), 'total' => $usage['total']]
+            ['id' => Cast::int($menu['id']), 'total' => Cast::int($usage['total'] ?? 0)]
         );
     }
 }

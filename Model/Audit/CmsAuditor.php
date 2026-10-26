@@ -12,6 +12,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScanner;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
@@ -21,7 +22,8 @@ use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 /**
  * Hyvä CMS content health: counts per state, broken/invalid content, image problems, schedule problems.
- * Shared by hyva_commerce.audit.cms and the content-health / migration dashboard widgets.
+ * Shared by hyva_commerce.audit.cms and the content-health / migration dashboard widgets. A caller restricted to
+ * some websites/store views gets the health of the pages, blocks and scheduled items it may see.
  *
  * @phpstan-import-type ContentRow from ContentIndex
  * @phpstan-type EntityCounts array{total: int, status: array<string, int>, rendered_by: array<string, int>,
@@ -40,6 +42,7 @@ class CmsAuditor
      * @param ScheduleService $scheduleService
      * @param ConflictReport $conflictReport
      * @param ContentScanner $contentScanner
+     * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
         private readonly ContentIndex $contentIndex,
@@ -49,7 +52,8 @@ class CmsAuditor
         private readonly MigrationAnalyzer $migrationAnalyzer,
         private readonly ScheduleService $scheduleService,
         private readonly ConflictReport $conflictReport,
-        private readonly ContentScanner $contentScanner
+        private readonly ContentScanner $contentScanner,
+        private readonly ContentScopeFilter $scopeFilter
     ) {
     }
 
@@ -63,15 +67,20 @@ class CmsAuditor
      * @param int $issueLimit
      * @return array
      * @phpstan-return array{counts: array<string, EntityCounts>, scheduling: array<string, int>,
-     *     content_issues: array<string, int>, issues: list<array<string, mixed>>}
+     *     content_issues: array<string, int>, issues: list<array<string, mixed>>,
+     *     entities_hidden_by_permissions?: int}
      */
     public function audit(int $issueLimit = 100): array
     {
         $issueLimit = max(0, $issueLimit);
         $counts = [];
         $documents = [];
+        $hidden = 0;
         foreach ([ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK] as $type) {
-            $rows = $this->contentIndex->getRows($type, true);
+            // The rows carry their store views, so the scope costs no query.
+            $scoped = $this->scopeFilter->filterByStoreIds($this->contentIndex->getRows($type, true));
+            $rows = $scoped['visible'];
+            $hidden += $scoped['hidden'];
             $counts[$type] = $this->countRows($rows);
             array_push($documents, ...$this->contentScanner->documentsOfRows($type, $rows));
         }
@@ -140,10 +149,18 @@ class CmsAuditor
             }
         }
 
-        $conflicts = $this->conflictReport->getConflicts();
+        $conflicts = $this->conflictReport->getConflictsWithinCallerScope()['conflicts'];
+        $pendingItems = $this->scopeFilter->filter(
+            $this->scheduleService->getItems(['status' => 'pending']),
+            'entity_type',
+            'entity_id'
+        )['visible'];
         $scheduling = [
-            'pending_releases' => count($this->scheduleService->getReleases('pending')),
-            'pending_items' => count($this->scheduleService->getItems(['status' => 'pending'])),
+            // A restricted caller sees the releases holding content it may see.
+            'pending_releases' => $this->scopeFilter->isRestricted()
+                ? count(array_unique(array_column($pendingItems, 'release_id')))
+                : count($this->scheduleService->getReleases('pending')),
+            'pending_items' => count($pendingItems),
             'conflict_errors' => count(
                 array_filter($conflicts, static fn (array $c): bool => $c['severity'] === 'error')
             ),
@@ -165,12 +182,16 @@ class CmsAuditor
         }
 
         ksort($buckets);
-        return [
+        $report = [
             'counts' => $counts,
             'scheduling' => $scheduling,
             'content_issues' => $contentIssues,
             'issues' => array_slice(array_merge([], ...array_values($buckets)), 0, $issueLimit),
         ];
+        if ($this->scopeFilter->isRestricted()) {
+            $report['entities_hidden_by_permissions'] = $hidden;
+        }
+        return $report;
     }
 
     /**

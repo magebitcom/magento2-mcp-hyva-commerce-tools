@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaCommerce\Audit;
 
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
@@ -32,12 +33,14 @@ class AuditMenu extends AbstractTool
      * @param MenuGatewayInterface $menuGateway
      * @param MenuService $menuService
      * @param MediaAuditor $auditor
+     * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
         private readonly FeatureCheckerInterface $featureChecker,
         private readonly MenuGatewayInterface $menuGateway,
         private readonly MenuService $menuService,
-        private readonly MediaAuditor $auditor
+        private readonly MediaAuditor $auditor,
+        private readonly ContentScopeFilter $scopeFilter
     ) {
     }
 
@@ -71,7 +74,8 @@ class AuditMenu extends AbstractTool
     {
         return 'Menu health: broken menu links, inactive categories, disabled products, empty menus, menus not '
             . 'assigned to store views or placements, plus menu image problems. Reports available=false without Hyvä '
-            . 'Menu Builder.';
+            . 'Menu Builder. Menus outside your role\'s websites/store views are left out and counted in '
+            . 'menus_hidden_by_permissions.';
     }
 
     /**
@@ -106,7 +110,8 @@ class AuditMenu extends AbstractTool
             'inactive' => 0,
         ];
         $codes = [];
-        foreach ($this->menuGateway->getList() as $menu) {
+        $scoped = $this->scopeFilter->filterByStoreIds($this->menuGateway->getList());
+        foreach ($scoped['visible'] as $menu) {
             $result = $this->menuService->validate(
                 $menu,
                 Cast::bool($menu['is_published'] ?? false) ? 'published' : 'draft'
@@ -132,7 +137,11 @@ class AuditMenu extends AbstractTool
         ksort($codes);
         $media = $this->auditor->audit('menu', 500, 20);
         return $this->jsonResult(
-            ['totals' => $totals, 'issue_counts' => $codes, 'menus' => $menus, 'media' => $media],
+            $this->scopeFilter->withHidden(
+                ['totals' => $totals, 'issue_counts' => $codes, 'menus' => $menus, 'media' => $media],
+                'menus_hidden_by_permissions',
+                $scoped['hidden']
+            ),
             $totals
         );
     }

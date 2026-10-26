@@ -15,6 +15,7 @@ use Magebit\McpHyvaCommerceTools\Api\Adapter\StoreCreditGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Form\FormRules;
 use Magebit\McpHyvaCommerceTools\Model\Media\LiteralUrlAuditor;
 use Magento\Framework\AuthorizationInterface;
@@ -27,6 +28,8 @@ use Magento\Framework\AuthorizationInterface;
  */
 class ModuleLenses
 {
+    private const FORM_PAGE_SIZE = 200;
+
     /**
      * @param FeatureCheckerInterface $featureChecker
      * @param AuthorizationInterface $authorization
@@ -37,6 +40,7 @@ class ModuleLenses
      * @param LiteralUrlAuditor $literalUrlAuditor
      * @param StoreCreditGatewayInterface $storeCredit
      * @param LinkedProductsGatewayInterface $linkedGroups
+     * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
         private readonly FeatureCheckerInterface $featureChecker,
@@ -47,7 +51,8 @@ class ModuleLenses
         private readonly EmailGatewayInterface $emails,
         private readonly LiteralUrlAuditor $literalUrlAuditor,
         private readonly StoreCreditGatewayInterface $storeCredit,
-        private readonly LinkedProductsGatewayInterface $linkedGroups
+        private readonly LinkedProductsGatewayInterface $linkedGroups,
+        private readonly ContentScopeFilter $scopeFilter
     ) {
     }
 
@@ -70,6 +75,9 @@ class ModuleLenses
     /**
      * Forms whose submissions go nowhere or would not be delivered.
      *
+     * A caller restricted to some websites/store views gets only its forms (all of them, not only the first page)
+     * and the number left out.
+     *
      * @return array<string, mixed>|null
      */
     private function forms(): ?array
@@ -77,7 +85,22 @@ class ModuleLenses
         if (!$this->featureChecker->isAvailable(FeatureCheckerInterface::FORM_BUILDER)) {
             return null;
         }
-        $list = $this->forms->getList(null, null, 1, 200);
+        $list = $this->forms->getList(null, null, 1, self::FORM_PAGE_SIZE);
+        $hidden = 0;
+        if ($this->scopeFilter->isRestricted()) {
+            $items = [];
+            $page = 1;
+            while (true) {
+                $scoped = $this->scopeFilter->filterByStoreIds($list['items']);
+                array_push($items, ...$scoped['visible']);
+                $hidden += $scoped['hidden'];
+                if ($list['items'] === [] || $page * self::FORM_PAGE_SIZE >= $list['total']) {
+                    break;
+                }
+                $list = $this->forms->getList(null, null, ++$page, self::FORM_PAGE_SIZE);
+            }
+            $list = ['total' => count($items), 'items' => $items];
+        }
         $broken = [];
         $inactive = 0;
         foreach ($list['items'] as $form) {
@@ -90,13 +113,13 @@ class ModuleLenses
                 $broken[] = $form['identifier'];
             }
         }
-        return [
+        return $this->scopeFilter->withHidden([
             'total' => $list['total'],
             'inactive' => $inactive,
             'with_delivery_errors' => count($broken),
             'with_delivery_errors_sample' => array_slice($broken, 0, 10),
             'details' => 'hyva_form.delivery.audit',
-        ];
+        ], 'forms_hidden_by_permissions', $hidden);
     }
 
     /**
@@ -140,11 +163,11 @@ class ModuleLenses
             return null;
         }
         $report = $this->literalUrlAuditor->audit($types, 200);
-        return [
+        return $this->scopeFilter->withHidden([
             'documents_checked' => $report['documents_checked'],
             'counts' => $report['counts'],
             'details' => 'hyva_media.audit.literal_urls',
-        ];
+        ], 'documents_hidden_by_permissions', $report['documents_hidden_by_permissions'] ?? 0);
     }
 
     /**

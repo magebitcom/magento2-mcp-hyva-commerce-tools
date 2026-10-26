@@ -12,6 +12,7 @@ use Hyva\CmsLiveviewEditor\Api\ImageAssetPathResolverInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScanner;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
@@ -32,28 +33,34 @@ class LiteralUrlAuditor
      * @param ComponentTree $componentTree
      * @param ImageReferenceExtractor $extractor
      * @param ImageAssetPathResolverInterface $assetPathResolver
+     * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
         private readonly ContentScanner $contentScanner,
         private readonly ComponentTree $componentTree,
         private readonly ImageReferenceExtractor $extractor,
-        private readonly ImageAssetPathResolverInterface $assetPathResolver
+        private readonly ImageAssetPathResolverInterface $assetPathResolver,
+        private readonly ContentScopeFilter $scopeFilter
     ) {
     }
 
     /**
      * Audit.
      *
+     * Documents of content outside the caller's websites/store views are skipped and counted in
+     * documents_hidden_by_permissions.
+     *
      * @param array $types
      * @param int $limit Max findings listed.
      * @return array
      * @phpstan-param list<string> $types
      * @phpstan-return array{documents_checked: int, counts: array<string, int>,
-     *     findings: list<array<string, mixed>>}
+     *     findings: list<array<string, mixed>>, documents_hidden_by_permissions?: int}
      */
     public function audit(array $types = ContentLocator::TYPES, int $limit = 200): array
     {
-        $documents = $this->contentScanner->getDocuments($types);
+        $scoped = $this->scopeFilter->filter($this->contentScanner->getDocuments($types));
+        $documents = $scoped['visible'];
         $this->extractor->prefetchAssetIds(array_column($documents, 'document'));
         $counts = ['id_backed' => 0, 'literal_fixable' => 0, 'literal_not_in_gallery' => 0, 'stale_asset_id' => 0,
             'richtext_literal' => 0];
@@ -87,11 +94,15 @@ class LiteralUrlAuditor
                 }
             });
         }
-        return [
+        $report = [
             'documents_checked' => count($documents),
             'counts' => $counts,
             'findings' => array_slice($findings, 0, $limit),
         ];
+        if ($this->scopeFilter->isRestricted()) {
+            $report['documents_hidden_by_permissions'] = $scoped['hidden'];
+        }
+        return $report;
     }
 
     /**

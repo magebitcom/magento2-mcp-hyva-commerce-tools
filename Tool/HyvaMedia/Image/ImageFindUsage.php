@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image;
 
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageContentEditor;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
@@ -28,11 +29,13 @@ class ImageFindUsage extends AbstractMediaTool
      * @param ImageUsageIndex $usageIndex
      * @param MediaFileInfo $fileInfo
      * @param ImageContentEditor $editor
+     * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
         private readonly ImageUsageIndex $usageIndex,
         private readonly MediaFileInfo $fileInfo,
-        private readonly ImageContentEditor $editor
+        private readonly ImageContentEditor $editor,
+        private readonly ContentScopeFilter $scopeFilter
     ) {
     }
 
@@ -51,7 +54,8 @@ class ImageFindUsage extends AbstractMediaTool
     {
         return 'Find everywhere an image is used: Hyvä CMS pages and blocks (draft and published, with component uid '
             . 'and field), Menu Builder rich content, Magento CMS / Page Builder content, product and category '
-            . 'descriptions. Use before replacing or deleting an image.';
+            . 'descriptions. Use before replacing or deleting an image. Pages, blocks and menus outside your role\'s '
+            . 'websites/store views are left out and counted in usages_hidden_by_permissions.';
     }
 
     /**
@@ -73,18 +77,19 @@ class ImageFindUsage extends AbstractMediaTool
     protected function run(array $arguments): ToolResultInterface
     {
         $path = $this->editor->normalize($this->requireString($arguments, 'path'));
-        $usages = $this->usageIndex->usagesOf($path);
+        $scoped = $this->scopeFilter->filter($this->usageIndex->usagesOf($path));
+        $usages = $scoped['visible'];
         $bySource = [];
         foreach ($usages as $usage) {
             $bySource[$usage['source']] = ($bySource[$usage['source']] ?? 0) + 1;
         }
-        return $this->jsonResult([
+        return $this->jsonResult($this->scopeFilter->withHidden([
             'path' => $path,
             'exists' => $this->fileInfo->exists($path),
             'total' => count($usages),
             'by_source' => $bySource,
             'live_usages' => count(array_filter($usages, static fn (array $u): bool => $u['edition'] !== 'draft')),
             'usages' => $usages,
-        ], ['total' => count($usages)]);
+        ], 'usages_hidden_by_permissions', $scoped['hidden']), ['total' => count($usages)]);
     }
 }

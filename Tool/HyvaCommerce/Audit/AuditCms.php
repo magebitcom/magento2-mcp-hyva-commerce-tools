@@ -54,7 +54,9 @@ class AuditCms extends AbstractContentTool
             . 'each add up to total. legacy is the subset rendered by Magento with Magento content left (= the '
             . 'migration.scan items): page_builder + wysiwyg + empty add up to legacy.total, and '
             . 'converted_drafts_waiting is part of it. Also scheduled releases and conflicts, and broken content '
-            . '(invalid JSON, unknown/disabled components, validation errors, missing alt text, missing images).';
+            . '(invalid JSON, unknown/disabled components, validation errors, missing alt text, missing images). '
+            . 'A role restricted to some websites/store views gets its own pages, blocks and scheduled items; the '
+            . 'others are counted in entities_hidden_by_permissions.';
     }
 
     /**

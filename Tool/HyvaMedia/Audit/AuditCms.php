@@ -44,7 +44,8 @@ class AuditCms extends AbstractMediaTool
     public function getDescription(): string
     {
         return 'Audit only images used in Hyvä CMS pages and blocks (draft and published): missing alt text, large '
-            . 'hero images, unoptimized campaign images, broken references.';
+            . 'hero images, unoptimized campaign images, broken references. Pages and blocks outside your role\'s '
+            . 'websites/store views are not checked (usages_hidden_by_permissions).';
     }
 
     /**

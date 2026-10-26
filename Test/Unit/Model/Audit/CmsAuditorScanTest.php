@@ -19,6 +19,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Model\Migration\MigrationAnalyzer;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content\ContentScopeStub;
 use Magento\Framework\App\ResourceConnection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -30,6 +31,8 @@ use PHPUnit\Framework\TestCase;
  */
 class CmsAuditorScanTest extends TestCase
 {
+    use ContentScopeStub;
+
     /**
      * @var ContentIndex&MockObject
      */
@@ -66,6 +69,7 @@ class CmsAuditorScanTest extends TestCase
             }
         );
         $this->mediaFileInfo->expects($this->once())->method('exists')->with('wysiwyg/a.jpg')->willReturn(false);
+        $this->conflictReport->method('getConflictsWithinCallerScope')->willReturn(['conflicts' => [], 'hidden' => 0]);
 
         $report = $this->auditor()->audit(100);
 
@@ -83,9 +87,9 @@ class CmsAuditorScanTest extends TestCase
             fn (string $type): array => [$this->row($type, 1), $this->row($type, 2), $this->row($type, 3)]
         );
         $this->mediaFileInfo->method('exists')->willReturn(false);
-        $this->conflictReport->method('getConflicts')->willReturn([
+        $this->conflictReport->method('getConflictsWithinCallerScope')->willReturn(['conflicts' => [
             ['severity' => 'warning', 'code' => 'overlap', 'message' => 'w', 'release_ids' => [], 'item_ids' => []],
-        ]);
+        ], 'hidden' => 0]);
 
         $report = $this->auditor()->audit(3);
 
@@ -101,9 +105,51 @@ class CmsAuditorScanTest extends TestCase
     }
 
     /**
-     * @return CmsAuditor
+     * A restricted caller gets the health of its own pages, blocks and scheduled items only (finding: unscoped
+     * image/audit lists).
+     *
+     * @return void
      */
-    private function auditor(): CmsAuditor
+    public function testARestrictedCallerAuditsOnlyItsContent(): void
+    {
+        $this->contentIndex->method('getRows')->willReturnCallback(fn (string $type): array => [
+            ['store_ids' => [1]] + $this->row($type, 1),
+            ['store_ids' => [2]] + $this->row($type, 2),
+        ]);
+        $this->conflictReport->method('getConflictsWithinCallerScope')->willReturn(['conflicts' => [], 'hidden' => 0]);
+        $pending = [];
+        foreach ([[7, 1], [7, 2], [8, 2]] as [$releaseId, $pageId]) {
+            $pending[] = ['release_id' => $releaseId, 'entity_type' => 'cms_page', 'entity_id' => $pageId];
+        }
+        $schedule = $this->createMock(ScheduleService::class);
+        $schedule->method('getItems')->willReturn($pending);
+        $schedule->method('getReleases')->willReturn([7 => [], 8 => []]);
+
+        $restricted = $this->auditor($schedule, [1])->audit();
+
+        $this->assertSame(1, $restricted['counts'][ContentLocator::TYPE_PAGE]['total']);
+        $this->assertSame(1, $restricted['counts'][ContentLocator::TYPE_BLOCK]['total']);
+        $this->assertSame(['cms_page1', 'cms_block1'], array_values(array_unique(
+            array_column($restricted['issues'], 'identifier')
+        )));
+        $this->assertSame(2, $restricted['entities_hidden_by_permissions'] ?? null);
+        $this->assertSame(1, $restricted['scheduling']['pending_items']);
+        $this->assertSame(1, $restricted['scheduling']['pending_releases']);
+
+        $all = $this->auditor($schedule, null)->audit();
+        $this->assertSame(2, $all['counts'][ContentLocator::TYPE_PAGE]['total']);
+        $this->assertSame(3, $all['scheduling']['pending_items']);
+        $this->assertSame(2, $all['scheduling']['pending_releases']);
+        $this->assertArrayNotHasKey('entities_hidden_by_permissions', $all);
+    }
+
+    /**
+     * @param ScheduleService|null $schedule
+     * @param array|null $allowedStoreIds
+     * @return CmsAuditor
+     * @phpstan-param list<int>|null $allowedStoreIds
+     */
+    private function auditor(?ScheduleService $schedule = null, ?array $allowedStoreIds = null): CmsAuditor
     {
         $tree = $this->createMock(ComponentTree::class);
         $tree->method('parse')->willReturnCallback(
@@ -120,9 +166,11 @@ class CmsAuditorScanTest extends TestCase
             'field' => 'image',
             'kind' => 'image',
         ]]);
-        $schedule = $this->createMock(ScheduleService::class);
-        $schedule->method('getReleases')->willReturn([]);
-        $schedule->method('getItems')->willReturn([]);
+        if ($schedule === null) {
+            $schedule = $this->createMock(ScheduleService::class);
+            $schedule->method('getReleases')->willReturn([]);
+            $schedule->method('getItems')->willReturn([]);
+        }
         return new CmsAuditor(
             $this->contentIndex,
             $tree,
@@ -136,7 +184,8 @@ class CmsAuditorScanTest extends TestCase
                 $tree,
                 $this->createMock(ResourceConnection::class),
                 $this->createMock(FeatureCheckerInterface::class)
-            )
+            ),
+            $this->contentScope($allowedStoreIds, ['cms_page' => [1 => [1], 2 => [2]]])
         );
     }
 

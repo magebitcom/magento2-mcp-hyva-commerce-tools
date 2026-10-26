@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu;
 
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Menu\AbstractMenuTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
@@ -28,11 +29,13 @@ class MenuAuditAll extends AbstractMenuTool
      * @param FeatureCheckerInterface $featureChecker
      * @param MenuService $menuService
      * @param MenuGatewayInterface $menuGateway
+     * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
         FeatureCheckerInterface $featureChecker,
         MenuService $menuService,
-        private readonly MenuGatewayInterface $menuGateway
+        private readonly MenuGatewayInterface $menuGateway,
+        private readonly ContentScopeFilter $scopeFilter
     ) {
         parent::__construct($featureChecker, $menuService);
     }
@@ -52,7 +55,8 @@ class MenuAuditAll extends AbstractMenuTool
     {
         return 'Validate every menu (published version when published, otherwise the draft) and report broken links, '
             . 'disabled categories/products, menus not assigned to any store view or placement, never-published '
-            . 'menus and menus not used anywhere.';
+            . 'menus and menus not used anywhere. Menus outside your role\'s websites/store views are left out and '
+            . 'counted in menus_hidden_by_permissions.';
     }
 
     /**
@@ -71,7 +75,8 @@ class MenuAuditAll extends AbstractMenuTool
     {
         $menus = [];
         $totals = ['menus' => 0, 'errors' => 0, 'warnings' => 0, 'unused' => 0, 'unpublished' => 0, 'inactive' => 0];
-        foreach ($this->menuGateway->getList() as $menu) {
+        $scoped = $this->scopeFilter->filterByStoreIds($this->menuGateway->getList());
+        foreach ($scoped['visible'] as $menu) {
             $edition = Cast::bool($menu['is_published'] ?? false) ? 'published' : 'draft';
             $result = $this->menuService->validate($menu, $edition);
             $usage = $this->menuService->findUsage(Cast::string($menu['identifier']));
@@ -92,6 +97,13 @@ class MenuAuditAll extends AbstractMenuTool
                 'issues' => array_slice($result['issues'], 0, 25),
             ];
         }
-        return $this->jsonResult(['totals' => $totals, 'menus' => $menus], $totals);
+        return $this->jsonResult(
+            $this->scopeFilter->withHidden(
+                ['totals' => $totals, 'menus' => $menus],
+                'menus_hidden_by_permissions',
+                $scoped['hidden']
+            ),
+            $totals
+        );
     }
 }

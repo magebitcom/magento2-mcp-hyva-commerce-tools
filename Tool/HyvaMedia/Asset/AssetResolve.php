@@ -8,6 +8,12 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset;
 
+use Magebit\McpHyvaCommerceTools\Api\Adapter\MediaGalleryGatewayInterface;
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
+use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
+use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
 use Magebit\McpHyvaCommerceTools\Model\Tool\MediaGallery\AbstractMediaGalleryTool;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
@@ -21,6 +27,25 @@ class AssetResolve extends AbstractMediaGalleryTool
 {
     public const TOOL_NAME = 'hyva_media.asset.resolve';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_media_asset_resolve';
+
+    /**
+     * @param FeatureCheckerInterface $featureChecker
+     * @param MediaGalleryGatewayInterface $gallery
+     * @param ImageReferenceExtractor $extractor
+     * @param ImageUsageIndex $usageIndex
+     * @param CallerContext $callerContext
+     * @param ContentScopeFilter $scopeFilter
+     */
+    public function __construct(
+        FeatureCheckerInterface $featureChecker,
+        MediaGalleryGatewayInterface $gallery,
+        ImageReferenceExtractor $extractor,
+        ImageUsageIndex $usageIndex,
+        CallerContext $callerContext,
+        private readonly ContentScopeFilter $scopeFilter
+    ) {
+        parent::__construct($featureChecker, $gallery, $extractor, $usageIndex, $callerContext);
+    }
 
     /**
      * @inheritDoc
@@ -38,7 +63,8 @@ class AssetResolve extends AbstractMediaGalleryTool
         return 'One Media Gallery asset by id or path: path, size, dimensions, keywords, whether the file exists, and '
             . 'where '
             . 'it is used (Hyvä CMS pages, blocks and menus by path or asset id, catalog, and Magento-tracked CMS '
-            . 'content). Use it before moving or trashing an asset.';
+            . 'content). Use it before moving or trashing an asset. Pages, blocks and menus outside your role\'s '
+            . 'websites/store views are left out and counted in usages_hidden_by_permissions.';
     }
 
     /**
@@ -68,11 +94,14 @@ class AssetResolve extends AbstractMediaGalleryTool
             return $this->softError('No Media Gallery asset matches. Run hyva_media.sync.status if the file exists '
                 . 'but is not in the gallery yet.');
         }
-        return $this->jsonResult([
+        $usage = $this->usage($asset);
+        $content = $this->scopeFilter->filter($usage['hyva_and_catalog']);
+        $tracked = $this->scopeFilter->filter($usage['magento_tracked'], 'entity_type', 'entity_id');
+        return $this->jsonResult($this->scopeFilter->withHidden([
             'asset' => $asset,
             'file_exists' => $this->gallery->fileExists($asset['path']),
             'keywords' => $this->gallery->keywords($asset['id']),
-            'used_in' => $this->usage($asset),
-        ], ['id' => $asset['id']]);
+            'used_in' => ['hyva_and_catalog' => $content['visible'], 'magento_tracked' => $tracked['visible']],
+        ], 'usages_hidden_by_permissions', $content['hidden'] + $tracked['hidden']), ['id' => $asset['id']]);
     }
 }
