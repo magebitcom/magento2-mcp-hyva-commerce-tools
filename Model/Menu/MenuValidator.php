@@ -206,13 +206,15 @@ class MenuValidator
                     $root['max_level'] ?? self::DEFAULT_MOBILE_MAX_LEVEL,
                     self::DEFAULT_MOBILE_MAX_LEVEL
                 );
-                if ($depth > $maxLevel) {
+                // Hyvä renders top-level items at level 0 and an item's children while its level < max_level, so
+                // the mobile menu shows max_level + 1 levels (depth counts the root, level starts below it).
+                if ($depth - 1 > $maxLevel) {
                     $issues[] = $this->issue(
                         'warning',
                         'too_deep_mobile',
                         $uid,
                         $label,
-                        sprintf('Item is %d levels deep; the mobile menu shows %d.', $depth, $maxLevel)
+                        sprintf('Item is %d levels deep; the mobile menu shows %d.', $depth, $maxLevel + 1)
                     );
                 }
             }

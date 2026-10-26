@@ -149,7 +149,9 @@ class MenuValidatorTest extends TestCase
         $mobile = $this->tree->createNode('mobile_menu');
         $deep = ['type' => 'category', 'value' => 10, 'label' => 'L1', 'children' => [
             ['type' => 'category', 'value' => 10, 'label' => 'L2', 'children' => [
-                ['type' => 'category', 'value' => 10, 'label' => 'L3'],
+                ['type' => 'category', 'value' => 10, 'label' => 'L3', 'children' => [
+                    ['type' => 'category', 'value' => 10, 'label' => 'L4'],
+                ]],
             ]],
         ]];
         $mobile['children'] = [$this->builder->build('mobile_menu', $deep)];
@@ -167,7 +169,8 @@ class MenuValidatorTest extends TestCase
         $this->assertArrayHasKey('empty_column', $codes);
         $this->assertArrayHasKey('empty_content_block', $codes);
         $this->assertArrayHasKey('duplicate_label', $codes);
-        $this->assertArrayHasKey('too_deep_mobile', $codes);
+        // max_level 2 shows three levels (0..2): only L4 is too deep.
+        $this->assertSame(1, $codes['too_deep_mobile'] ?? 0);
         $this->assertSame('error', $issues[0]['severity'], 'Errors are listed first.');
     }
 
