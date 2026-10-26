@@ -63,8 +63,8 @@ class AssetResolve extends AbstractMediaGalleryTool
         return 'One Media Gallery asset by id or path: path, size, dimensions, keywords, whether the file exists, and '
             . 'where '
             . 'it is used (Hyvä CMS pages, blocks and menus by path or asset id, catalog, and Magento-tracked CMS '
-            . 'content). Use it before moving or trashing an asset. Pages, blocks and menus outside your role\'s '
-            . 'websites/store views are left out and counted in usages_hidden_by_permissions.';
+            . 'content). Use it before moving or trashing an asset. Pages, blocks, menus, products and categories '
+            . 'outside your role\'s websites/store views are left out and counted in usages_hidden_by_permissions.';
     }
 
     /**
@@ -94,14 +94,12 @@ class AssetResolve extends AbstractMediaGalleryTool
             return $this->softError('No Media Gallery asset matches. Run hyva_media.sync.status if the file exists '
                 . 'but is not in the gallery yet.');
         }
-        $usage = $this->usage($asset);
-        $content = $this->scopeFilter->filter($usage['hyva_and_catalog']);
-        $tracked = $this->scopeFilter->filter($usage['magento_tracked'], 'entity_type', 'entity_id');
+        $scoped = $this->scopeFilter->filterAssetUsages([$asset['id'] => $this->usage($asset)]);
         return $this->jsonResult($this->scopeFilter->withHidden([
             'asset' => $asset,
             'file_exists' => $this->gallery->fileExists($asset['path']),
             'keywords' => $this->gallery->keywords($asset['id']),
-            'used_in' => ['hyva_and_catalog' => $content['visible'], 'magento_tracked' => $tracked['visible']],
-        ], 'usages_hidden_by_permissions', $content['hidden'] + $tracked['hidden']), ['id' => $asset['id']]);
+            'used_in' => $scoped['visible'][$asset['id']],
+        ], 'usages_hidden_by_permissions', $scoped['hidden'][$asset['id']]), ['id' => $asset['id']]);
     }
 }

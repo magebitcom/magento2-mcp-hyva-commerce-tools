@@ -13,11 +13,13 @@ use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Security\AdminScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magento\Framework\Module\Manager as ModuleManager;
+use Magento\Store\Api\Data\GroupInterface;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
 
 /**
- * Real StoreScopeGuard over mocked Hyvä scope data: store views 1 and 2 exist (website 1 and 2).
+ * Real StoreScopeGuard over mocked Hyvä scope data: store views 1 and 2 exist (website 1 and 2, store group 1 and 2
+ * with root category 11 and 12).
  */
 trait StoreScopeStub
 {
@@ -41,13 +43,21 @@ trait StoreScopeStub
         $caller = $this->createMock(CallerContext::class);
         $caller->method('adminUserId')->willReturn(7);
         $stores = [];
+        $groups = [];
         foreach ([1, 2] as $storeId) {
             $store = $this->createMock(StoreInterface::class);
             $store->method('getId')->willReturn($storeId);
+            $store->method('getStoreGroupId')->willReturn($storeId);
             $stores[$storeId] = $store;
+            $group = $this->createMock(GroupInterface::class);
+            $group->method('getRootCategoryId')->willReturn(10 + $storeId);
+            $groups[$storeId] = $group;
         }
         $storeManager = $this->createMock(StoreManagerInterface::class);
         $storeManager->method('getStores')->willReturn($stores);
+        $storeManager->method('getGroup')->willReturnCallback(
+            static fn (int|string|null $groupId): GroupInterface => $groups[(int) $groupId]
+        );
         return new StoreScopeGuard(new AdminScopeGuard($modules, $gateway), $caller, $storeManager);
     }
 }

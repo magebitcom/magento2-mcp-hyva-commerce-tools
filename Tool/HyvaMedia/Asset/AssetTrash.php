@@ -8,6 +8,12 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset;
 
+use Magebit\McpHyvaCommerceTools\Api\Adapter\MediaGalleryGatewayInterface;
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
+use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
+use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
 use Magebit\McpHyvaCommerceTools\Model\Tool\MediaGallery\AbstractMediaGalleryTool;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
@@ -24,6 +30,25 @@ class AssetTrash extends AbstractMediaGalleryTool
     public const IS_WRITE = true;
 
     /**
+     * @param FeatureCheckerInterface $featureChecker
+     * @param MediaGalleryGatewayInterface $gallery
+     * @param ImageReferenceExtractor $extractor
+     * @param ImageUsageIndex $usageIndex
+     * @param CallerContext $callerContext
+     * @param ContentScopeFilter $scopeFilter
+     */
+    public function __construct(
+        FeatureCheckerInterface $featureChecker,
+        MediaGalleryGatewayInterface $gallery,
+        ImageReferenceExtractor $extractor,
+        ImageUsageIndex $usageIndex,
+        CallerContext $callerContext,
+        private readonly ContentScopeFilter $scopeFilter
+    ) {
+        parent::__construct($featureChecker, $gallery, $extractor, $usageIndex, $callerContext);
+    }
+
+    /**
      * @inheritDoc
      */
     public function getTitle(): string
@@ -37,8 +62,10 @@ class AssetTrash extends AbstractMediaGalleryTool
     public function getDescription(): string
     {
         return 'Move assets to Hyvä\'s Trash (restorable with hyva_media.trash.restore during the retention period, '
-            . 'default 7 days; then purged by cron). Without confirm=true you get where each asset is used first. A '
-            . 'restored asset may get a new id, so id references to it stop resolving.';
+            . 'default 7 days; then purged by cron). Without confirm=true you get where each asset is used first; '
+            . 'pages, blocks, menus, products and categories outside your role\'s websites/store views are left out '
+            . '(usages_hidden_by_permissions) but still count in in_use. A restored asset may get a new id, so id '
+            . 'references to it stop resolving.';
     }
 
     /**
@@ -67,10 +94,16 @@ class AssetTrash extends AbstractMediaGalleryTool
         $affected = [];
         $inUse = 0;
         $usages = $this->usages($assets);
+        $scoped = $this->scopeFilter->filterAssetUsages($usages);
         foreach ($assets as $asset) {
+            // Usages the caller may not see still make the asset in use.
             $usage = $usages[$asset['id']];
             $inUse += ($usage['hyva_and_catalog'] !== [] || $usage['magento_tracked'] !== []) ? 1 : 0;
-            $affected[] = ['asset' => $asset, 'used_in' => $usage];
+            $affected[] = $this->scopeFilter->withHidden(
+                ['asset' => $asset, 'used_in' => $scoped['visible'][$asset['id']]],
+                'usages_hidden_by_permissions',
+                $scoped['hidden'][$asset['id']]
+            );
         }
         if (!$this->boolArg($arguments, 'confirm')) {
             return $this->confirmationRequired('trash_assets', [

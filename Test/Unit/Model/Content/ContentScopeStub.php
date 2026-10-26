@@ -13,6 +13,7 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
+use Magebit\McpHyvaCommerceTools\Model\Security\CatalogScopeReader;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magento\Cms\Api\BlockRepositoryInterface;
 use Magento\Cms\Api\PageRepositoryInterface;
@@ -20,7 +21,8 @@ use Magento\Cms\Model\ResourceModel\Block\CollectionFactory as BlockCollectionFa
 use Magento\Cms\Model\ResourceModel\Page\CollectionFactory as PageCollectionFactory;
 
 /**
- * Real ContentScopeFilter and ContentLocator over mocked store view assignments (store views 1 and 2 exist).
+ * Real ContentScopeFilter and ContentLocator over mocked store view assignments (store views 1 and 2 exist) and
+ * mocked catalog data (product websites, category paths; the roots of store view 1 and 2 are categories 11 and 12).
  */
 trait ContentScopeStub
 {
@@ -32,15 +34,29 @@ trait ContentScopeStub
      * @param array|null $allowedStoreIds
      * @param array $storeIds Store views per entity type and id; entities not listed do not exist.
      * @param ContentIndex|null $contentIndex Replaces the lookup over $storeIds (e.g. to count queries).
+     * @param array $catalog Websites per product id and paths per category id; others do not exist.
+     * @param CatalogScopeReader|null $catalogReader Replaces the lookup over $catalog (e.g. to count queries).
      * @return ContentScopeFilter
      * @phpstan-param list<int>|null $allowedStoreIds
      * @phpstan-param array<string, array<int, list<int>>> $storeIds
+     * @phpstan-param array{product?: array<int, list<int>>, category?: array<int, string>} $catalog
      */
     private function contentScope(
         ?array $allowedStoreIds,
         array $storeIds = [],
-        ?ContentIndex $contentIndex = null
+        ?ContentIndex $contentIndex = null,
+        array $catalog = [],
+        ?CatalogScopeReader $catalogReader = null
     ): ContentScopeFilter {
+        if ($catalogReader === null) {
+            $catalogReader = $this->createMock(CatalogScopeReader::class);
+            $catalogReader->method('productWebsiteIds')->willReturnCallback(
+                static fn (array $ids): array => array_intersect_key($catalog['product'] ?? [], array_flip($ids))
+            );
+            $catalogReader->method('categoryPaths')->willReturnCallback(
+                static fn (array $ids): array => array_intersect_key($catalog['category'] ?? [], array_flip($ids))
+            );
+        }
         if ($contentIndex === null) {
             $contentIndex = $this->createMock(ContentIndex::class);
             $contentIndex->method('getStoreIds')->willReturnCallback(
@@ -63,6 +79,6 @@ trait ContentScopeStub
             $guard,
             $contentIndex
         );
-        return new ContentScopeFilter($locator, $guard);
+        return new ContentScopeFilter($locator, $guard, $catalogReader);
     }
 }

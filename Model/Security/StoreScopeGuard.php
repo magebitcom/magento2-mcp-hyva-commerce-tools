@@ -20,10 +20,17 @@ use Magento\Store\Model\StoreManagerInterface;
  * - write: every assigned store view must be allowed; store view 0 is inherited by every store view, so it needs
  *   all of them. Re-assigning may not drop a store view outside the role either.
  * - data without a store assignment (global): a restricted role may not change it.
+ * - catalog (read): a product is visible in an allowed website or in none, a category under the root category of
+ *   an allowed store view (Hyvä's CatalogProductEntityGuard and CatalogCategoryEntityGuard).
  * Unrestricted callers (no MCP admin, scope module disabled, role without a restriction) pass every check.
  */
 class StoreScopeGuard
 {
+    /**
+     * @var array<string, list<int>> Category root ids per allowed store view list.
+     */
+    private array $categoryRootIds = [];
+
     /**
      * @param AdminScopeGuard $adminScopeGuard
      * @param CallerContext $callerContext
@@ -79,6 +86,52 @@ class StoreScopeGuard
             }
         }
         return false;
+    }
+
+    /**
+     * Whether the caller may see a product in these websites
+     *
+     * Hyvä's CatalogProductEntityGuard: visible when one of its websites is allowed; a product in no website is
+     * in no storefront and stays visible.
+     *
+     * @param array $websiteIds
+     * @return bool
+     * @phpstan-param list<int> $websiteIds
+     */
+    public function allowsProductWebsites(array $websiteIds): bool
+    {
+        $scopes = $this->adminScopeGuard->allowedScopes($this->callerContext->adminUserId());
+        if (!$scopes['restricted'] || $websiteIds === []) {
+            return true;
+        }
+        foreach ($websiteIds as $websiteId) {
+            if ($websiteId === 0 || in_array($websiteId, $scopes['website_ids'], true)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether the caller may see a category with this tree path (e.g. "1/2/15")
+     *
+     * Hyvä's CatalogCategoryEntityGuard: visible when it sits under the root category of an allowed store view's
+     * store group; the tree root ("1") carries no scope.
+     *
+     * @param string $path
+     * @return bool
+     */
+    public function allowsCategoryPath(string $path): bool
+    {
+        $allowed = $this->restrictedStoreIds();
+        if ($allowed === null) {
+            return true;
+        }
+        $segments = array_map('intval', explode('/', $path));
+        if (count($segments) < 2) {
+            return true;
+        }
+        return in_array($segments[1], $this->categoryRootIds($allowed), true);
     }
 
     /**
@@ -209,6 +262,34 @@ class StoreScopeGuard
                 $what
             ));
         }
+    }
+
+    /**
+     * Root category ids of the store groups of these store views (Hyvä's AllowedCategoryRoots)
+     *
+     * @param array $storeIds
+     * @return array
+     * @phpstan-param list<int> $storeIds
+     * @phpstan-return list<int>
+     */
+    private function categoryRootIds(array $storeIds): array
+    {
+        $key = implode(',', $storeIds);
+        if (!isset($this->categoryRootIds[$key])) {
+            $rootIds = [];
+            foreach ($this->storeManager->getStores() as $store) {
+                if (!in_array((int) $store->getId(), $storeIds, true)) {
+                    continue;
+                }
+                $group = $this->storeManager->getGroup((string) $store->getStoreGroupId());
+                $rootId = (int) $group->getRootCategoryId();
+                if ($rootId > 0) {
+                    $rootIds[$rootId] = $rootId;
+                }
+            }
+            $this->categoryRootIds[$key] = array_values($rootIds);
+        }
+        return $this->categoryRootIds[$key];
     }
 
     /**

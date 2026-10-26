@@ -233,7 +233,8 @@ class ImageListTest extends TestCase
     }
 
     /**
-     * Tool for a caller restricted to store view 1: page 1 and menu 3 are its own, page 2 is store view 2's.
+     * Tool for a caller restricted to store view 1: page 1, menu 3 and product 5 are its own, page 2 is store
+     * view 2's.
      *
      * @return ImageList
      */
@@ -241,7 +242,9 @@ class ImageListTest extends TestCase
     {
         return new ImageList($this->inventory, $this->fileInfo, $this->usageIndex, $this->contentScope(
             [1],
-            ['cms_page' => [1 => [1], 2 => [2]], 'menu' => [3 => [0]]]
+            ['cms_page' => [1 => [1], 2 => [2]], 'menu' => [3 => [0]]],
+            null,
+            ['product' => [5 => [1]]]
         ));
     }
 

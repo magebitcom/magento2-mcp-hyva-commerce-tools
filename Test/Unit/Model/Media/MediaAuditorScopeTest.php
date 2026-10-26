@@ -71,7 +71,7 @@ class MediaAuditorScopeTest extends TestCase
             $usageIndex,
             $checker,
             $this->createMock(MediaService::class),
-            $this->contentScope($allowedStoreIds, ['cms_page' => [1 => [1], 2 => [2]]])
+            $this->contentScope($allowedStoreIds, ['cms_page' => [1 => [1], 2 => [2]]], null, ['product' => [5 => [1]]])
         );
     }
 

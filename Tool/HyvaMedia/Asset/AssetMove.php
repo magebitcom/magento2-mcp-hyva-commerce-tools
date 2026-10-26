@@ -8,6 +8,12 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset;
 
+use Magebit\McpHyvaCommerceTools\Api\Adapter\MediaGalleryGatewayInterface;
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
+use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
+use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
 use Magebit\McpHyvaCommerceTools\Model\Tool\MediaGallery\AbstractMediaGalleryTool;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
@@ -25,6 +31,25 @@ class AssetMove extends AbstractMediaGalleryTool
     public const IS_WRITE = true;
 
     /**
+     * @param FeatureCheckerInterface $featureChecker
+     * @param MediaGalleryGatewayInterface $gallery
+     * @param ImageReferenceExtractor $extractor
+     * @param ImageUsageIndex $usageIndex
+     * @param CallerContext $callerContext
+     * @param ContentScopeFilter $scopeFilter
+     */
+    public function __construct(
+        FeatureCheckerInterface $featureChecker,
+        MediaGalleryGatewayInterface $gallery,
+        ImageReferenceExtractor $extractor,
+        ImageUsageIndex $usageIndex,
+        CallerContext $callerContext,
+        private readonly ContentScopeFilter $scopeFilter
+    ) {
+        parent::__construct($featureChecker, $gallery, $extractor, $usageIndex, $callerContext);
+    }
+
+    /**
      * @inheritDoc
      */
     public function getTitle(): string
@@ -40,7 +65,8 @@ class AssetMove extends AbstractMediaGalleryTool
         return 'Move assets to another folder under wysiwyg/ (Hyvä\'s MediaMover; asset ids stay the same, files whose '
             . 'name exists in the target are skipped). Content that references an asset by id keeps working; '
             . 'content that references the old path does not, so without confirm=true you get the affected usages '
-            . 'first.';
+            . 'first. Pages, blocks, menus, products and categories outside your role\'s websites/store views are '
+            . 'left out of them and counted in usages_hidden_by_permissions.';
     }
 
     /**
@@ -74,9 +100,13 @@ class AssetMove extends AbstractMediaGalleryTool
         }
         if (!$this->boolArg($arguments, 'confirm')) {
             $affected = [];
-            $usages = $this->usages($assets);
+            $scoped = $this->scopeFilter->filterAssetUsages($this->usages($assets));
             foreach ($assets as $asset) {
-                $affected[] = ['asset' => $asset, 'used_in' => $usages[$asset['id']]];
+                $affected[] = $this->scopeFilter->withHidden(
+                    ['asset' => $asset, 'used_in' => $scoped['visible'][$asset['id']]],
+                    'usages_hidden_by_permissions',
+                    $scoped['hidden'][$asset['id']]
+                );
             }
             return $this->confirmationRequired('move_assets', [
                 'target_folder' => $target,

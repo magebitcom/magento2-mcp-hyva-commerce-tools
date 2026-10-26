@@ -112,7 +112,7 @@ class ImageUsageScopeTest extends TestCase
     }
 
     /**
-     * Scope over page 1 (store view 1), page 2, block 4 and menu 3 (store view 2).
+     * Scope over page 1 (store view 1), page 2, block 4 and menu 3 (store view 2), product 5 (website 1).
      *
      * @param array|null $allowedStoreIds
      * @return ContentScopeFilter
@@ -124,7 +124,7 @@ class ImageUsageScopeTest extends TestCase
             'cms_page' => [1 => [1], 2 => [2]],
             'cms_block' => [4 => [2]],
             'menu' => [3 => [2]],
-        ]);
+        ], null, ['product' => [5 => [1]]]);
     }
 
     /**

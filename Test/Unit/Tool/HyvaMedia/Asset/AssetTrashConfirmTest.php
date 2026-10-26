@@ -13,6 +13,7 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content\ContentScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset\AssetTrash;
 use PHPUnit\Framework\MockObject\MockObject;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\ToolPayloadTrait;
@@ -20,6 +21,7 @@ use PHPUnit\Framework\TestCase;
 
 class AssetTrashConfirmTest extends TestCase
 {
+    use ContentScopeStub;
     use ToolPayloadTrait;
 
     /**
@@ -56,7 +58,8 @@ class AssetTrashConfirmTest extends TestCase
             $this->gallery,
             $this->createMock(ImageReferenceExtractor::class),
             $this->usageIndex,
-            $this->createMock(CallerContext::class)
+            $this->createMock(CallerContext::class),
+            $this->contentScope(null)
         );
     }
 

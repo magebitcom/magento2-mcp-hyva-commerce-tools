@@ -10,11 +10,12 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content;
 
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Security\CatalogScopeReader;
 use PHPUnit\Framework\TestCase;
 
 /**
  * Usage lists, audits and widgets hide content of other websites' store views from a restricted caller (finding:
- * unscoped image/audit lists).
+ * unscoped image/audit lists), and products and categories of other websites as Hyvä's catalog guards do.
  */
 class ContentScopeFilterTest extends TestCase
 {
@@ -29,12 +30,27 @@ class ContentScopeFilterTest extends TestCase
         ContentLocator::TYPE_MENU => [5 => [1, 2]],
     ];
 
+    /**
+     * Products: 2 = website 1, 6 = website 2, 7 = no website, 8 = websites 1 and 2 (9 does not exist).
+     * Categories (root of store view 1 = 11, of store view 2 = 12): 4 and 11 in tree 11, 5 and 12 in tree 12,
+     * 1 = the tree root (99 does not exist).
+     */
+    private const CATALOG = [
+        'product' => [2 => [1], 6 => [2], 7 => [], 8 => [1, 2]],
+        'category' => [4 => '1/11/4', 11 => '1/11', 5 => '1/12/5', 12 => '1/12', 1 => '1'],
+    ];
+
     public function testAnUnrestrictedCallerGetsEverythingWithoutALookup(): void
     {
         $contentIndex = $this->createMock(ContentIndex::class);
         $contentIndex->expects($this->never())->method('getStoreIds');
-        $filter = $this->contentScope(null, [], $contentIndex);
+        $catalogReader = $this->createMock(CatalogScopeReader::class);
+        $catalogReader->expects($this->never())->method('productWebsiteIds');
+        $catalogReader->expects($this->never())->method('categoryPaths');
+        $filter = $this->contentScope(null, [], $contentIndex, [], $catalogReader);
         $items = $this->items();
+        $usages = [3 => ['hyva_and_catalog' => $items, 'magento_tracked' => [['entity_type' => 'catalog_product',
+            'entity_id' => '6']]]];
 
         $this->assertFalse($filter->isRestricted());
         $this->assertSame(['visible' => $items, 'hidden' => 0], $filter->filter($items));
@@ -47,15 +63,16 @@ class ContentScopeFilterTest extends TestCase
         $report = ['total' => 3, 'used' => true, 'hyva' => $items];
         $this->assertSame($report, $filter->filterUsageReport($report, ['hyva']));
         $this->assertSame(['a' => 1], $filter->withHidden(['a' => 1], 'hidden', 4));
+        $this->assertSame(['visible' => $usages, 'hidden' => [3 => 0]], $filter->filterAssetUsages($usages));
     }
 
     public function testARestrictedCallerSeesOnlyContentOfItsStoreViewsAndEverythingElse(): void
     {
-        $filter = $this->contentScope([1], self::STORE_IDS);
+        $filter = $this->contentScope([1], self::STORE_IDS, null, self::CATALOG);
 
         $result = $filter->filter($this->items());
 
-        // Page 2, block 4 and the deleted page 9 are hidden; products and categories are not store view content.
+        // Page 2, block 4 and the deleted page 9 are hidden; product 2 and category 4 are in website 1.
         $this->assertSame(
             [['cms_page', 1], ['cms_page', 3], ['menu', 5], ['product', 2], ['category', 4]],
             array_map(static fn (array $i): array => [$i['entity_type'], $i['id']], $result['visible'])
@@ -73,7 +90,7 @@ class ContentScopeFilterTest extends TestCase
                 array_flip($ids)
             )
         );
-        $filter = $this->contentScope([1], [], $contentIndex);
+        $filter = $this->contentScope([1], [], $contentIndex, self::CATALOG);
 
         $result = $filter->filterGrouped(['a.jpg' => $this->items(), 'b.jpg' => $this->items()]);
         // Already looked up: no further query.
@@ -91,10 +108,77 @@ class ContentScopeFilterTest extends TestCase
             ['entity_type' => 'catalog_product', 'entity_id' => '4', 'field' => 'description'],
         ];
 
-        $result = $this->contentScope([1], self::STORE_IDS)->filter($tracked, 'entity_type', 'entity_id');
+        $result = $this->contentScope([1], self::STORE_IDS, null, ['product' => [4 => [1]]])
+            ->filter($tracked, 'entity_type', 'entity_id');
 
         $this->assertSame([$tracked[0], $tracked[2]], $result['visible']);
         $this->assertSame(1, $result['hidden']);
+    }
+
+    public function testProductsAreVisibleInTheRolesWebsitesOrInNone(): void
+    {
+        $products = [];
+        foreach ([2, 6, 7, 8, 9] as $id) {
+            $products[] = ['entity_type' => 'product', 'id' => $id];
+        }
+
+        $result = $this->contentScope([1], [], null, self::CATALOG)->filter($products);
+
+        // Product 6 is only in website 2, product 9 no longer exists.
+        $this->assertSame([2, 7, 8], array_column($result['visible'], 'id'));
+        $this->assertSame(2, $result['hidden']);
+        $this->assertSame([6, 7, 8], array_column(
+            $this->contentScope([2], [], null, self::CATALOG)->filter($products)['visible'],
+            'id'
+        ));
+    }
+
+    public function testCategoriesAreVisibleInTheTreesOfTheRolesStoreViews(): void
+    {
+        $categories = [];
+        foreach ([4, 11, 5, 12, 1, 99] as $id) {
+            $categories[] = ['entity_type' => 'catalog_category', 'entity_id' => (string) $id];
+        }
+
+        $result = $this->contentScope([1], [], null, self::CATALOG)->filter($categories, 'entity_type', 'entity_id');
+
+        // Category 5 and root 12 are in store view 2's tree, category 99 no longer exists.
+        $this->assertSame(['4', '11', '1'], array_column($result['visible'], 'entity_id'));
+        $this->assertSame(3, $result['hidden']);
+    }
+
+    public function testAssetUsagesAreCheckedWithOneCatalogLookupPerType(): void
+    {
+        $catalogReader = $this->createMock(CatalogScopeReader::class);
+        $catalogReader->expects($this->once())->method('productWebsiteIds')->with([6, 2])
+            ->willReturn([6 => [2], 2 => [1]]);
+        $catalogReader->expects($this->once())->method('categoryPaths')->with([5])->willReturn([5 => '1/12/5']);
+        $filter = $this->contentScope([1], self::STORE_IDS, null, [], $catalogReader);
+        $usages = [
+            3 => [
+                'hyva_and_catalog' => [
+                    ['entity_type' => 'product', 'id' => 6],
+                    ['entity_type' => 'cms_page', 'id' => 1],
+                ],
+                'magento_tracked' => [['entity_type' => 'catalog_product', 'entity_id' => '2']],
+            ],
+            4 => [
+                'hyva_and_catalog' => [],
+                'magento_tracked' => [['entity_type' => 'catalog_category', 'entity_id' => '5'],
+                    ['entity_type' => 'catalog_product', 'entity_id' => '6']],
+            ],
+        ];
+
+        $result = $filter->filterAssetUsages($usages);
+
+        $this->assertSame([
+            3 => [
+                'hyva_and_catalog' => [['entity_type' => 'cms_page', 'id' => 1]],
+                'magento_tracked' => [['entity_type' => 'catalog_product', 'entity_id' => '2']],
+            ],
+            4 => ['hyva_and_catalog' => [], 'magento_tracked' => []],
+        ], $result['visible']);
+        $this->assertSame([3 => 1, 4 => 2], $result['hidden']);
     }
 
     public function testRowsWithStoreViewsNeedNoLookup(): void
