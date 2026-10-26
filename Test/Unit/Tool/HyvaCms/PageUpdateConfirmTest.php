@@ -73,6 +73,38 @@ class PageUpdateConfirmTest extends TestCase
         $this->assertArrayNotHasKey('confirmation_required', $payload);
     }
 
+    public function testAnUnchangedMetaFieldOfAnActivePageIsNoChange(): void
+    {
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->expects($this->once())->method('currentValues')
+            ->with('cms_page', 7, ['meta_title'])->willReturn(['meta_title' => 'Sale | Shop']);
+        $writer->expects($this->once())->method('update')->willReturn(['meta_title']);
+
+        $payload = $this->payload($this->tool($this->createMock(ContentService::class), $writer, null, true)->execute([
+            'identifier' => 'sale',
+            'settings' => ['meta_title' => 'Sale | Shop', 'title' => 'Sale'],
+        ]));
+
+        $this->assertArrayNotHasKey('confirmation_required', $payload);
+    }
+
+    public function testAChangedMetaFieldOfAnActivePageShowsTheStoredValue(): void
+    {
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->method('currentValues')->willReturn(['meta_title' => 'Sale | Shop']);
+        $writer->expects($this->never())->method('update');
+
+        $payload = $this->payload($this->tool($this->createMock(ContentService::class), $writer, null, true)->execute([
+            'identifier' => 'sale',
+            'settings' => ['meta_title' => 'Summer sale | Shop'],
+        ]));
+
+        $this->assertTrue($payload['confirmation_required'] ?? null);
+        $affected = $payload['affected'] ?? null;
+        $this->assertIsArray($affected);
+        $this->assertSame('Sale | Shop', $affected[0]['from'] ?? null);
+    }
+
     public function testARestrictedRoleMayNotMoveAPageToAllStoreViews(): void
     {
         $writer = $this->createMock(EntityWriter::class);
@@ -102,21 +134,23 @@ class PageUpdateConfirmTest extends TestCase
     }
 
     /**
-     * Page update over an inactive page.
+     * Page update over the "sale" page.
      *
      * @param ContentService $contentService
      * @param EntityWriter $writer
      * @param array|null $allowedStoreIds Store views of a restricted caller; null = unrestricted.
+     * @param bool $active Whether the page is active.
      * @return PageUpdate
      * @phpstan-param list<int>|null $allowedStoreIds
      */
     private function tool(
         ContentService $contentService,
         EntityWriter $writer,
-        ?array $allowedStoreIds = null
+        ?array $allowedStoreIds = null,
+        bool $active = false
     ): PageUpdate {
         $locator = $this->createMock(ContentLocator::class);
-        $locator->method('locateForWrite')->willReturn(self::PAGE);
+        $locator->method('locateForWrite')->willReturn(['is_active' => $active] + self::PAGE);
         return new PageUpdate(
             $locator,
             $contentService,

@@ -38,6 +38,12 @@ class LiveSettingsTest extends TestCase
         $this->assertSame(['title'], array_column($changes, 'field'), 'same store views and flag in another form');
     }
 
+    public function testPreviewUrlKeyIsNeverLive(): void
+    {
+        $current = ['is_active' => true, 'title' => 'Main', 'preview_url_key' => 'home'];
+        $this->assertSame([], (new LiveSettings())->changes($current, ['preview_url_key' => 'contact']));
+    }
+
     public function testNoChangeNoConfirmation(): void
     {
         $this->assertSame([], (new LiveSettings())->changes(['is_active' => true, 'title' => 'A'], ['title' => 'A']));

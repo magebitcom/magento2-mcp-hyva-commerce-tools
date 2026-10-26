@@ -110,17 +110,60 @@ class EntityWriter
      */
     public function update(string $type, int $id, array $fields): array
     {
+        $entity = $this->load($type, $id);
+        $changed = $this->apply($entity, $type, $fields);
+        if ($changed !== []) {
+            $this->save($type, $entity);
+        }
+        return $changed;
+    }
+
+    /**
+     * Stored values of settings fields that the content locator does not return (page layout, heading, meta).
+     *
+     * Lets the update tools tell an unchanged value from a change. Loads the entity only when a field is asked.
+     *
+     * @param string $type cms_page|cms_block
+     * @param int $id
+     * @param array $fields
+     * @return array Field => stored value; NULL is returned as '' (the value a write of '' stores).
+     * @throws LocalizedException
+     * @phpstan-param list<string> $fields
+     * @phpstan-return array<string, mixed>
+     */
+    public function currentValues(string $type, int $id, array $fields): array
+    {
+        $allowed = $type === ContentLocator::TYPE_PAGE ? self::PAGE_FIELDS : self::BLOCK_FIELDS;
+        $fields = array_values(array_intersect($fields, array_diff($allowed, ['store_ids', 'is_active'])));
+        if ($fields === []) {
+            return [];
+        }
+        $entity = $this->load($type, $id);
+        $values = [];
+        foreach ($fields as $name) {
+            $value = $entity->getData($name);
+            $values[$name] = is_scalar($value) ? (string) $value : '';
+        }
+        return $values;
+    }
+
+    /**
+     * Load the Magento page or block model.
+     *
+     * @param string $type
+     * @param int $id
+     * @return AbstractModel
+     * @throws LocalizedException
+     */
+    private function load(string $type, int $id): AbstractModel
+    {
         $entity = $type === ContentLocator::TYPE_PAGE
             ? $this->pageRepository->getById($id)
             : $this->blockRepository->getById((string) $id);
         if (!$entity instanceof AbstractModel) {
             throw new LocalizedException(__('Unexpected %1 model.', $type));
         }
-        $changed = $this->apply($entity, $type, $fields);
-        if ($changed !== []) {
-            $this->save($type, $entity);
-        }
-        return $changed;
+        return $entity;
     }
 
     /**

@@ -13,7 +13,8 @@ namespace Magebit\McpHyvaCommerceTools\Model\Tool;
  *
  * Settings are Magento fields, saved at once (no draft). Some always change what the storefront serves or where
  * (is_active, store_ids, identifier); the others (title, meta, layout) show on the storefront when the entity is
- * active. Update tools ask for `confirm: true` before applying any of these.
+ * active. Update tools ask for `confirm: true` before applying any of these. A menu's preview_url_key is never live:
+ * it only picks the storefront page the editor previews the menu on (Hyvä MenuProvider::getStoreContentData()).
  */
 class LiveSettings
 {
@@ -23,9 +24,14 @@ class LiveSettings
     public const ALWAYS_LIVE = ['is_active', 'store_ids', 'identifier'];
 
     /**
+     * Fields that never change what the storefront serves.
+     */
+    public const NEVER_LIVE = ['preview_url_key'];
+
+    /**
      * Live-affecting changes, with what they do to the storefront.
      *
-     * @param array $current Current values: identifier, title, is_active, store_ids
+     * @param array $current Current values of the entity, at least of every field in $settings
      * @param array $settings Requested settings
      * @return array
      * @phpstan-param array<string, mixed> $current
@@ -38,6 +44,9 @@ class LiveSettings
         $changes = [];
         foreach ($settings as $field => $value) {
             $field = (string) $field;
+            if (in_array($field, self::NEVER_LIVE, true)) {
+                continue;
+            }
             $from = $current[$field] ?? null;
             if ($this->same($from, $value)) {
                 continue;
@@ -45,7 +54,12 @@ class LiveSettings
             if (!$active && !in_array($field, self::ALWAYS_LIVE, true)) {
                 continue;
             }
-            $changes[] = ['field' => $field, 'from' => $from, 'to' => $value, 'effect' => $this->effect($field, $value)];
+            $changes[] = [
+                'field' => $field,
+                'from' => $from,
+                'to' => $value,
+                'effect' => $this->effect($field, $value),
+            ];
         }
         return $changes;
     }

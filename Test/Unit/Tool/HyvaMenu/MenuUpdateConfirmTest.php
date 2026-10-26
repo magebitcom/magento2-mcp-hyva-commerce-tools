@@ -72,6 +72,24 @@ class MenuUpdateConfirmTest extends TestCase
         $this->assertFalse($result->isError());
     }
 
+    public function testPreviewUrlKeyOfAnActiveMenuNeedsNoConfirm(): void
+    {
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->expects($this->once())->method('update')->with(3, ['preview_url_key' => 'contact'])
+            ->willReturn(['preview_url_key']);
+
+        $result = $this->tool($gateway, $this->createMock(ContentService::class))->execute([
+            'id' => 3,
+            'settings' => ['preview_url_key' => 'contact'],
+        ]);
+        $text = $result->getContent()[0]['text'] ?? '';
+        $this->assertIsString($text);
+        $payload = json_decode($text, true);
+
+        $this->assertIsArray($payload);
+        $this->assertSame(['preview_url_key'], $payload['settings_changed'] ?? null);
+    }
+
     /**
      * Menu update over an active menu.
      *
@@ -90,7 +108,7 @@ class MenuUpdateConfirmTest extends TestCase
         $features->method('isAvailable')->willReturn(true);
         $menus = $this->createMock(MenuService::class);
         $menus->method('locateForWrite')->willReturn(['id' => 3, 'identifier' => 'main', 'title' => 'Main menu',
-            'is_active' => true, 'store_ids' => [0]]);
+            'is_active' => true, 'store_ids' => [0], 'preview_url_key' => null]);
         return new MenuUpdate(
             $features,
             $menus,

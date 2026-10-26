@@ -72,9 +72,11 @@ class MenuUpdate extends AbstractMenuTool
     public function getDescription(): string
     {
         return 'Update a menu: settings (title, identifier, store_ids, is_active, preview_url_key) apply IMMEDIATELY, '
-            . 'and those that change the live storefront (active flag, store views, identifier; any setting of an '
-            . 'active menu) need "confirm": true, otherwise nothing is written and the reply lists what would change; '
-            . 'structure edits (operations, same as hyva_cms.draft.update: '
+            . 'and those that change the live storefront (active flag, store views, identifier; title of an active '
+            . 'menu) need "confirm": true, otherwise nothing is written and the reply lists what would change. '
+            . 'preview_url_key only sets the page the editor previews the menu on and needs no confirm. '
+            . 'Structure '
+            . 'edits (operations, same as hyva_cms.draft.update: '
             . 'add/remove/move/set_field/set_fields/replace_node/replace_text) are saved as a DRAFT. Prefer '
             . 'hyva_menu.item.* for single items.';
     }

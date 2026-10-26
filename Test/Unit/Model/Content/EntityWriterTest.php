@@ -77,6 +77,28 @@ class EntityWriterTest extends TestCase
         $writer->update(ContentLocator::TYPE_PAGE, 5, ['page_layout' => '']);
     }
 
+    public function testCurrentValuesReadsOnlyUnlocatedFields(): void
+    {
+        $page = $this->page();
+        $page->setData(['meta_title' => 'Sale | Shop', 'meta_description' => null, 'title' => 'Sale']);
+        $repository = $this->createMock(PageRepositoryInterface::class);
+        $repository->expects($this->once())->method('getById')->with(5)->willReturn($page);
+        $writer = new EntityWriter(
+            $this->createMock(PageInterfaceFactory::class),
+            $repository,
+            $this->createMock(BlockInterfaceFactory::class),
+            $this->createMock(BlockRepositoryInterface::class),
+            $this->createMock(AppState::class),
+            $this->createMock(ScopeConfigInterface::class)
+        );
+
+        $this->assertSame(
+            ['meta_title' => 'Sale | Shop', 'meta_description' => ''],
+            $writer->currentValues(ContentLocator::TYPE_PAGE, 5, ['meta_title', 'meta_description', 'is_active', 'x'])
+        );
+        $this->assertSame([], $writer->currentValues(ContentLocator::TYPE_PAGE, 5, ['store_ids']), 'no load');
+    }
+
     /**
      * Writer whose page repository records the saved page.
      *

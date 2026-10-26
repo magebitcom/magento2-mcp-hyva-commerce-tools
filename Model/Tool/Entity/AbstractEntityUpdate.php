@@ -70,8 +70,8 @@ abstract class AbstractEntityUpdate extends AbstractTool
     public function getDescription(): string
     {
         return sprintf(
-            'Update a CMS %1$s. Content changes (components = replace all root components, operations = targeted edits) '
-                . 'are saved as a DRAFT and the live version is unchanged until hyva_cms.publish. "settings" changes '
+            'Update a CMS %1$s. Content changes (components = replace all root components, operations = targeted '
+                . 'edits) are saved as a DRAFT and the live version is unchanged until hyva_cms.publish. "settings" changes '
                 . 'Magento fields (title, active flag, store views, meta) and applies IMMEDIATELY: a setting that '
                 . 'changes the live storefront (active flag, store views, URL key; any field of an active %1$s) needs '
                 . '"confirm": true. Without it nothing is written and the reply lists what would change.',
@@ -138,7 +138,13 @@ abstract class AbstractEntityUpdate extends AbstractTool
             );
         }
 
-        $live = $this->liveSettings->changes($entity, $settings);
+        // Layout, heading and meta are not part of the located row: load them so an unchanged value is no change.
+        $current = $entity + $this->entityWriter->currentValues(
+            $entity['type'],
+            $entity['id'],
+            array_map('strval', array_keys(array_diff_key($settings, $entity)))
+        );
+        $live = $this->liveSettings->changes($current, $settings);
         if ($live !== [] && !$this->boolArg($arguments, 'confirm')) {
             // Nothing is written, the draft half of the call included: one call, one decision.
             return $this->confirmationRequired('apply_live_settings', $live);
