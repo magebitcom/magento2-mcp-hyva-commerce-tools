@@ -100,7 +100,10 @@ class MenuList extends AbstractMenuTool
             ) {
                 continue;
             }
-            $items[] = $menu + ['placements' => $locations, 'assignments' => $assignments];
+            // Placements name every location (like `used`); the per-scope rows are those the role may open.
+            $scoped = $this->menuService->filterAssignments($assignments);
+            $items[] = $menu + ['placements' => $locations, 'assignments' => $scoped['visible']]
+                + ($scoped['hidden'] > 0 ? ['assignments_hidden_by_permissions' => $scoped['hidden']] : []);
         }
         return $this->jsonResult(['total' => count($items), 'items' => $items], ['total' => count($items)]);
     }

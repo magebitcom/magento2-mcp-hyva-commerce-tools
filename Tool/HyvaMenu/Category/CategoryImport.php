@@ -17,6 +17,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magento\Framework\Exception\LocalizedException;
 
 /**
  * `hyva_menu.category.import` MCP tool.
@@ -87,7 +88,7 @@ class CategoryImport extends AbstractMenuEditTool
      */
     protected function executeMenu(array $arguments): ToolResultInterface
     {
-        $menu = $this->menuService->locateForWrite($arguments);
+        $menu = $this->locateMenu($arguments);
         $menuId = Cast::int($menu['id']);
         $storeId = $this->intArg(
             $arguments,
@@ -191,5 +192,19 @@ class CategoryImport extends AbstractMenuEditTool
     protected function isDryRun(array $arguments): bool
     {
         return $this->boolArg($arguments, 'dry_run');
+    }
+
+    /**
+     * Menu to import into: one the caller may change.
+     *
+     * @param array $arguments
+     * @return array
+     * @throws LocalizedException
+     * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-return array<string, mixed>
+     */
+    protected function locateMenu(array $arguments): array
+    {
+        return $this->menuService->locateForWrite($arguments);
     }
 }

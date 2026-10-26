@@ -52,10 +52,10 @@ class MenuUsageResolver implements ContentFieldResolverInterface
     public function resolve(array $entity, array $args): mixed
     {
         unset($args);
-        return $this->scopeFilter->filterUsageReport(
+        return $this->menuService->withScopedAssignments($this->scopeFilter->filterUsageReport(
             $this->menuService->findUsage($entity['identifier']),
             ['hyva_cms_content', 'magento_cms_content'],
             ['widget_instances']
-        );
+        ));
     }
 }

@@ -16,9 +16,12 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\UsageFinder;
+use Magebit\McpHyvaCommerceTools\Model\Security\CatalogScopeReader;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Filesystem\Driver\File as FileDriver;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Store\Model\StoreManagerInterface;
@@ -57,6 +60,8 @@ class MenuService
      * @param DirectoryList $directoryList
      * @param FileDriver $fileDriver
      * @param LoggerInterface $logger
+     * @param StoreScopeGuard $storeScopeGuard
+     * @param CatalogScopeReader $catalogScopeReader
      */
     public function __construct(
         private readonly MenuGatewayInterface $menuGateway,
@@ -71,7 +76,9 @@ class MenuService
         private readonly StoreManagerInterface $storeManager,
         private readonly DirectoryList $directoryList,
         private readonly FileDriver $fileDriver,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly StoreScopeGuard $storeScopeGuard,
+        private readonly CatalogScopeReader $catalogScopeReader
     ) {
     }
 
@@ -164,6 +171,96 @@ class MenuService
             ];
         }
         return $rows;
+    }
+
+    /**
+     * Design-config assignments the caller may see, and how many were left out.
+     *
+     * Hyvä's ConfigScopeAccess (design configuration grid and edit page): a restricted role never sees the default
+     * scope, a website only when it holds every store view of it (a website without store views is refused), a store
+     * view scope only for that store view. Unrestricted callers see every assignment.
+     *
+     * @param array $assignments
+     * @return array
+     * @phpstan-param list<array{location: string, path: string, scope: string, scope_id: int}> $assignments
+     * @phpstan-return array{visible: list<array{location: string, path: string, scope: string, scope_id: int}>,
+     *     hidden: int}
+     */
+    public function filterAssignments(array $assignments): array
+    {
+        if ($this->storeScopeGuard->restrictedStoreIds() === null) {
+            return ['visible' => $assignments, 'hidden' => 0];
+        }
+        $visible = array_values(array_filter($assignments, function (array $assignment): bool {
+            $scopeId = $assignment['scope_id'];
+            if ($scopeId === 0) {
+                return false;
+            }
+            if (in_array($assignment['scope'], ['stores', 'store'], true)) {
+                return $this->storeScopeGuard->allowsWrite([$scopeId]);
+            }
+            if (in_array($assignment['scope'], ['websites', 'website'], true)) {
+                $storeIds = $this->websiteStoreIds($scopeId);
+                return $storeIds !== [] && $this->storeScopeGuard->allowsWrite($storeIds);
+            }
+            return false;
+        }));
+        return ['visible' => $visible, 'hidden' => count($assignments) - count($visible)];
+    }
+
+    /**
+     * A usage report (findUsage(), after ContentScopeFilter::filterUsageReport()) with the design-config assignments
+     * the caller may not see taken off `design_config` and `total` and counted in usages_hidden_by_permissions.
+     *
+     * `used` keeps reporting every usage, so a menu placed in another scope is never mistaken for unused.
+     *
+     * @param array $report
+     * @return array
+     * @phpstan-param array<string, mixed> $report
+     * @phpstan-return array<string, mixed>
+     */
+    public function withScopedAssignments(array $report): array
+    {
+        if ($this->storeScopeGuard->restrictedStoreIds() === null) {
+            return $report;
+        }
+        $assignments = [];
+        foreach (is_array($report['design_config'] ?? null) ? $report['design_config'] : [] as $row) {
+            if (is_array($row)) {
+                $assignments[] = [
+                    'location' => Cast::string($row['location'] ?? ''),
+                    'path' => Cast::string($row['path'] ?? ''),
+                    'scope' => Cast::string($row['scope'] ?? ''),
+                    'scope_id' => Cast::int($row['scope_id'] ?? 0),
+                ];
+            }
+        }
+        $filtered = $this->filterAssignments($assignments);
+        $report['design_config'] = $filtered['visible'];
+        if (is_int($report['total'] ?? null)) {
+            $report['total'] -= $filtered['hidden'];
+        }
+        $report['usages_hidden_by_permissions'] = Cast::int($report['usages_hidden_by_permissions'] ?? 0)
+            + $filtered['hidden'];
+        return $report;
+    }
+
+    /**
+     * Store view ids of a website; empty for an unknown website or one without store views.
+     *
+     * @param int $websiteId
+     * @return array
+     * @phpstan-return list<int>
+     */
+    private function websiteStoreIds(int $websiteId): array
+    {
+        $storeIds = [];
+        foreach ($this->storeManager->getStores() as $store) {
+            if ((int) $store->getWebsiteId() === $websiteId) {
+                $storeIds[] = (int) $store->getId();
+            }
+        }
+        return $storeIds;
     }
 
     /**
@@ -268,7 +365,7 @@ class MenuService
         ];
         $names = [];
         $plan['tree'] = $this->filterTree(
-            $this->linkTargetResolver->getCategoryTree($rootCategoryId, $depth, $storeId),
+            $this->categoryTreeWithinCallerScope($rootCategoryId, $depth, $storeId),
             $linked,
             $includeInactive,
             $includeHidden,
@@ -281,6 +378,38 @@ class MenuService
             }
         }
         return $plan;
+    }
+
+    /**
+     * Category subtree under a root the caller may see.
+     *
+     * Like Hyvä's CatalogCategoryEntityGuard: a restricted role may only read categories under the root category of
+     * an allowed store view; under the tree root ("1") only the store roots it holds are kept.
+     *
+     * @param int $rootCategoryId
+     * @param int $depth
+     * @param int $storeId
+     * @return array
+     * @throws AuthorizationException When the root category is outside the caller's scope.
+     * @phpstan-return list<array<string, mixed>>
+     */
+    private function categoryTreeWithinCallerScope(int $rootCategoryId, int $depth, int $storeId): array
+    {
+        $path = $this->catalogScopeReader->categoryPaths([$rootCategoryId])[$rootCategoryId] ?? null;
+        if ($path !== null && !$this->storeScopeGuard->allowsCategoryPath($path)) {
+            throw new AuthorizationException(__(
+                'Your admin role is restricted to other websites or store views; category #%1 is outside it.',
+                $rootCategoryId
+            ));
+        }
+        $tree = $this->linkTargetResolver->getCategoryTree($rootCategoryId, $depth, $storeId);
+        if ($path === null || str_contains($path, '/')) {
+            return $tree;
+        }
+        return array_values(array_filter(
+            $tree,
+            fn (array $root): bool => $this->storeScopeGuard->allowsCategoryPath($path . '/' . $root['id'])
+        ));
     }
 
     /**

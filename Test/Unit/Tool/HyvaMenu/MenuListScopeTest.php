@@ -42,6 +42,7 @@ class MenuListScopeTest extends TestCase
         $features->method('isAvailable')->willReturn(true);
         $menus = $this->createMock(MenuService::class);
         $menus->method('getAssignments')->willReturn([]);
+        $menus->method('filterAssignments')->willReturn(['visible' => [], 'hidden' => 0]);
         $gateway = $this->createMock(MenuGatewayInterface::class);
         $gateway->method('getList')->willReturn([
             ['id' => 1, 'title' => 'Main', 'identifier' => 'main', 'is_active' => true, 'store_ids' => [1]],

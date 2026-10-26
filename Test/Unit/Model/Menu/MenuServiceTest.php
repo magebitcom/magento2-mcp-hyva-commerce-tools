@@ -20,15 +20,21 @@ use Magebit\McpHyvaCommerceTools\Model\Content\UsageFinder;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuItemBuilder;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuValidator;
+use Magebit\McpHyvaCommerceTools\Model\Security\CatalogScopeReader;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Filesystem\Driver\File as FileDriver;
+use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
 
 class MenuServiceTest extends TestCase
 {
+    use StoreScopeStub;
+
     /**
      * @var ComponentTree
      */
@@ -43,6 +49,11 @@ class MenuServiceTest extends TestCase
      * @var MenuService
      */
     private MenuService $service;
+
+    /**
+     * @var LinkTargetResolverInterface
+     */
+    private LinkTargetResolverInterface $resolver;
 
     protected function setUp(): void
     {
@@ -121,20 +132,105 @@ class MenuServiceTest extends TestCase
                 'children' => [],
             ],
         ]);
-        $this->service = new MenuService(
+        $this->resolver = $resolver;
+        $this->service = $this->service(null);
+    }
+
+    public function testARestrictedRoleSeesOnlyTheDesignConfigScopesItMayOpen(): void
+    {
+        $rows = [];
+        foreach ([['default', 0], ['websites', 1], ['websites', 2], ['websites', 9], ['stores', 1], ['stores', 2]]
+                 as [$scope, $scopeId]) {
+            $rows[] = ['location' => 'header', 'path' => 'design/header/topmenu_identifier', 'scope' => $scope,
+                'scope_id' => $scopeId];
+        }
+
+        $restricted = $this->service([1], [], [1 => [1], 2 => [2]])->filterAssignments($rows);
+        $this->assertSame(
+            [['websites', 1], ['stores', 1]],
+            array_map(static fn (array $r): array => [$r['scope'], $r['scope_id']], $restricted['visible'])
+        );
+        $this->assertSame(4, $restricted['hidden']);
+        $this->assertSame(['visible' => $rows, 'hidden' => 0], $this->service->filterAssignments($rows));
+
+        $report = $this->service([1], [], [1 => [1]])->withScopedAssignments(
+            ['used' => true, 'total' => 9, 'design_config' => $rows, 'usages_hidden_by_permissions' => 1]
+        );
+        $this->assertTrue($report['used']);
+        $this->assertIsArray($report['design_config']);
+        $this->assertCount(2, $report['design_config']);
+        $this->assertSame(5, $report['total']);
+        $this->assertSame(5, $report['usages_hidden_by_permissions']);
+    }
+
+    public function testCategoryImportRefusesARootOutsideTheRole(): void
+    {
+        $this->expectException(AuthorizationException::class);
+        $this->service([1], [2 => '1/12/2'])
+            ->planCategoryImport($this->tree->newDocument('menu', 1), 2, 2, 1, false, false);
+    }
+
+    public function testCategoryImportUnderTheTreeRootKeepsOnlyTheHeldStoreRoots(): void
+    {
+        $resolver = $this->createMock(LinkTargetResolverInterface::class);
+        $resolver->method('getCategoryTree')->willReturn([
+            ['id' => 11, 'name' => 'Main', 'active' => true, 'include_in_menu' => true, 'has_url_rewrite' => true,
+                'level' => 1, 'children' => []],
+            ['id' => 12, 'name' => 'Other', 'active' => true, 'include_in_menu' => true, 'has_url_rewrite' => true,
+                'level' => 1, 'children' => []],
+        ]);
+        $this->resolver = $resolver;
+
+        $plan = $this->service([1], [1 => '1'])
+            ->planCategoryImport($this->tree->newDocument('menu', 1), 1, 2, 1, false, false);
+
+        $this->assertSame([11], array_column($plan['tree'], 'id'));
+    }
+
+    /**
+     * Menu service for a caller restricted to the store views, or unrestricted (null).
+     *
+     * @param array|null $allowedStoreIds
+     * @param array $categoryPaths Tree path per category id.
+     * @param array $websiteStores Store view ids per website id.
+     * @return MenuService
+     * @phpstan-param list<int>|null $allowedStoreIds
+     * @phpstan-param array<int, string> $categoryPaths
+     * @phpstan-param array<int, list<int>> $websiteStores
+     */
+    private function service(?array $allowedStoreIds, array $categoryPaths = [], array $websiteStores = []): MenuService
+    {
+        $paths = $this->createMock(CatalogScopeReader::class);
+        $paths->method('categoryPaths')->willReturnCallback(
+            static fn (array $ids): array => array_intersect_key($categoryPaths, array_flip($ids))
+        );
+        $stores = [];
+        foreach ($websiteStores as $websiteId => $storeIds) {
+            foreach ($storeIds as $storeId) {
+                $store = $this->createMock(StoreInterface::class);
+                $store->method('getId')->willReturn($storeId);
+                $store->method('getWebsiteId')->willReturn($websiteId);
+                $stores[] = $store;
+            }
+        }
+        $storeManager = $this->createMock(StoreManagerInterface::class);
+        $storeManager->method('getStores')->willReturn($stores);
+        return new MenuService(
             $this->createMock(MenuGatewayInterface::class),
             $this->createMock(ContentLocator::class),
             $this->createMock(ContentService::class),
             $this->tree,
             $this->createMock(MenuValidator::class),
             $this->builder,
-            $resolver,
+            $this->resolver,
             $this->createMock(UsageFinder::class),
             $this->createMock(ResourceConnection::class),
-            $this->createMock(StoreManagerInterface::class),
+            $storeManager,
             $this->createMock(DirectoryList::class),
             $this->createMock(FileDriver::class),
-            $this->createMock(LoggerInterface::class)
+            $this->createMock(LoggerInterface::class),
+            $this->storeScope($allowedStoreIds),
+            $paths
         );
     }
 

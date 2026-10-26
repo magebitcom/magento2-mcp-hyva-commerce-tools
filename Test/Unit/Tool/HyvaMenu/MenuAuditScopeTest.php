@@ -55,9 +55,10 @@ class MenuAuditScopeTest extends TestCase
         $restricted = $this->payload($this->findUsage([1])->execute(['id' => 1]));
         $this->assertSame([1], array_column($this->list($restricted['hyva_cms_content'] ?? null), 'id'));
         $this->assertSame([], $restricted['widget_instances'] ?? null);
-        $this->assertSame(2, $restricted['total'] ?? null);
+        $this->assertSame([], $restricted['design_config'] ?? null);
+        $this->assertSame(1, $restricted['total'] ?? null);
         $this->assertTrue($restricted['used'] ?? null);
-        $this->assertSame(2, $restricted['usages_hidden_by_permissions'] ?? null);
+        $this->assertSame(3, $restricted['usages_hidden_by_permissions'] ?? null);
 
         $all = $this->payload($this->findUsage(null)->execute(['id' => 1]));
         $this->assertSame(4, $all['total'] ?? null);
@@ -67,11 +68,19 @@ class MenuAuditScopeTest extends TestCase
     /**
      * Menu service validating every menu without issues and finding one placement per menu.
      *
+     * A restricted caller may not open the default design config scope of that placement (Hyvä ConfigScopeAccess).
+     *
+     * @param bool $restricted
      * @return MenuService
      */
-    private function menuService(): MenuService
+    private function menuService(bool $restricted = false): MenuService
     {
         $service = $this->createMock(MenuService::class);
+        $service->method('withScopedAssignments')->willReturnCallback(
+            static fn (array $report): array => $restricted ? ['design_config' => [],
+                'total' => $report['total'] - 1,
+                'usages_hidden_by_permissions' => $report['usages_hidden_by_permissions'] + 1] + $report : $report
+        );
         $service->method('validate')->willReturn(['issues' => [], 'counts' => ['error' => 0, 'warning' => 0]]);
         $service->method('getAssignments')->willReturn([]);
         $service->method('locate')->willReturn(['id' => 1, 'identifier' => 'main']);
@@ -165,7 +174,7 @@ class MenuAuditScopeTest extends TestCase
     {
         return new MenuFindUsage(
             $this->features(),
-            $this->menuService(),
+            $this->menuService($allowedStoreIds !== null),
             $this->contentScope($allowedStoreIds, ['cms_page' => [1 => [1], 2 => [2]]])
         );
     }

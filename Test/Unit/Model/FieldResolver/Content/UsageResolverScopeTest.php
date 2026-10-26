@@ -64,6 +64,7 @@ class UsageResolverScopeTest extends TestCase
             'widget_instances' => [['instance_id' => 2, 'store_ids' => '1']],
             'layout_and_templates' => [],
         ]);
+        $menus->expects($this->once())->method('withScopedAssignments')->willReturnArgument(0);
 
         $usage = (new MenuUsageResolver($menus, $this->contentScope([1], self::STORE_IDS)))
             ->resolve($this->entity('menu'), []);

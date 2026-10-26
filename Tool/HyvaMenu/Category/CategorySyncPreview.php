@@ -43,4 +43,14 @@ class CategorySyncPreview extends CategoryImport
     {
         return true;
     }
+
+    /**
+     * Read-only preview: a menu the caller may see is enough.
+     *
+     * @inheritDoc
+     */
+    protected function locateMenu(array $arguments): array
+    {
+        return $this->menuService->locate($arguments);
+    }
 }
