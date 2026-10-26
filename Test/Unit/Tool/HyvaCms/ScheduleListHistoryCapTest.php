@@ -39,8 +39,25 @@ class ScheduleListHistoryCapTest extends TestCase
 
         $this->assertSame(ScheduleList::HISTORY_ROW_CAP + 1, $captured['limit'] ?? null);
         $this->assertTrue($payload['truncated']);
-        $this->assertSame(ScheduleList::HISTORY_ROW_CAP, $payload['total_releases']);
-        $this->assertSame(2, $payload['releases'][0]['release_id'], 'The oldest extra row is dropped.');
+        $this->assertSame(ScheduleList::HISTORY_ROW_CAP - 1, $payload['total_releases']);
+        $this->assertSame(
+            ScheduleList::HISTORY_ROW_CAP + 1,
+            $payload['releases'][0]['release_id'],
+            'History lists the newest release first.'
+        );
+        $ids = array_column($payload['releases'], 'release_id');
+        $this->assertNotContains(2, $ids, 'The release cut by the cap is left out, not returned partial.');
+        $this->assertNotContains(1, $ids);
+    }
+
+    public function testPendingKeepsOldestFirstOrder(): void
+    {
+        $service = $this->createMock(ScheduleService::class);
+        $service->method('getItems')->willReturn([$this->item(1), $this->item(2)]);
+
+        $payload = $this->payloadOf($service, []);
+
+        $this->assertSame([1, 2], array_column($payload['releases'], 'release_id'));
     }
 
     public function testHistoryBelowTheCapIsNotTruncated(): void

@@ -58,8 +58,8 @@ class ScheduleList extends AbstractContentTool
     {
         return 'List scheduled content releases (pending by default) with their pages/blocks/menus, times in UTC and '
             . 'store time. Filter by entity, status and date range (from/to in store time, YYYY-MM-DD[ HH:MM]). '
-            . 'Statuses other than pending read at most the newest ' . self::HISTORY_ROW_CAP . ' items '
-            . '(truncated: true when cut; '
+            . 'Statuses other than pending list the newest releases first and read at most the newest '
+            . self::HISTORY_ROW_CAP . ' items (truncated: true when cut, the release cut by the cap is left out; '
             . 'total_releases counts only the items read).';
     }
 
@@ -112,6 +112,12 @@ class ScheduleList extends AbstractContentTool
         if (count($items) > self::HISTORY_ROW_CAP) {
             $truncated = true;
             $items = array_slice($items, count($items) - self::HISTORY_ROW_CAP);
+            // The oldest release of the window may continue below the cut: leave it out rather than return it partial.
+            $cutRelease = $items[0]['release_id'];
+            $items = array_values(array_filter(
+                $items,
+                static fn (array $item): bool => $item['release_id'] !== $cutRelease
+            ));
         }
         // Items of content outside the caller's website/store view restriction are hidden like those of content
         // types the role may not schedule; one store view lookup per type covers all items.
@@ -145,7 +151,11 @@ class ScheduleList extends AbstractContentTool
             ];
         }
         $totalReleases = count($releases);
-        $releases = array_slice(array_values($releases), 0, $this->intArg($arguments, 'limit', 100) ?? 100);
+        $releases = array_values($releases);
+        if ($filters['status'] !== 'pending') {
+            $releases = array_reverse($releases);
+        }
+        $releases = array_slice($releases, 0, $this->intArg($arguments, 'limit', 100) ?? 100);
 
         return $this->jsonResult(
             [
