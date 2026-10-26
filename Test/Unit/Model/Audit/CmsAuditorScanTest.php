@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Audit;
 
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Audit\CmsAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
@@ -143,14 +144,51 @@ class CmsAuditorScanTest extends TestCase
         $this->assertArrayNotHasKey('entities_hidden_by_permissions', $all);
     }
 
+    public function testScheduleDataOfTypesTheRoleMayNotScheduleIsLeftOut(): void
+    {
+        $this->contentIndex->method('getRows')->willReturn([]);
+        $this->conflictReport->method('getConflictsWithinCallerScope')->willReturn(['conflicts' => [
+            ['code' => 'overdue', 'severity' => 'error', 'message' => 'page late', 'entity_type' => 'cms_page'],
+            ['code' => 'overlap', 'severity' => 'warning', 'message' => 'menu twice', 'entity_type' => 'menu'],
+            ['code' => 'empty_release', 'severity' => 'warning', 'message' => 'release level'],
+        ], 'hidden' => 0]);
+        $schedule = $this->createMock(ScheduleService::class);
+        $schedule->method('getItems')->willReturn([
+            ['release_id' => 7, 'entity_type' => 'cms_page', 'entity_id' => 1],
+            ['release_id' => 8, 'entity_type' => 'menu', 'entity_id' => 2],
+        ]);
+        $schedule->method('getReleases')->willReturn([7 => [], 8 => []]);
+
+        $report = $this->auditor($schedule, null, ['menu'])->audit();
+
+        $this->assertSame(1, $report['scheduling']['pending_items']);
+        $this->assertSame(1, $report['scheduling']['pending_releases']);
+        $this->assertSame(0, $report['scheduling']['conflict_errors']);
+        $this->assertSame(0, $report['scheduling']['overdue_releases']);
+        $this->assertSame(2, $report['scheduling']['conflict_warnings']);
+        $this->assertSame(
+            ['schedule_overlap', 'schedule_empty_release'],
+            array_column($report['issues'], 'code')
+        );
+    }
+
     /**
      * @param ScheduleService|null $schedule
      * @param array|null $allowedStoreIds
+     * @param array $schedulable Content types the role may schedule.
      * @return CmsAuditor
      * @phpstan-param list<int>|null $allowedStoreIds
+     * @phpstan-param list<string> $schedulable
      */
-    private function auditor(?ScheduleService $schedule = null, ?array $allowedStoreIds = null): CmsAuditor
-    {
+    private function auditor(
+        ?ScheduleService $schedule = null,
+        ?array $allowedStoreIds = null,
+        array $schedulable = ContentLocator::TYPES
+    ): CmsAuditor {
+        $acl = $this->createMock(ContentAcl::class);
+        $acl->method('allowedTypes')->willReturnCallback(
+            static fn (array $types): array => array_values(array_intersect($types, $schedulable))
+        );
         $tree = $this->createMock(ComponentTree::class);
         $tree->method('parse')->willReturnCallback(
             static fn (string $json, string $type, int $id): array => ['type' => $type, 'id' => $id]
@@ -185,7 +223,8 @@ class CmsAuditorScanTest extends TestCase
                 $this->createMock(ResourceConnection::class),
                 $this->createMock(FeatureCheckerInterface::class)
             ),
-            $this->contentScope($allowedStoreIds, ['cms_page' => [1 => [1], 2 => [2]]])
+            $this->contentScope($allowedStoreIds, ['cms_page' => [1 => [1], 2 => [2]]]),
+            $acl
         );
     }
 

@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Audit;
 
+use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
@@ -23,7 +24,8 @@ use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 /**
  * Hyvä CMS content health: counts per state, broken/invalid content, image problems, schedule problems.
  * Shared by hyva_commerce.audit.cms and the content-health / migration dashboard widgets. A caller restricted to
- * some websites/store views gets the health of the pages, blocks and scheduled items it may see.
+ * some websites/store views gets the health of the pages, blocks and scheduled items it may see; schedule data of a
+ * content type the role may not schedule is left out, like hyva_cms.schedule.list / detect_conflicts do.
  *
  * @phpstan-import-type ContentRow from ContentIndex
  * @phpstan-type EntityCounts array{total: int, status: array<string, int>, rendered_by: array<string, int>,
@@ -43,6 +45,7 @@ class CmsAuditor
      * @param ConflictReport $conflictReport
      * @param ContentScanner $contentScanner
      * @param ContentScopeFilter $scopeFilter
+     * @param ContentAcl $contentAcl
      */
     public function __construct(
         private readonly ContentIndex $contentIndex,
@@ -53,7 +56,8 @@ class CmsAuditor
         private readonly ScheduleService $scheduleService,
         private readonly ConflictReport $conflictReport,
         private readonly ContentScanner $contentScanner,
-        private readonly ContentScopeFilter $scopeFilter
+        private readonly ContentScopeFilter $scopeFilter,
+        private readonly ContentAcl $contentAcl
     ) {
     }
 
@@ -149,15 +153,23 @@ class CmsAuditor
             }
         }
 
-        $conflicts = $this->conflictReport->getConflictsWithinCallerScope()['conflicts'];
-        $pendingItems = $this->scopeFilter->filter(
-            $this->scheduleService->getItems(['status' => 'pending']),
-            'entity_type',
-            'entity_id'
-        )['visible'];
+        $schedulable = $this->contentAcl->allowedTypes(ContentLocator::TYPES, ContentAcl::VERB_SCHEDULING);
+        $conflicts = array_values(array_filter(
+            $this->conflictReport->getConflictsWithinCallerScope()['conflicts'],
+            static fn (array $c): bool => !isset($c['entity_type']) || in_array($c['entity_type'], $schedulable, true)
+        ));
+        $pendingItems = array_values(array_filter(
+            $this->scopeFilter->filter(
+                $this->scheduleService->getItems(['status' => 'pending']),
+                'entity_type',
+                'entity_id'
+            )['visible'],
+            static fn (array $item): bool => in_array($item['entity_type'], $schedulable, true)
+        ));
+        // A restricted caller, or one that may not schedule every type, sees the releases holding items it may see.
+        $partial = $this->scopeFilter->isRestricted() || count($schedulable) < count(ContentLocator::TYPES);
         $scheduling = [
-            // A restricted caller sees the releases holding content it may see.
-            'pending_releases' => $this->scopeFilter->isRestricted()
+            'pending_releases' => $partial
                 ? count(array_unique(array_column($pendingItems, 'release_id')))
                 : count($this->scheduleService->getReleases('pending')),
             'pending_items' => count($pendingItems),

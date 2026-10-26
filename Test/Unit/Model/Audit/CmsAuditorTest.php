@@ -11,6 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Audit;
 use Hyva\CmsLiveviewEditor\Api\ImageAssetPathResolverInterface;
 use Hyva\CmsLiveviewEditor\Model\Component\Provider as ComponentProvider;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Audit\CmsAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
@@ -103,7 +104,8 @@ class CmsAuditorTest extends TestCase
                 $this->createMock(ResourceConnection::class),
                 $this->createMock(FeatureCheckerInterface::class)
             ),
-            $this->contentScope(null)
+            $this->contentScope(null),
+            $this->createMock(ContentAcl::class)
         );
     }
 
