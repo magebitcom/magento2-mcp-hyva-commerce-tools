@@ -85,10 +85,11 @@ class ScheduleService
      * Scheduled items joined with their release.
      *
      * @param array $filters `status` = pending (item + release pending), any, or an exact item status;
-     *     `from` / `to` are UTC 'Y-m-d H:i:s'; `item_ids` limits to these items.
+     *     `from` / `to` are UTC 'Y-m-d H:i:s'; `item_ids` limits to these items; `limit` keeps only the newest
+     *     N rows (by release time, still returned oldest first).
      * @return array
      * @phpstan-param array{status?: string|null, entity_type?: string|null, entity_id?: int|null, from?: string|null,
-     *     to?: string|null, release_id?: int|null, item_ids?: list<int>} $filters
+     *     to?: string|null, release_id?: int|null, item_ids?: list<int>, limit?: int|null} $filters
      * @phpstan-return list<ScheduleItemRow>
      */
     public function getItems(array $filters = []): array
@@ -103,8 +104,14 @@ class ScheduleService
                 ['r' => $this->resourceConnection->getTableName(self::RELEASE_TABLE)],
                 'r.id = i.release_id',
                 ['release_name' => 'name', 'release_status' => 'status', 'time_scheduled']
-            )
-            ->order(['r.time_scheduled ASC', 'i.id ASC']);
+            );
+        $limit = $filters['limit'] ?? null;
+        if ($limit !== null && $limit > 0) {
+            $select->order(['r.time_scheduled DESC', 'i.id DESC'])->limit($limit);
+        } else {
+            $limit = null;
+            $select->order(['r.time_scheduled ASC', 'i.id ASC']);
+        }
 
         $status = $filters['status'] ?? 'pending';
         if ($status === 'pending') {
@@ -148,7 +155,7 @@ class ScheduleService
                 'time_scheduled' => Cast::string($row['time_scheduled']),
             ];
         }
-        return $rows;
+        return $limit === null ? $rows : array_reverse($rows);
     }
 
     /**

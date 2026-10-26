@@ -27,6 +27,7 @@ class ScheduleList extends AbstractContentTool
     public const TOOL_NAME = 'hyva_cms.schedule.list';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_cms_schedule_list';
     public const CONTENT_VERBS = [ContentAcl::VERB_SCHEDULING];
+    public const HISTORY_ROW_CAP = 1000;
 
     /**
      * @param ScheduleService $scheduleService
@@ -56,7 +57,10 @@ class ScheduleList extends AbstractContentTool
     public function getDescription(): string
     {
         return 'List scheduled content releases (pending by default) with their pages/blocks/menus, times in UTC and '
-            . 'store time. Filter by entity, status and date range (from/to in store time, YYYY-MM-DD[ HH:MM]).';
+            . 'store time. Filter by entity, status and date range (from/to in store time, YYYY-MM-DD[ HH:MM]). '
+            . 'Statuses other than pending read at most the newest ' . self::HISTORY_ROW_CAP . ' items '
+            . '(truncated: true when cut; '
+            . 'total_releases counts only the items read).';
     }
 
     /**
@@ -99,7 +103,16 @@ class ScheduleList extends AbstractContentTool
 
         $releases = [];
         $hidden = 0;
+        $truncated = false;
+        if ($filters['status'] !== 'pending') {
+            // History grows without bound: read only the newest rows, one extra to tell whether the cap was hit.
+            $filters['limit'] = self::HISTORY_ROW_CAP + 1;
+        }
         $items = $this->scheduleService->getItems($filters);
+        if (count($items) > self::HISTORY_ROW_CAP) {
+            $truncated = true;
+            $items = array_slice($items, count($items) - self::HISTORY_ROW_CAP);
+        }
         // Items of content outside the caller's website/store view restriction are hidden like those of content
         // types the role may not schedule; one store view lookup per type covers all items.
         $this->contentLocator->prefetchScope(array_map(
@@ -138,6 +151,7 @@ class ScheduleList extends AbstractContentTool
             [
                 'store_timezone' => $this->scheduleTime->getStoreTimezone(),
                 'total_releases' => $totalReleases,
+                'truncated' => $truncated,
                 'releases' => $releases,
                 'items_hidden_by_permissions' => $hidden,
             ],

@@ -17,12 +17,60 @@ use Hyva\CmsScheduling\Api\ScheduledReleaseRepositoryInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\DB\Adapter\AdapterInterface;
+use Magento\Framework\DB\Select;
 use Magento\Framework\Exception\LocalizedException;
 use PHPUnit\Framework\TestCase;
 use Rakit\Validation\Validator;
 
 class ScheduleServiceTest extends TestCase
 {
+    public function testLimitKeepsTheNewestRowsAndReturnsThemOldestFirst(): void
+    {
+        $orders = [];
+        $limits = [];
+        $select = $this->createMock(Select::class);
+        $select->method('from')->willReturnSelf();
+        $select->method('join')->willReturnSelf();
+        $select->method('where')->willReturnSelf();
+        $select->method('order')->willReturnCallback(function (array $order) use ($select, &$orders): Select {
+            $orders = $order;
+            return $select;
+        });
+        $select->method('limit')->willReturnCallback(function (int $count) use ($select, &$limits): Select {
+            $limits[] = $count;
+            return $select;
+        });
+        $connection = $this->createMock(AdapterInterface::class);
+        $connection->method('select')->willReturn($select);
+        $row = static fn (int $id): array => [
+            'item_id' => $id, 'release_id' => $id, 'entity_type' => 'cms_page', 'entity_id' => 1, 'name' => 'N',
+            'status' => 'success', 'settings' => null, 'version_history_id' => null, 'creation_time' => '',
+            'release_name' => 'R', 'release_status' => 'success', 'time_scheduled' => '',
+        ];
+        // The database returns newest first under the DESC order.
+        $connection->method('fetchAll')->willReturn([$row(3), $row(2)]);
+        $resource = $this->createMock(ResourceConnection::class);
+        $resource->method('getConnection')->willReturn($connection);
+        $resource->method('getTableName')->willReturnArgument(0);
+        $service = new ScheduleService(
+            $resource,
+            $this->createMock(ScheduledReleaseRepositoryInterface::class),
+            $this->createMock(ScheduledItemRepositoryInterface::class),
+            $this->createMock(ScheduledReleaseInterfaceFactory::class),
+            $this->createMock(ScheduledItemInterfaceFactory::class),
+            $this->createMock(ContentProvider::class),
+            $this->createMock(ContentService::class),
+            new Validator()
+        );
+
+        $items = $service->getItems(['status' => 'any', 'limit' => 2]);
+
+        $this->assertSame(['r.time_scheduled DESC', 'i.id DESC'], $orders);
+        $this->assertSame([2], $limits);
+        $this->assertSame([2, 3], array_column($items, 'item_id'));
+    }
+
     /**
      * @dataProvider invalidSettingsProvider
      * @param array<string, mixed> $settings
