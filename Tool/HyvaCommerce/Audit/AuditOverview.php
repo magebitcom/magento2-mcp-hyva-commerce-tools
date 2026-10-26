@@ -85,7 +85,8 @@ class AuditOverview extends AbstractTool
      */
     public function getDescription(): string
     {
-        return 'Report installed Hyvä Commerce modules with versions and enabled state, the Hyvä CMS / Menu Builder / '
+        return 'Report installed Hyvä Commerce modules with versions and enabled state, the Hyvä CMS / '
+            . 'Menu Builder / '
             . 'Media Optimization / Image Editor / Admin Dashboard feature status, key config flags, and which '
             . 'hyva_* MCP tools are usable. With lenses (default): one-line health of forms (delivery errors), '
             . 'transactional emails (Hyvä designs live), CMS images without a Media Gallery asset id, store credit '

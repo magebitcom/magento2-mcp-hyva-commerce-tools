@@ -43,7 +43,10 @@ class PreviewPictureTest extends TestCase
                 'srcset' => 'https://shop.test/media/resized/300x200/1x/hero.jpg 1x'],
         ], $preview['sources']);
         $this->assertCount(7, $preview['missing'], '2x and 3x resizes, their WebP, and AVIF for all three densities');
-        $this->assertStringContainsString('<img src="https://shop.test/media/resized/300x200/1x/hero.jpg"', $preview['html']);
+        $this->assertStringContainsString(
+            '<img src="https://shop.test/media/resized/300x200/1x/hero.jpg"',
+            $preview['html']
+        );
         $this->assertStringContainsString('alt="Hero"', $preview['html']);
     }
 

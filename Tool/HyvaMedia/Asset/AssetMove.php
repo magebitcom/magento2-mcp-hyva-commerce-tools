@@ -62,7 +62,8 @@ class AssetMove extends AbstractMediaGalleryTool
      */
     public function getDescription(): string
     {
-        return 'Move assets to another folder under wysiwyg/ (Hyvä\'s MediaMover; asset ids stay the same, files whose '
+        return 'Move assets to another folder under wysiwyg/ (Hyvä\'s MediaMover; asset ids stay the same, files '
+            . 'whose '
             . 'name exists in the target are skipped). Content that references an asset by id keeps working; '
             . 'content that references the old path does not, so without confirm=true you get the affected usages '
             . 'first. Pages, blocks, menus, products and categories outside your role\'s websites/store views are '

@@ -72,7 +72,8 @@ abstract class AbstractEntityUpdate extends AbstractTool
     {
         return sprintf(
             'Update a CMS %1$s. Content changes (components = replace all root components, operations = targeted '
-                . 'edits) are saved as a DRAFT and the live version is unchanged until hyva_cms.publish. "settings" changes '
+                . 'edits) are saved as a DRAFT and the live version is unchanged until hyva_cms.publish. "settings" '
+                . 'changes '
                 . 'Magento fields (title, active flag, store views, meta) and applies IMMEDIATELY: a setting that '
                 . 'changes the live storefront (active flag, store views, URL key; any field of an active %1$s) needs '
                 . '"confirm": true. Without it nothing is written and the reply lists what would change.',

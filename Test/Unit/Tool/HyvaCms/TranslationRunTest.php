@@ -128,7 +128,10 @@ class TranslationRunTest extends TestCase
     public function testTheTranslateResourceIsOnlyCheckedWhileTheModuleIsOn(): void
     {
         $this->assertContains('Hyva_CmsAiTranslations::translate', $this->tool(true)->getContextualAclResources([]));
-        $this->assertNotContains('Hyva_CmsAiTranslations::translate', $this->tool(false)->getContextualAclResources([]));
+        $this->assertNotContains(
+            'Hyva_CmsAiTranslations::translate',
+            $this->tool(false)->getContextualAclResources([])
+        );
     }
 
     public function testWriteDraftNeedsSavePermission(): void

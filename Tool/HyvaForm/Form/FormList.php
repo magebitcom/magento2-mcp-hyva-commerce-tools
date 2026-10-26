@@ -38,9 +38,8 @@ class FormList extends AbstractFormTool
      */
     public function getDescription(): string
     {
-        return 'List Hyvä Form Builder forms (newest first) with identifier, title, enabled flag, store views, whether '
-            . 'they '
-            . 'have a draft and a published version, and where submissions go (recipients, webhook).';
+        return 'List Hyvä Form Builder forms (newest first) with identifier, title, enabled flag, store views, '
+            . 'whether they have a draft and a published version, and where submissions go (recipients, webhook).';
     }
 
     /**
