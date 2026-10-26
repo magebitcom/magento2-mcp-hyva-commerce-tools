@@ -13,6 +13,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 /**
  * Preview links and an optional server-side render with Hyvä's sample data.
@@ -52,13 +53,19 @@ abstract class AbstractTemplatePreview extends AbstractEmailTool
     protected function executeEmail(array $arguments): ToolResultInterface
     {
         $template = $this->locateTemplate($arguments);
+        $storeId = $this->intArg($arguments, 'store_id');
+        if ($storeId !== null) {
+            $this->storeScopeGuard->assertReadable('store view ' . $storeId, [$storeId]);
+        }
+        $preview = $this->previewService->getPreview(static::TEMPLATE_TYPE, $template['id'], $storeId);
+        // Like send_test: a role restricted to some websites/store views previews only its own store views.
+        $preview['stores'] = array_values(array_filter(
+            $preview['stores'],
+            fn (array $store): bool => $this->storeScopeGuard->allowsRead([Cast::int($store['store_id'] ?? 0)])
+        ));
         $result = [
             'id' => $template['id'],
-            'preview' => $this->previewService->getPreview(
-                static::TEMPLATE_TYPE,
-                $template['id'],
-                $this->intArg($arguments, 'store_id')
-            ),
+            'preview' => $preview,
         ];
         if ($this->boolArg($arguments, 'render')) {
             $edition = $this->stringArg($arguments, 'edition', 'draft') ?? 'draft';
@@ -66,7 +73,7 @@ abstract class AbstractTemplatePreview extends AbstractEmailTool
                 static::TEMPLATE_TYPE,
                 $template['id'],
                 $edition,
-                $this->intArg($arguments, 'store_id')
+                $storeId
             );
             $result['edition'] = $edition;
             $result['html_bytes'] = strlen($html);
