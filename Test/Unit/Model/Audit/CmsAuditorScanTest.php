@@ -8,15 +8,18 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Audit;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Audit\CmsAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScanner;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Model\Migration\MigrationAnalyzer;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
+use Magento\Framework\App\ResourceConnection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -127,7 +130,13 @@ class CmsAuditorScanTest extends TestCase
             $this->mediaFileInfo,
             $this->createMock(MigrationAnalyzer::class),
             $schedule,
-            $this->conflictReport
+            $this->conflictReport,
+            new ContentScanner(
+                $this->contentIndex,
+                $tree,
+                $this->createMock(ResourceConnection::class),
+                $this->createMock(FeatureCheckerInterface::class)
+            )
         );
     }
 

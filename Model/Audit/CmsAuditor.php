@@ -18,7 +18,6 @@ use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Model\Migration\MigrationAnalyzer;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
-use Magento\Framework\Exception\LocalizedException;
 
 /**
  * Hyvä CMS content health: counts per state, broken/invalid content, image problems, schedule problems.
@@ -40,6 +39,7 @@ class CmsAuditor
      * @param MigrationAnalyzer $migrationAnalyzer
      * @param ScheduleService $scheduleService
      * @param ConflictReport $conflictReport
+     * @param ContentScanner $contentScanner
      */
     public function __construct(
         private readonly ContentIndex $contentIndex,
@@ -48,7 +48,8 @@ class CmsAuditor
         private readonly MediaFileInfo $mediaFileInfo,
         private readonly MigrationAnalyzer $migrationAnalyzer,
         private readonly ScheduleService $scheduleService,
-        private readonly ConflictReport $conflictReport
+        private readonly ConflictReport $conflictReport,
+        private readonly ContentScanner $contentScanner
     ) {
     }
 
@@ -72,7 +73,7 @@ class CmsAuditor
         foreach ([ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK] as $type) {
             $rows = $this->contentIndex->getRows($type, true);
             $counts[$type] = $this->countRows($rows);
-            array_push($documents, ...$this->documentsOf($type, $rows));
+            array_push($documents, ...$this->contentScanner->documentsOfRows($type, $rows));
         }
 
         $buckets = [];
@@ -188,48 +189,6 @@ class CmsAuditor
         if (count($buckets[$rank] ?? []) < $limit) {
             $buckets[$rank][] = $issue;
         }
-    }
-
-    /**
-     * Parsed Hyvä CMS documents (draft and published edition) of rows already read with their content.
-     *
-     * @param string $type
-     * @param array $rows
-     * @return array
-     * @phpstan-param list<ContentRow> $rows
-     * @phpstan-return list<array{entity_type: string, id: int, identifier: string, edition: string,
-     *     document: array<string, mixed>|null, error: string|null}>
-     */
-    private function documentsOf(string $type, array $rows): array
-    {
-        $documents = [];
-        foreach ($rows as $row) {
-            $editions = [
-                ContentScanner::EDITION_DRAFT => $row['draft_content'] ?? null,
-                ContentScanner::EDITION_PUBLISHED => $row['published_content'] ?? null,
-            ];
-            foreach ($editions as $edition => $json) {
-                if (!is_string($json) || trim($json) === '' || trim($json) === '[]') {
-                    continue;
-                }
-                $document = null;
-                $error = null;
-                try {
-                    $document = $this->componentTree->parse($json, $type, $row['id']);
-                } catch (LocalizedException $e) {
-                    $error = $e->getMessage();
-                }
-                $documents[] = [
-                    'entity_type' => $type,
-                    'id' => $row['id'],
-                    'identifier' => $row['identifier'],
-                    'edition' => $edition,
-                    'document' => $document,
-                    'error' => $error,
-                ];
-            }
-        }
-        return $documents;
     }
 
     /**

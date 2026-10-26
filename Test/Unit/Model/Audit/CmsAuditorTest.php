@@ -10,9 +10,11 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Audit;
 
 use Hyva\CmsLiveviewEditor\Api\ImageAssetPathResolverInterface;
 use Hyva\CmsLiveviewEditor\Model\Component\Provider as ComponentProvider;
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Audit\CmsAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScanner;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
@@ -83,14 +85,21 @@ class CmsAuditorTest extends TestCase
     {
         $tree = new ComponentTree($this->createMock(ComponentProvider::class));
         $extractor = new ImageReferenceExtractor($tree, $this->createMock(ImageAssetPathResolverInterface::class));
+        $contentIndex = new ContentIndex($this->createMock(ResourceConnection::class));
         return new CmsAuditor(
-            new ContentIndex($this->createMock(ResourceConnection::class)),
+            $contentIndex,
             $tree,
             $extractor,
             $this->createMock(MediaFileInfo::class),
             new MigrationAnalyzer($extractor),
             $this->createMock(ScheduleService::class),
-            $this->createMock(ConflictReport::class)
+            $this->createMock(ConflictReport::class),
+            new ContentScanner(
+                $contentIndex,
+                $tree,
+                $this->createMock(ResourceConnection::class),
+                $this->createMock(FeatureCheckerInterface::class)
+            )
         );
     }
 

@@ -65,35 +65,61 @@ class ContentScanner
             $rows = $type === ContentLocator::TYPE_MENU
                 ? $this->getMenuRows()
                 : $this->contentIndex->getRows($type, true);
-            foreach ($rows as $row) {
-                $editions = [];
-                if ($includeDraft) {
-                    $editions[self::EDITION_DRAFT] = $row['draft_content'] ?? null;
+            array_push($documents, ...$this->documentsOfRows($type, $rows, $includeDraft, $includePublished));
+        }
+        return $documents;
+    }
+
+    /**
+     * Parsed draft / published documents of rows already read with their content.
+     *
+     * Rows come from ContentIndex::getRows() with content, or are menu rows; empty editions are skipped, unparsable
+     * ones come back with an error.
+     *
+     * @param string $type
+     * @param array $rows
+     * @param bool $includeDraft
+     * @param bool $includePublished
+     * @return array
+     * @phpstan-param list<array<string, mixed>> $rows
+     * @phpstan-return list<array{entity_type: string, id: int, identifier: string, title: string, edition: string,
+     *     document: array<string, mixed>|null, error: string|null}>
+     */
+    public function documentsOfRows(
+        string $type,
+        array $rows,
+        bool $includeDraft = true,
+        bool $includePublished = true
+    ): array {
+        $documents = [];
+        foreach ($rows as $row) {
+            $editions = [];
+            if ($includeDraft) {
+                $editions[self::EDITION_DRAFT] = $row['draft_content'] ?? null;
+            }
+            if ($includePublished) {
+                $editions[self::EDITION_PUBLISHED] = $row['published_content'] ?? null;
+            }
+            foreach ($editions as $edition => $json) {
+                if (!is_string($json) || trim($json) === '' || trim($json) === '[]') {
+                    continue;
                 }
-                if ($includePublished) {
-                    $editions[self::EDITION_PUBLISHED] = $row['published_content'] ?? null;
+                $document = null;
+                $error = null;
+                try {
+                    $document = $this->componentTree->parse($json, $type, Cast::int($row['id']));
+                } catch (LocalizedException $e) {
+                    $error = $e->getMessage();
                 }
-                foreach ($editions as $edition => $json) {
-                    if (!is_string($json) || trim($json) === '' || trim($json) === '[]') {
-                        continue;
-                    }
-                    $document = null;
-                    $error = null;
-                    try {
-                        $document = $this->componentTree->parse($json, $type, Cast::int($row['id']));
-                    } catch (LocalizedException $e) {
-                        $error = $e->getMessage();
-                    }
-                    $documents[] = [
-                        'entity_type' => $type,
-                        'id' => Cast::int($row['id']),
-                        'identifier' => Cast::string($row['identifier']),
-                        'title' => Cast::string($row['title']),
-                        'edition' => $edition,
-                        'document' => $document,
-                        'error' => $error,
-                    ];
-                }
+                $documents[] = [
+                    'entity_type' => $type,
+                    'id' => Cast::int($row['id']),
+                    'identifier' => Cast::string($row['identifier']),
+                    'title' => Cast::string($row['title']),
+                    'edition' => $edition,
+                    'document' => $document,
+                    'error' => $error,
+                ];
             }
         }
         return $documents;
