@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaCms;
 
+use Magento\Framework\Exception\LocalizedException;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
@@ -131,6 +132,40 @@ class PageUpdateConfirmTest extends TestCase
         ]));
 
         $this->assertSame(['title'], $payload['settings_changed'] ?? null);
+    }
+
+    public function testAFailingSettingsSaveReportsTheAlreadySavedDraft(): void
+    {
+        $contentService = $this->createMock(ContentService::class);
+        $contentService->method('getWorkingDocument')->willReturn(['content' => []]);
+        $contentService->expects($this->once())->method('saveDraft')->willReturn(['version_uid' => 'v1']);
+        $editor = $this->createMock(DraftEditor::class);
+        $editor->method('apply')->willReturn(['document' => ['content' => []], 'applied' => []]);
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->method('update')->willThrowException(new LocalizedException(__('Could not save')));
+        $locator = $this->createMock(ContentLocator::class);
+        $locator->method('locateForWrite')->willReturn(['is_active' => false] + self::PAGE);
+        $tool = new PageUpdate(
+            $locator,
+            $contentService,
+            $this->createMock(ComponentTree::class),
+            $editor,
+            $writer,
+            new LiveSettings(),
+            $this->storeScope(null)
+        );
+
+        $result = $tool->execute([
+            'identifier' => 'sale',
+            'operations' => [['op' => 'remove', 'uid' => 'x']],
+            'settings' => ['title' => 'Summer sale'],
+        ]);
+        $payload = $this->payload($result);
+
+        $this->assertTrue($result->isError());
+        $this->assertTrue($payload['draft_saved'] ?? null);
+        $this->assertFalse($payload['settings_applied'] ?? null);
+        $this->assertSame(['version_uid' => 'v1'], $payload['draft'] ?? null);
     }
 
     /**

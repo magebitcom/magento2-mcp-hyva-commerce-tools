@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Tool\Entity;
 
+use Magento\Framework\Exception\LocalizedException;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\ObjectBuilder;
@@ -175,7 +176,24 @@ abstract class AbstractEntityUpdate extends AbstractTool
             foreach ($settings as $key => $value) {
                 $stringKeyed[(string) $key] = $value;
             }
-            $result['settings_changed'] = $this->entityWriter->update($entity['type'], $entity['id'], $stringKeyed);
+            // The draft goes first: it is not live and stays in version history, whereas settings change the live
+            // entity, so a refused draft (stale base_version_uid, bad operations) must not leave settings applied.
+            try {
+                $result['settings_changed'] = $this->entityWriter->update(
+                    $entity['type'],
+                    $entity['id'],
+                    $stringKeyed
+                );
+            } catch (LocalizedException $exception) {
+                if (!isset($result['draft'])) {
+                    throw $exception;
+                }
+                // The draft is already saved: report it with the error instead of hiding a partial write.
+                return $this->softError(
+                    'The draft was saved but the settings were not applied: ' . $exception->getMessage(),
+                    ['draft_saved' => true, 'settings_applied' => false] + $result
+                );
+            }
         }
 
         return $this->jsonResult($result, [
