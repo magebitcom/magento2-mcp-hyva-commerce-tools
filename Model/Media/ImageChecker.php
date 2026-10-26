@@ -130,7 +130,8 @@ class ImageChecker
             );
         } elseif ($variants !== null && $ext !== 'svg') {
             foreach ($options['output_formats'] ?? [] as $format) {
-                if (!in_array($format, $variants['formats'], true)) {
+                // Hyvä's ImageConverter skips a file already in the target format, so no variant is expected.
+                if ($ext !== $format && !in_array($format, $variants['formats'], true)) {
                     $issues[] = $this->issue(
                         'info',
                         'missing_' . $format,
