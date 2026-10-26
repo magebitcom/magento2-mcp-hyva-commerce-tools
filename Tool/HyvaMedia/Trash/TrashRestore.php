@@ -68,9 +68,9 @@ class TrashRestore extends AbstractMediaGalleryTool
         $blocked = [];
         foreach ($items as $item) {
             $path = Cast::string($item['path'] ?? '');
-            if ($this->gallery->fileExists($path)) {
+            if ($this->gallery->pathExists($path)) {
                 $blocked[] = ['trash_id' => Cast::int($item['id'] ?? 0), 'path' => $path,
-                    'reason' => 'A file already exists at the original path.'];
+                    'reason' => 'A file or folder already exists at the original path.'];
             } else {
                 $restorable[Cast::int($item['id'] ?? 0)] = $path;
             }

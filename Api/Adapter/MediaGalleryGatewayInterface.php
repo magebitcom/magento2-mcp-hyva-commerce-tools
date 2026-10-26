@@ -139,6 +139,15 @@ interface MediaGalleryGatewayInterface
     public function fileExists(string $path): bool;
 
     /**
+     * Whether anything (file or folder) exists under pub/media: the rule Hyvä's trash restore uses before it moves a
+     * file back (TrashRepository::restore() skips the move but still drops the trash row).
+     *
+     * @param string $path
+     * @return bool
+     */
+    public function pathExists(string $path): bool;
+
+    /**
      * Files in the media gallery folders on disk, the asset paths in the database, and sync queue state.
      *
      * @return array

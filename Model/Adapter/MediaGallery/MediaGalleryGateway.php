@@ -243,6 +243,14 @@ class MediaGalleryGateway implements MediaGalleryGatewayInterface
     /**
      * @inheritDoc
      */
+    public function pathExists(string $path): bool
+    {
+        return $this->filesystem->getDirectoryRead(DirectoryList::MEDIA)->isExist($path);
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function syncSnapshot(): array
     {
         $configured = $this->scopeConfig->getValue(
