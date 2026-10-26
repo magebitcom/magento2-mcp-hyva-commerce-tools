@@ -10,14 +10,22 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool;
 
 use Hyva\CmsLiveviewEditor\Model\Security\ContentTypeAuthorization;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
+use Magebit\McpHyvaCommerceTools\Model\Acl\VersionHistoryAcl;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Entity\AbstractEntityCreate;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Entity\AbstractEntityGet;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockCreate;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockGet;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Content\Preview;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Content\Publish;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Draft\DraftCreate;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageCreate;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageGet;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule\ScheduleCreate;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Transfer\TransferExport;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuGet;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuPreview;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuPublish;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuScheduleCreate;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -111,6 +119,78 @@ class ContentVerbAclTest extends TestCase
             $this->assertSame([], $tool->getContextualAclResources(['copy_from' => 'menu']));
             $this->assertSame([], $tool->getContextualAclResources(['copy_from' => ['entity_type' => 'product']]));
         }
+    }
+
+    public function testScheduleOfAVersionNeedsVersionHistory(): void
+    {
+        $tool = $this->withAcl(ScheduleCreate::class, ScheduleCreate::class);
+        $this->assertSame(
+            ['Hyva::cms_block_schedule_save', 'Hyva::cms_block_version_history'],
+            $tool->getContextualAclResources(['entity_type' => 'cms_block', 'version_id' => 4])
+        );
+        $this->assertSame(
+            ['Hyva::cms_block_schedule_save'],
+            $tool->getContextualAclResources(['entity_type' => 'cms_block'])
+        );
+
+        $menu = $this->withAcl(MenuScheduleCreate::class, ScheduleCreate::class);
+        $this->assertSame(
+            ['Hyva::menu_schedule_save', 'Hyva::menu_version_history'],
+            $menu->getContextualAclResources(['id' => 2, 'version_id' => 4])
+        );
+    }
+
+    public function testMenuPreviewOfAVersionNeedsVersionHistory(): void
+    {
+        $tool = $this->withVersionHistoryAcl(MenuPreview::class, MenuPreview::class);
+        $this->assertSame(
+            ['Hyva::menu_version_history'],
+            $tool->getContextualAclResources(['id' => 2, 'version_id' => 4])
+        );
+        $this->assertSame([], $tool->getContextualAclResources(['id' => 2]));
+    }
+
+    public function testGetWithVersionsFieldNeedsVersionHistory(): void
+    {
+        $tools = [
+            'Hyva::cms_page_version_history' => $this->withVersionHistoryAcl(PageGet::class, AbstractEntityGet::class),
+            'Hyva::cms_block_version_history' => $this->withVersionHistoryAcl(
+                BlockGet::class,
+                AbstractEntityGet::class
+            ),
+            'Hyva::menu_version_history' => $this->withVersionHistoryAcl(MenuGet::class, MenuGet::class),
+        ];
+        foreach ($tools as $resource => $tool) {
+            $this->assertSame([$resource], $tool->getContextualAclResources(['id' => 1, 'fields' => ['versions']]));
+            $this->assertSame([$resource], $tool->getContextualAclResources([
+                'id' => 1,
+                'fields' => ['draft', 'versions'],
+            ]));
+            $this->assertSame([$resource], $tool->getContextualAclResources(['id' => 1, 'fields' => 'versions']));
+            $this->assertSame([], $tool->getContextualAclResources(['id' => 1]));
+            $this->assertSame([], $tool->getContextualAclResources(['id' => 1, 'fields' => ['draft']]));
+            $this->assertSame([], $tool->getContextualAclResources([
+                'id' => 1,
+                'fields' => ['versions'],
+                'exclude' => ['versions'],
+            ]));
+        }
+    }
+
+    /**
+     * Real tool class with only its versionHistoryAcl dependency set.
+     *
+     * @template T of object
+     * @param class-string<T> $class
+     * @param class-string $declaringClass Class that declares the private versionHistoryAcl property
+     * @return T
+     */
+    private function withVersionHistoryAcl(string $class, string $declaringClass): object
+    {
+        $tool = (new \ReflectionClass($class))->newInstanceWithoutConstructor();
+        (new \ReflectionProperty($declaringClass, 'versionHistoryAcl'))
+            ->setValue($tool, new VersionHistoryAcl($this->acl));
+        return $tool;
     }
 
     /**

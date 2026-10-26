@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu;
 
+use Magebit\Mcp\Api\ContextualAclAwareInterface;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\ArrayBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
@@ -15,6 +16,7 @@ use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\Mcp\Model\Util\ResolverPipeline;
 use Magebit\McpHyvaCommerceTools\Api\ContentFieldResolverInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Acl\VersionHistoryAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Menu\AbstractMenuTool;
@@ -23,7 +25,7 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
 /**
  * `hyva_menu.get`: full menu structure composed by field resolvers.
  */
-class MenuGet extends AbstractMenuTool
+class MenuGet extends AbstractMenuTool implements ContextualAclAwareInterface
 {
     public const TOOL_NAME = 'hyva_menu.get';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_menu_get';
@@ -33,6 +35,7 @@ class MenuGet extends AbstractMenuTool
      * @param MenuService $menuService
      * @param ContentLocator $contentLocator
      * @param ResolverPipeline $pipeline
+     * @param VersionHistoryAcl $versionHistoryAcl
      * @param ContentFieldResolverInterface[] $fieldResolvers
      */
     public function __construct(
@@ -40,9 +43,20 @@ class MenuGet extends AbstractMenuTool
         MenuService $menuService,
         private readonly ContentLocator $contentLocator,
         private readonly ResolverPipeline $pipeline,
+        private readonly VersionHistoryAcl $versionHistoryAcl,
         private readonly array $fieldResolvers = []
     ) {
         parent::__construct($featureChecker, $menuService);
+    }
+
+    /**
+     * Menu version history permission when `fields` asks for the versions key.
+     *
+     * @inheritDoc
+     */
+    public function getContextualAclResources(array $arguments): array
+    {
+        return $this->versionHistoryAcl->forFields(ContentLocator::TYPE_MENU, $arguments);
     }
 
     /**

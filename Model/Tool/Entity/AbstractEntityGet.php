@@ -8,11 +8,13 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Tool\Entity;
 
+use Magebit\Mcp\Api\ContextualAclAwareInterface;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\ArrayBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\Mcp\Model\Util\ResolverPipeline;
 use Magebit\McpHyvaCommerceTools\Api\ContentFieldResolverInterface;
+use Magebit\McpHyvaCommerceTools\Model\Acl\VersionHistoryAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
@@ -20,7 +22,7 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
 /**
  * Shared implementation of hyva_cms.page.get / hyva_cms.block.get; the response is composed by field resolvers.
  */
-abstract class AbstractEntityGet extends AbstractTool
+abstract class AbstractEntityGet extends AbstractTool implements ContextualAclAwareInterface
 {
     public const ENTITY_TYPE = '';
     public const ENTITY_LABEL = '';
@@ -28,13 +30,25 @@ abstract class AbstractEntityGet extends AbstractTool
     /**
      * @param ContentLocator $contentLocator
      * @param ResolverPipeline $pipeline
+     * @param VersionHistoryAcl $versionHistoryAcl
      * @param ContentFieldResolverInterface[] $fieldResolvers
      */
     public function __construct(
         private readonly ContentLocator $contentLocator,
         private readonly ResolverPipeline $pipeline,
+        private readonly VersionHistoryAcl $versionHistoryAcl,
         private readonly array $fieldResolvers = []
     ) {
+    }
+
+    /**
+     * Version history permission when `fields` asks for the versions key.
+     *
+     * @inheritDoc
+     */
+    public function getContextualAclResources(array $arguments): array
+    {
+        return $this->versionHistoryAcl->forFields(static::ENTITY_TYPE, $arguments);
     }
 
     /**

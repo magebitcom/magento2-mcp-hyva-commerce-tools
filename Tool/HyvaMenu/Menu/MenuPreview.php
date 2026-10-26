@@ -9,12 +9,14 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu;
 
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Acl\VersionHistoryAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Menu\AbstractMenuTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magebit\Mcp\Api\ContextualAclAwareInterface;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
@@ -22,7 +24,7 @@ use Magebit\Mcp\Model\Tool\Schema\Schema;
 /**
  * `hyva_menu.preview` MCP tool.
  */
-class MenuPreview extends AbstractMenuTool
+class MenuPreview extends AbstractMenuTool implements ContextualAclAwareInterface
 {
     public const TOOL_NAME = 'hyva_menu.preview';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_menu_preview';
@@ -31,13 +33,25 @@ class MenuPreview extends AbstractMenuTool
      * @param FeatureCheckerInterface $featureChecker
      * @param MenuService $menuService
      * @param PreviewService $previewService
+     * @param VersionHistoryAcl $versionHistoryAcl
      */
     public function __construct(
         FeatureCheckerInterface $featureChecker,
         MenuService $menuService,
-        private readonly PreviewService $previewService
+        private readonly PreviewService $previewService,
+        private readonly VersionHistoryAcl $versionHistoryAcl
     ) {
         parent::__construct($featureChecker, $menuService);
+    }
+
+    /**
+     * Menu version history permission when a version_id is previewed.
+     *
+     * @inheritDoc
+     */
+    public function getContextualAclResources(array $arguments): array
+    {
+        return $this->versionHistoryAcl->forVersionId(ContentLocator::TYPE_MENU, $arguments);
     }
 
     /**

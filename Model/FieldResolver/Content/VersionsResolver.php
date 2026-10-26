@@ -8,11 +8,15 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content;
 
+use Magebit\McpHyvaCommerceTools\Model\Acl\VersionHistoryAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Api\ContentFieldResolverInterface;
 
 /**
- * The ten most recent version-history items.
+ * The ten most recent version-history items; null for a caller without the type's version_history permission.
+ *
+ * A get that names "versions" in `fields` is refused before it runs (VersionHistoryAcl::forFields); a get without
+ * `fields` still answers, without the version history.
  */
 class VersionsResolver implements ContentFieldResolverInterface
 {
@@ -20,9 +24,11 @@ class VersionsResolver implements ContentFieldResolverInterface
 
     /**
      * @param ContentService $contentService
+     * @param VersionHistoryAcl $versionHistoryAcl
      */
     public function __construct(
-        private readonly ContentService $contentService
+        private readonly ContentService $contentService,
+        private readonly VersionHistoryAcl $versionHistoryAcl
     ) {
     }
 
@@ -48,6 +54,9 @@ class VersionsResolver implements ContentFieldResolverInterface
     public function resolve(array $entity, array $args): mixed
     {
         unset($args);
+        if (!$this->versionHistoryAcl->isAllowed($entity['type'])) {
+            return null;
+        }
         return array_slice($this->contentService->getVersions($entity['type'], $entity['id']), 0, 10);
     }
 }

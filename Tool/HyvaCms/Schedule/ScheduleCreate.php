@@ -140,6 +140,20 @@ class ScheduleCreate extends AbstractContentTool
     }
 
     /**
+     * Schedule save; scheduling a version_id also reads version history.
+     *
+     * @inheritDoc
+     */
+    protected function contentVerbs(array $arguments): array
+    {
+        $verbs = parent::contentVerbs($arguments);
+        if (($arguments['version_id'] ?? null) !== null) {
+            $verbs[] = ContentAcl::VERB_VERSION_HISTORY;
+        }
+        return $verbs;
+    }
+
+    /**
      * @inheritDoc
      */
     protected function contentAcl(): ContentAcl
