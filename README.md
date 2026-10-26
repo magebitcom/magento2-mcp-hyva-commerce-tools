@@ -45,8 +45,10 @@ bin/magento cache:flush
   fields and apply immediately, so a setting that changes the live storefront needs `"confirm": true`: the active
   flag, store views and URL key / identifier always, and any setting of an active page, block or menu. Without
   `confirm` nothing is written (not even the draft part of the call) and the reply lists each change with its
-  storefront effect.
-- **Explicit confirm.** Live `settings` changes (above), replacing unpublished draft changes, removing a menu item with
+  storefront effect. `hyva_cms.page.create` / `hyva_cms.block.create` with `is_active=true` need `"confirm": true`
+  too: without it nothing is created and the reply shows what would go live. An inactive create needs no confirm,
+  whatever its identifier and store views, because an inactive page or block is not served.
+- **Explicit confirm.** Creating an active page or block, live `settings` changes (above), replacing unpublished draft changes, removing a menu item with
   children, a global image replacement and clearing every optimized image need `"confirm": true`; without it the tool
   returns a dry-run preview of what would change.
 - **ACL (Hyvä Commerce 1.4).** A call passes three checks, all against the token's admin role:
@@ -57,8 +59,21 @@ bin/magento cache:flush
      ("Checked per call"), e.g. `hyva_cms.publish` on a page needs `Hyva_Cms::page_publish`, on a menu
      `Hyva_MenuBuilder::menu_publish`. These tools are listed for any role with Hyvä CMS access and refused per call
      with `-32004`, because `tools/list` has no arguments to decide on.
+  Reading a version needs the type's `version_history` verb as well: `fields` with `versions` on the get tools,
+  `version_id` on preview, publish and schedule create, `source=version` on draft create and `include_versions` on
+  export. A get without `fields` returns `versions: null` to a caller without that permission.
   Hyvä 1.4 also checks permissions inside its own services (e.g. version restore); the module gives Magento
   authorization the MCP caller's role while a tool runs, so those checks see the same role.
+- **Store scope (Advanced Admin Permissions).** Hyvä's scope guards run only in the admin and the web API, not on the
+  `/mcp` route, so the module applies the MCP admin's website / store view restriction itself. CMS pages, blocks,
+  menus and forms outside the role's store views are hidden from the lists, and every tool that reads or changes
+  one refuses them (status 403). Changing one, or assigning store views, needs every store view it is assigned to;
+  store view 0 ("All Store Views") needs all of them, as in the Hyvä admin. Menus and forms are scoped by their store
+  views although the Hyvä admin does not scope them. Email and newsletter templates, linked product groups and
+  category positions belong to no store view: a restricted role can read them but not change them.
+  `image.replace` and `image.update_alt` skip content outside the role, `schedule.cancel` refuses items of content
+  outside it, and store credit is checked against the customer's website. Image usage lists, `image.list` and the
+  audits are not filtered by scope.
 - **Refusals.** Hyvä's save refusals come back as soft errors with a `status`: 422 with `field_errors` (per component
   uid and field) when a provider refuses content or Hyvä's content guard rejects it (3 MB, 5000 components, depth 50),
   409 when the draft changed since you read it (pass `base_version_uid` to the update tools to get this check; reload
@@ -125,7 +140,7 @@ Hyvä Commerce 1.4.0 (`hyva-themes/commerce` 1.4.0) and what this module offers 
 | Linked Products 1.0.0 | `hyva_linked.*` (4) | Groups, validation with storefront warnings, save with page cache refresh |
 | Category Merchandiser 1.0.0 | `hyva_merch.category.*` (2) | Reorder only. The Enterprise package is not installed. Reports when another module (ElasticSuite) owns storefront sorting |
 | AI Worker 1.0.0 and AI Worker CMS 1.0.0 | `hyva_ai.*` (5) | Monitoring only (status, jobs, usage, errors); AI Worker CMS jobs show in `hyva_ai.job.list`. No generation by design |
-| Advanced Admin Permissions 1.0.0 | `hyva_admin_perm.*` (2) | Read only (effective permissions, audit log). Scope restrictions are honoured by the write tools |
+| Advanced Admin Permissions 1.0.0 | `hyva_admin_perm.*` (2) | Read only (effective permissions, audit log). Scope restrictions are applied by the module itself, see [Store scope](#safety-model) |
 | Admin Dashboard 2.0.3 (+ API 3.0.1, CMS widgets, CrUX history widget) | `hyva_dashboard.*` (3) + [widgets](#dashboard-widgets) | Views and widget types as the caller sees them; MCP activity and content health widgets |
 | Audits | `hyva_commerce.audit.*` (4) | `audit.overview` adds one health line per 1.4 module |
 
@@ -146,29 +161,29 @@ Not covered, on purpose:
 
 | Tool | Mode | Listed with | Checked per call (Hyvä verb) | What it does |
 |---|---|---|---|---|
-| `hyva_cms.block.create` | write | `Hyva_Cms::block_save` |  | Create Hyvä CMS Block |
-| `hyva_cms.block.get` | read | `Hyva_Cms::block_view` |  | Get Hyvä CMS Block |
+| `hyva_cms.block.create` | write | `Hyva_Cms::block_save` | copy_from.entity_type → view | Create Hyvä CMS Block |
+| `hyva_cms.block.get` | read | `Hyva_Cms::block_view` | fields with versions → version_history | Get Hyvä CMS Block |
 | `hyva_cms.block.list` | read | `Hyva_Cms::block_view` |  | List Hyvä CMS Blocks |
 | `hyva_cms.block.update` | write | `Hyva_Cms::block_save` |  | Update Hyvä CMS Block |
 | `hyva_cms.component.list` | read | `Hyva_Cms::cms` |  | List Hyvä CMS Components |
 | `hyva_cms.component.schema` | read | `Hyva_Cms::cms` |  | Get Hyvä CMS Component Schema |
 | `hyva_cms.component.validate` | read | `Hyva_Cms::cms` | entity_type → view | Validate Hyvä CMS Components |
-| `hyva_cms.draft.create` | write | `Hyva_Cms::cms` | entity_type → save | Create Hyvä CMS Draft |
+| `hyva_cms.draft.create` | write | `Hyva_Cms::cms` | entity_type → save (+ version_history for source=version) | Create Hyvä CMS Draft |
 | `hyva_cms.draft.update` | write | `Hyva_Cms::cms` | entity_type → save | Update Hyvä CMS Draft |
-| `hyva_cms.export` | read | `Hyva_Cms::cms` | entity_type → export + `Hyva_Cms::transfer` | Export Hyvä CMS Content |
+| `hyva_cms.export` | read | `Hyva_Cms::cms` | entity_type → export (+ version_history with include_versions) + `Hyva_Cms::transfer` | Export Hyvä CMS Content |
 | `hyva_cms.import` | write | `Hyva_Cms::cms` | entity_type → save + `Hyva_Cms::transfer` | Import Hyvä CMS Content |
 | `hyva_cms.migration.analyze` | read | `Hyva_Cms::cms` | entity_type → view | Analyze Legacy CMS Content |
 | `hyva_cms.migration.convert_to_draft` | write | `Hyva_Cms::cms` | entity_type → save | Convert Legacy CMS Content to Draft |
 | `hyva_cms.migration.scan` | read | `Hyva_Cms::cms` | entity_type → view | Scan Legacy CMS Content |
-| `hyva_cms.page.create` | write | `Hyva_Cms::page_save` |  | Create Hyvä CMS Page |
-| `hyva_cms.page.get` | read | `Hyva_Cms::page_view` |  | Get Hyvä CMS Page |
+| `hyva_cms.page.create` | write | `Hyva_Cms::page_save` | copy_from.entity_type → view | Create Hyvä CMS Page |
+| `hyva_cms.page.get` | read | `Hyva_Cms::page_view` | fields with versions → version_history | Get Hyvä CMS Page |
 | `hyva_cms.page.list` | read | `Hyva_Cms::page_view` |  | List Hyvä CMS Pages |
 | `hyva_cms.page.update` | write | `Hyva_Cms::page_save` |  | Update Hyvä CMS Page |
 | `hyva_cms.permission.check` | read | `-` |  | Check Hyvä CMS Permissions |
-| `hyva_cms.preview` | read | `Hyva_Cms::cms` | entity_type → view | Preview Hyvä CMS Content |
-| `hyva_cms.publish` | write | `Hyva_Cms::cms` | entity_type → publish | Publish Hyvä CMS Content |
+| `hyva_cms.preview` | read | `Hyva_Cms::cms` | entity_type → view (+ version_history with version_id) | Preview Hyvä CMS Content |
+| `hyva_cms.publish` | write | `Hyva_Cms::cms` | entity_type → publish (+ version_history with version_id) | Publish Hyvä CMS Content |
 | `hyva_cms.schedule.cancel` | write | `Hyva_Cms::cms` | entity_type → schedule_cancel | Cancel Hyvä CMS Schedule |
-| `hyva_cms.schedule.create` | write | `Hyva_Cms::cms` | entity_type → schedule_save | Schedule Hyvä CMS Content |
+| `hyva_cms.schedule.create` | write | `Hyva_Cms::cms` | entity_type → schedule_save (+ version_history with version_id) | Schedule Hyvä CMS Content |
 | `hyva_cms.schedule.detect_conflicts` | read | `Hyva_Cms::cms` | entity_type → scheduling | Detect Hyvä CMS Schedule Conflicts |
 | `hyva_cms.schedule.list` | read | `Hyva_Cms::cms` | entity_type → scheduling | List Hyvä CMS Schedules |
 | `hyva_cms.translation.run` | write | `Hyva_Cms::cms` | entity_type → view + `Hyva_CmsAiTranslations::translate` | Run Hyvä CMS AI Translation |
@@ -185,16 +200,16 @@ Not covered, on purpose:
 | `hyva_menu.category.sync_preview` | read | `Hyva_MenuBuilder::menu_view` |  | Preview Category Import into Hyvä Menu |
 | `hyva_menu.create` | write | `Hyva_MenuBuilder::menu_save` |  | Create Hyvä Menu |
 | `hyva_menu.find_usage` | read | `Hyva_MenuBuilder::menu_view` |  | Find Hyvä Menu Usage |
-| `hyva_menu.get` | read | `Hyva_MenuBuilder::menu_view` |  | Get Hyvä Menu |
+| `hyva_menu.get` | read | `Hyva_MenuBuilder::menu_view` | fields with versions → version_history | Get Hyvä Menu |
 | `hyva_menu.item.add` | write | `Hyva_MenuBuilder::menu_save` |  | Add Hyvä Menu Item |
 | `hyva_menu.item.remove` | write | `Hyva_MenuBuilder::menu_save` |  | Remove Hyvä Menu Item |
 | `hyva_menu.item.update` | write | `Hyva_MenuBuilder::menu_save` |  | Update Hyvä Menu Item |
 | `hyva_menu.list` | read | `Hyva_MenuBuilder::menu_view` |  | List Hyvä Menus |
-| `hyva_menu.preview` | read | `Hyva_MenuBuilder::menu_view` |  | Preview Hyvä Menu |
-| `hyva_menu.publish` | write | `Hyva_MenuBuilder::menu_publish` | entity_type → publish | Publish Hyvä Menu |
+| `hyva_menu.preview` | read | `Hyva_MenuBuilder::menu_view` | version_id → version_history | Preview Hyvä Menu |
+| `hyva_menu.publish` | write | `Hyva_MenuBuilder::menu_publish` | entity_type → publish (+ version_history with version_id) | Publish Hyvä Menu |
 | `hyva_menu.render_check` | read | `Hyva_MenuBuilder::menu_view` |  | Check Hyvä Menu Rendering |
 | `hyva_menu.schedule.cancel` | write | `Hyva_MenuBuilder::menu_schedule_cancel` | entity_type → schedule_cancel | Cancel Hyvä Menu Schedule |
-| `hyva_menu.schedule.create` | write | `Hyva_MenuBuilder::menu_schedule_save` | entity_type → schedule_save | Schedule Hyvä Menu |
+| `hyva_menu.schedule.create` | write | `Hyva_MenuBuilder::menu_schedule_save` | entity_type → schedule_save (+ version_history with version_id) | Schedule Hyvä Menu |
 | `hyva_menu.status` | read | `Hyva_Cms::cms` |  | Menu Builder Status |
 | `hyva_menu.update` | write | `Hyva_MenuBuilder::menu_save` |  | Update Hyvä Menu |
 | `hyva_menu.validate` | read | `Hyva_MenuBuilder::menu_view` |  | Validate Hyvä Menu |
@@ -337,7 +352,7 @@ reuses the same services as the audit tools. Templates are static markup (no Alp
 
 | Widget | Shows |
 |---|---|
-| `magebit_mcp_activity_widget` | MCP calls, failures, writes, AI-generated drafts, publish/destructive actions, link to the MCP audit log |
+| `magebit_mcp_activity_widget` | MCP calls, failures, writes (every registered write tool), AI-generated drafts, publish/destructive actions (write tools named publish, delete, trash, remove, clear, restore, import, replace, cancel, move, flush, reset or disable), link to the MCP audit log |
 | `magebit_content_health_widget` | Missing alt text, broken images, invalid/disabled components, unpublished drafts, schedule problems, legacy pages |
 | `magebit_menu_health_widget` | Menus with broken links, disabled targets, empty columns, placement, last MCP menu actions |
 | `magebit_media_health_widget` | Oversized images, missing alt, broken references, missing WebP/AVIF, optimization and engine status |
