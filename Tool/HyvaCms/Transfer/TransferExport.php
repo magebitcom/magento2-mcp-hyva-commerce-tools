@@ -129,6 +129,22 @@ class TransferExport extends AbstractContentTool
     }
 
     /**
+     * Export; include_versions also reads version history.
+     *
+     * Any include_versions value but false/null counts here, so the check is never looser than run().
+     *
+     * @inheritDoc
+     */
+    protected function contentVerbs(array $arguments): array
+    {
+        $verbs = parent::contentVerbs($arguments);
+        if (($arguments['include_versions'] ?? false) !== false) {
+            $verbs[] = ContentAcl::VERB_VERSION_HISTORY;
+        }
+        return $verbs;
+    }
+
+    /**
      * @inheritDoc
      */
     protected function contentAcl(): ContentAcl

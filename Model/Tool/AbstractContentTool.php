@@ -83,9 +83,25 @@ abstract class AbstractContentTool extends AbstractTool implements ContextualAcl
             return $this->extraAclResources();
         }
         return array_values(array_unique(array_merge(
-            $this->contentAcl()->resources($types, array_values(static::CONTENT_VERBS)),
+            $this->contentAcl()->resources($types, $this->contentVerbs($arguments)),
             $this->extraAclResources()
         )));
+    }
+
+    /**
+     * Hyvä verbs the call needs on each targeted type; default CONTENT_VERBS.
+     *
+     * A tool adds a verb for an argument that reads more, e.g. version_history when it reads a version. Arguments are
+     * not validated yet here: a tool reads them at least as broadly as run() does.
+     *
+     * @param array $arguments
+     * @return array
+     * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-return list<string>
+     */
+    protected function contentVerbs(array $arguments): array
+    {
+        return array_values(static::CONTENT_VERBS);
     }
 
     /**

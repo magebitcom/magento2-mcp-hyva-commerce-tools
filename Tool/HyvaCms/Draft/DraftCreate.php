@@ -150,6 +150,20 @@ class DraftCreate extends AbstractContentTool
     }
 
     /**
+     * Save; source=version also reads version history, like hyva_cms.version.restore.
+     *
+     * @inheritDoc
+     */
+    protected function contentVerbs(array $arguments): array
+    {
+        $verbs = parent::contentVerbs($arguments);
+        if ($this->stringArg($arguments, 'source') === 'version') {
+            $verbs[] = ContentAcl::VERB_VERSION_HISTORY;
+        }
+        return $verbs;
+    }
+
+    /**
      * @inheritDoc
      */
     protected function contentAcl(): ContentAcl
