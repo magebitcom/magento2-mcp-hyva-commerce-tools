@@ -111,7 +111,7 @@ class LinkTargetResolver implements LinkTargetResolverInterface
         foreach ($identifiers as $identifier) {
             $result[$identifier] = ['exists' => false, 'active' => false, 'store_ids' => []];
         }
-        foreach ($this->contentIndex->getRows(ContentLocator::TYPE_PAGE) as $row) {
+        foreach ($this->contentIndex->getByIdentifiers(ContentLocator::TYPE_PAGE, $identifiers) as $row) {
             if (array_key_exists($row['identifier'], $result) && !$result[$row['identifier']]['active']) {
                 $result[$row['identifier']] = [
                     'exists' => true,
