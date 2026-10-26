@@ -18,6 +18,8 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Form\FormRules;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
+use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
 
 /**
@@ -38,12 +40,14 @@ abstract class AbstractFormTool extends AbstractTool
      * @param FormGatewayInterface $formGateway
      * @param ContentService $contentService
      * @param FormRules $formRules
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         protected readonly FeatureCheckerInterface $featureChecker,
         protected readonly FormGatewayInterface $formGateway,
         protected readonly ContentService $contentService,
-        protected readonly FormRules $formRules
+        protected readonly FormRules $formRules,
+        protected readonly StoreScopeGuard $storeScopeGuard
     ) {
     }
 
@@ -86,7 +90,41 @@ abstract class AbstractFormTool extends AbstractTool
     abstract protected function executeForm(array $arguments): ToolResultInterface;
 
     /**
-     * Form from id, or identifier (+ store_id when several store views use it).
+     * Form the caller may see (website/store view restriction applied).
+     *
+     * @param array $arguments
+     * @return array
+     * @throws LocalizedException
+     * @throws AuthorizationException
+     * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-return FormRow
+     */
+    protected function locateForm(array $arguments): array
+    {
+        $form = $this->findForm($arguments);
+        $this->storeScopeGuard->assertReadable('form #' . $form['id'], $form['store_ids']);
+        return $form;
+    }
+
+    /**
+     * Form the caller may change: every store view it is assigned to is within the caller's restriction.
+     *
+     * @param array $arguments
+     * @return array
+     * @throws LocalizedException
+     * @throws AuthorizationException
+     * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-return FormRow
+     */
+    protected function locateFormForWrite(array $arguments): array
+    {
+        $form = $this->findForm($arguments);
+        $this->storeScopeGuard->assertWritable('form #' . $form['id'], $form['store_ids']);
+        return $form;
+    }
+
+    /**
+     * Form from id, or identifier (+ store_id when several store views use it), scope not checked.
      *
      * @param array $arguments
      * @return array
@@ -94,7 +132,7 @@ abstract class AbstractFormTool extends AbstractTool
      * @phpstan-param array<string, mixed> $arguments
      * @phpstan-return FormRow
      */
-    protected function locateForm(array $arguments): array
+    private function findForm(array $arguments): array
     {
         $id = $this->intArg($arguments, 'id');
         if ($id !== null) {

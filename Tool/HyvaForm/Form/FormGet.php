@@ -14,6 +14,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Form\FormRules;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Form\AbstractFormTool;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
@@ -31,6 +32,7 @@ class FormGet extends AbstractFormTool
      * @param FormGatewayInterface $formGateway
      * @param ContentService $contentService
      * @param FormRules $formRules
+     * @param StoreScopeGuard $storeScopeGuard
      * @param PreviewService $previewService
      */
     public function __construct(
@@ -38,9 +40,10 @@ class FormGet extends AbstractFormTool
         FormGatewayInterface $formGateway,
         ContentService $contentService,
         FormRules $formRules,
+        StoreScopeGuard $storeScopeGuard,
         private readonly PreviewService $previewService
     ) {
-        parent::__construct($featureChecker, $formGateway, $contentService, $formRules);
+        parent::__construct($featureChecker, $formGateway, $contentService, $formRules, $storeScopeGuard);
     }
 
     /**

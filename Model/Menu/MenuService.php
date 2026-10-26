@@ -76,7 +76,7 @@ class MenuService
     }
 
     /**
-     * Locate.
+     * Menu the caller may see (website/store view restriction applied).
      *
      * @param array $arguments id | identifier [+ store_id]
      * @return array Menu row from the gateway.
@@ -87,6 +87,21 @@ class MenuService
     public function locate(array $arguments): array
     {
         $entity = $this->contentLocator->locate(ContentLocator::TYPE_MENU, $arguments);
+        return $this->menuGateway->get($entity['id']);
+    }
+
+    /**
+     * Menu the caller may change: every store view it is assigned to is within the caller's restriction.
+     *
+     * @param array $arguments id | identifier [+ store_id]
+     * @return array Menu row from the gateway.
+     * @throws LocalizedException
+     * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-return array<string, mixed>
+     */
+    public function locateForWrite(array $arguments): array
+    {
+        $entity = $this->contentLocator->locateForWrite(ContentLocator::TYPE_MENU, $arguments);
         return $this->menuGateway->get($entity['id']);
     }
 

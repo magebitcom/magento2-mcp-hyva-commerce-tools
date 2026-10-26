@@ -16,6 +16,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Form\FormRules;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Form\AbstractFormTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
@@ -35,6 +36,7 @@ class FormUpdateDraft extends AbstractFormTool
      * @param FormGatewayInterface $formGateway
      * @param ContentService $contentService
      * @param FormRules $formRules
+     * @param StoreScopeGuard $storeScopeGuard
      * @param DraftEditor $draftEditor
      */
     public function __construct(
@@ -42,9 +44,10 @@ class FormUpdateDraft extends AbstractFormTool
         FormGatewayInterface $formGateway,
         ContentService $contentService,
         FormRules $formRules,
+        StoreScopeGuard $storeScopeGuard,
         private readonly DraftEditor $draftEditor
     ) {
-        parent::__construct($featureChecker, $formGateway, $contentService, $formRules);
+        parent::__construct($featureChecker, $formGateway, $contentService, $formRules, $storeScopeGuard);
     }
 
     /**
@@ -89,7 +92,7 @@ class FormUpdateDraft extends AbstractFormTool
      */
     protected function executeForm(array $arguments): ToolResultInterface
     {
-        $form = $this->locateForm($arguments);
+        $form = $this->locateFormForWrite($arguments);
         $result = ['id' => $form['id'], 'published' => false];
         $settings = $this->settingsFrom($arguments);
         $candidate = $form;
@@ -127,6 +130,13 @@ class FormUpdateDraft extends AbstractFormTool
             return $this->softError('Nothing was changed: fix the delivery settings first.', ['issues' => $blocking]);
         }
         unset($settings['identifier']);
+        if (isset($settings['store_ids'])) {
+            $this->storeScopeGuard->assertAssignable(
+                'form #' . $form['id'],
+                $form['store_ids'],
+                Cast::intList($settings['store_ids']) ?: [0]
+            );
+        }
         $newIdentifier = $this->stringArg($arguments, 'new_identifier');
         if ($newIdentifier !== null || isset($settings['store_ids'])) {
             // Check the identifier against the store views the form will have after this call.

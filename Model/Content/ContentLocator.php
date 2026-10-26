@@ -11,19 +11,23 @@ namespace Magebit\McpHyvaCommerceTools\Model\Content;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Exception\FeatureUnavailableException;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magento\Cms\Api\BlockRepositoryInterface;
 use Magento\Cms\Api\Data\BlockInterface;
 use Magento\Cms\Api\Data\PageInterface;
 use Magento\Cms\Api\PageRepositoryInterface;
 use Magento\Cms\Model\ResourceModel\Block\CollectionFactory as BlockCollectionFactory;
 use Magento\Cms\Model\ResourceModel\Page\CollectionFactory as PageCollectionFactory;
+use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Model\AbstractModel;
 
 /**
  * Resolves a Hyvä CMS entity (cms_page, cms_block, menu) from tool arguments: `id`, or `identifier` + optional
- * `store_id`.
+ * `store_id`. Applies the MCP caller's website/store view restriction (Hyvä Advanced Admin Permissions), whose own
+ * guards are not registered for the /mcp route: locate() refuses entities the role may not see, locateForWrite()
+ * also those it may not change.
  */
 class ContentLocator
 {
@@ -39,6 +43,7 @@ class ContentLocator
      * @param BlockCollectionFactory $blockCollectionFactory
      * @param MenuGatewayInterface $menuGateway
      * @param FeatureCheckerInterface $featureChecker
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         private readonly PageRepositoryInterface $pageRepository,
@@ -46,12 +51,100 @@ class ContentLocator
         private readonly PageCollectionFactory $pageCollectionFactory,
         private readonly BlockCollectionFactory $blockCollectionFactory,
         private readonly MenuGatewayInterface $menuGateway,
-        private readonly FeatureCheckerInterface $featureChecker
+        private readonly FeatureCheckerInterface $featureChecker,
+        private readonly StoreScopeGuard $storeScopeGuard
     ) {
     }
 
     /**
-     * Locate.
+     * Entity the caller may see.
+     *
+     * @param string $type cms_page|cms_block|menu
+     * @param array $arguments
+     * @return array
+     * @throws LocalizedException
+     * @throws AuthorizationException When the caller's website/store view restriction excludes the entity.
+     * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-return array{type: string, id: int, identifier: string, title: string, is_active: bool,
+     *     store_ids: list<int>}
+     */
+    public function locate(string $type, array $arguments): array
+    {
+        $entity = $this->find($type, $arguments);
+        $this->storeScopeGuard->assertReadable($this->label($entity), $entity['store_ids']);
+        return $entity;
+    }
+
+    /**
+     * Entity the caller may change: every store view it is assigned to is within the caller's restriction.
+     *
+     * @param string $type cms_page|cms_block|menu
+     * @param array $arguments
+     * @return array
+     * @throws LocalizedException
+     * @throws AuthorizationException When the caller's website/store view restriction excludes the entity.
+     * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-return array{type: string, id: int, identifier: string, title: string, is_active: bool,
+     *     store_ids: list<int>}
+     */
+    public function locateForWrite(string $type, array $arguments): array
+    {
+        $entity = $this->find($type, $arguments);
+        $this->storeScopeGuard->assertWritable($this->label($entity), $entity['store_ids']);
+        return $entity;
+    }
+
+    /**
+     * Split entities into those the caller may change and those it may only see; the rest are dropped.
+     *
+     * Unrestricted callers get every target back as writable without any lookup.
+     *
+     * @param array $targets
+     * @return array
+     * @phpstan-param list<array{entity_type: string, id: int, identifier: string}> $targets
+     * @phpstan-return array{writable: list<array{entity_type: string, id: int, identifier: string}>,
+     *     read_only: list<array{entity_type: string, id: int, identifier: string}>}
+     */
+    public function partitionByScope(array $targets): array
+    {
+        if ($this->storeScopeGuard->restrictedStoreIds() === null) {
+            return ['writable' => $targets, 'read_only' => []];
+        }
+        $writable = [];
+        $readOnly = [];
+        foreach ($targets as $target) {
+            try {
+                $storeIds = $this->find($target['entity_type'], ['id' => $target['id']])['store_ids'];
+            } catch (LocalizedException) {
+                continue;
+            }
+            if ($this->storeScopeGuard->allowsWrite($storeIds)) {
+                $writable[] = $target;
+            } elseif ($this->storeScopeGuard->allowsRead($storeIds)) {
+                $readOnly[] = $target;
+            }
+        }
+        return ['writable' => $writable, 'read_only' => $readOnly];
+    }
+
+    /**
+     * Human label of a located entity, e.g. "CMS page #5"
+     *
+     * @param array $entity
+     * @return string
+     * @phpstan-param array{type: string, id: int} $entity
+     */
+    public function label(array $entity): string
+    {
+        return match ($entity['type']) {
+            self::TYPE_PAGE => 'CMS page #' . $entity['id'],
+            self::TYPE_BLOCK => 'CMS block #' . $entity['id'],
+            default => 'menu #' . $entity['id'],
+        };
+    }
+
+    /**
+     * Entity from the arguments, scope not checked.
      *
      * @param string $type cms_page|cms_block|menu
      * @param array $arguments
@@ -61,7 +154,7 @@ class ContentLocator
      * @phpstan-return array{type: string, id: int, identifier: string, title: string, is_active: bool,
      *     store_ids: list<int>}
      */
-    public function locate(string $type, array $arguments): array
+    private function find(string $type, array $arguments): array
     {
         $id = $arguments['id'] ?? null;
         $id = is_int($id) || (is_string($id) && ctype_digit($id)) ? (int) $id : null;
@@ -120,6 +213,13 @@ class ContentLocator
             }
             return $this->preferStoreSpecific($candidates, $storeId);
         }
+        if (count($ids) > 1 && $this->storeScopeGuard->restrictedStoreIds() !== null) {
+            // A restricted role only competes among the entities it may see; with none, the first one is refused.
+            $ids = array_values(array_filter(
+                $ids,
+                fn (int $candidateId): bool => $this->isReadable($this->pageRepository->getById($candidateId))
+            )) ?: [$ids[0]];
+        }
         if (count($ids) > 1) {
             throw new LocalizedException(__(
                 'Several CMS pages use identifier "%1" (ids %2). Pass id or store_id.',
@@ -165,6 +265,13 @@ class ContentLocator
                 $candidates[] = $this->blockRepository->getById((string) $candidateId);
             }
             return $this->preferStoreSpecific($candidates, $storeId);
+        }
+        if (count($ids) > 1 && $this->storeScopeGuard->restrictedStoreIds() !== null) {
+            // A restricted role only competes among the entities it may see; with none, the first one is refused.
+            $ids = array_values(array_filter(
+                $ids,
+                fn (int $candidateId): bool => $this->isReadable($this->blockRepository->getById((string) $candidateId))
+            )) ?: [$ids[0]];
         }
         if (count($ids) > 1) {
             throw new LocalizedException(__(
@@ -271,6 +378,19 @@ class ContentLocator
             }
         }
         return $ids;
+    }
+
+    /**
+     * Whether the caller may see the page/block
+     *
+     * @param PageInterface|BlockInterface $entity
+     * @return bool
+     */
+    private function isReadable(PageInterface|BlockInterface $entity): bool
+    {
+        return $this->storeScopeGuard->allowsRead(
+            $this->storeIds($entity instanceof AbstractModel ? $entity->getData('store_id') : [])
+        );
     }
 
     /**

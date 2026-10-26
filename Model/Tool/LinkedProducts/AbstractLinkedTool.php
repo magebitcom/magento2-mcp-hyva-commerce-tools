@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Api\Adapter\LinkedProductsGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magento\Framework\Exception\LocalizedException;
 
 /**
@@ -34,10 +35,12 @@ abstract class AbstractLinkedTool extends AbstractTool
     /**
      * @param FeatureCheckerInterface $featureChecker
      * @param LinkedProductsGatewayInterface $linkedGroups
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         protected readonly FeatureCheckerInterface $featureChecker,
-        protected readonly LinkedProductsGatewayInterface $linkedGroups
+        protected readonly LinkedProductsGatewayInterface $linkedGroups,
+        protected readonly StoreScopeGuard $storeScopeGuard
     ) {
     }
 
@@ -62,6 +65,10 @@ abstract class AbstractLinkedTool extends AbstractTool
             return $this->featureUnavailable(
                 $this->featureChecker->getUnavailableResponse(FeatureCheckerInterface::LINKED_PRODUCTS)
             );
+        }
+        if (static::IS_WRITE) {
+            // Groups have no website or store view assignment: a restricted role may not change them.
+            $this->storeScopeGuard->assertUnrestricted('Linked product groups');
         }
         return $this->executeLinked($arguments);
     }

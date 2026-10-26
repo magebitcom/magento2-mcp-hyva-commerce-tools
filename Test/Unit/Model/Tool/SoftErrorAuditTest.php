@@ -12,6 +12,7 @@ use Magebit\McpHyvaCommerceTools\Api\Adapter\LinkedProductsGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupGet;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupSave;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use PHPUnit\Framework\TestCase;
 
 class SoftErrorAuditTest extends TestCase
@@ -20,7 +21,8 @@ class SoftErrorAuditTest extends TestCase
     {
         $gateway = $this->createMock(LinkedProductsGatewayInterface::class);
         $gateway->method('findIdByName')->willReturn(null);
-        $result = (new GroupGet($this->features(), $gateway))->execute(['name' => 'secret@example.com']);
+        $tool = new GroupGet($this->features(), $gateway, $this->guard());
+        $result = $tool->execute(['name' => 'secret@example.com']);
 
         $this->assertTrue($result->isError());
         $this->assertStringContainsString('No such group', json_encode($result->getContent()) ?: '');
@@ -32,7 +34,7 @@ class SoftErrorAuditTest extends TestCase
         $gateway = $this->createMock(LinkedProductsGatewayInterface::class);
         $gateway->method('productIdsBySkus')->willReturn([]);
         $gateway->method('check')->willReturn(['issues' => [], 'members' => []]);
-        $result = (new GroupSave($this->features(), $gateway))->execute([
+        $result = (new GroupSave($this->features(), $gateway, $this->guard()))->execute([
             'name' => 'Leak', 'skus' => ['private-sku-1'], 'confirm' => true,
         ]);
 
@@ -49,5 +51,15 @@ class SoftErrorAuditTest extends TestCase
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn(true);
         return $features;
+    }
+
+    /**
+     * Unrestricted scope guard.
+     *
+     * @return StoreScopeGuard
+     */
+    private function guard(): StoreScopeGuard
+    {
+        return $this->createMock(StoreScopeGuard::class);
     }
 }

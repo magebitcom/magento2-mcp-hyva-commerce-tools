@@ -31,10 +31,12 @@ class ImageUpdateAlt extends AbstractMediaTool implements ContextualAclAwareInte
     /**
      * @param ImageContentEditor $editor
      * @param ContentAcl $contentAcl
+     * @param ContentLocator $contentLocator
      */
     public function __construct(
         private readonly ImageContentEditor $editor,
-        private readonly ContentAcl $contentAcl
+        private readonly ContentAcl $contentAcl,
+        private readonly ContentLocator $contentLocator
     ) {
     }
 
@@ -86,10 +88,14 @@ class ImageUpdateAlt extends AbstractMediaTool implements ContextualAclAwareInte
             return $this->softError(sprintf('Your role may not save %s drafts.', implode(' / ', $requested)));
         }
         $targets = $this->editor->findTargets($path, $types, $this->intListArg($arguments, 'entity_ids'));
+        // A role restricted to some websites or store views only changes the content it may change.
+        $inScope = $this->contentLocator->partitionByScope($targets['editable']);
+        $targets['editable'] = $inScope['writable'];
+        $outOfScope = $inScope['read_only'] !== [] ? ['skipped_out_of_scope' => $inScope['read_only']] : [];
         if ($targets['editable'] === []) {
             return $this->softError(
                 sprintf('"%s" is not used in Hyvä content for this scope.', $path),
-                ['not_editable_usages' => $targets['not_editable']]
+                ['not_editable_usages' => $targets['not_editable']] + $outOfScope
             );
         }
         $results = $this->editor->rewrite(
@@ -104,7 +110,7 @@ class ImageUpdateAlt extends AbstractMediaTool implements ContextualAclAwareInte
                 'published' => false,
                 'not_changed' => $targets['not_editable'],
                 'skipped_types_no_permission' => array_values(array_diff($requested, $types)),
-            ],
+            ] + $outOfScope,
             ['path' => $path, 'entities' => count($results)]
         );
     }

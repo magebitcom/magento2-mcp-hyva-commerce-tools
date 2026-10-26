@@ -14,6 +14,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Form\FormRules;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Form\AbstractFormTool;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
@@ -33,6 +34,7 @@ class FormPublish extends AbstractFormTool
      * @param FormGatewayInterface $formGateway
      * @param ContentService $contentService
      * @param FormRules $formRules
+     * @param StoreScopeGuard $storeScopeGuard
      * @param PreviewService $previewService
      */
     public function __construct(
@@ -40,9 +42,10 @@ class FormPublish extends AbstractFormTool
         FormGatewayInterface $formGateway,
         ContentService $contentService,
         FormRules $formRules,
+        StoreScopeGuard $storeScopeGuard,
         private readonly PreviewService $previewService
     ) {
-        parent::__construct($featureChecker, $formGateway, $contentService, $formRules);
+        parent::__construct($featureChecker, $formGateway, $contentService, $formRules, $storeScopeGuard);
     }
 
     /**
@@ -79,7 +82,7 @@ class FormPublish extends AbstractFormTool
      */
     protected function executeForm(array $arguments): ToolResultInterface
     {
-        $form = $this->locateForm($arguments);
+        $form = $this->locateFormForWrite($arguments);
         $versionId = $this->intArg($arguments, 'version_id');
         if ($versionId === null) {
             $draft = $this->contentService->getWorkingDocument(self::CONTENT_TYPE, $form['id']);

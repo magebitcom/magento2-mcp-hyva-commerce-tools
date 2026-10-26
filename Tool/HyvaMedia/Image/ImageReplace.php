@@ -34,11 +34,13 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
      * @param ImageContentEditor $editor
      * @param MediaFileInfo $fileInfo
      * @param ContentAcl $contentAcl
+     * @param ContentLocator $contentLocator
      */
     public function __construct(
         private readonly ImageContentEditor $editor,
         private readonly MediaFileInfo $fileInfo,
-        private readonly ContentAcl $contentAcl
+        private readonly ContentAcl $contentAcl,
+        private readonly ContentLocator $contentLocator
     ) {
     }
 
@@ -100,11 +102,15 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
             return $this->softError(sprintf('Your role may not save %s drafts.', implode(' / ', $requested)));
         }
         $targets = $this->editor->findTargets($old, $types, $this->intListArg($arguments, 'entity_ids'));
+        // A role restricted to some websites or store views only changes the content it may change.
+        $inScope = $this->contentLocator->partitionByScope($targets['editable']);
+        $targets['editable'] = $inScope['writable'];
+        $outOfScope = $inScope['read_only'] !== [] ? ['skipped_out_of_scope' => $inScope['read_only']] : [];
         if ($scope === 'global' && !$this->boolArg($arguments, 'confirm')) {
             return $this->confirmationRequired('replace_image_globally', [
                 'hyva_entities' => $targets['editable'],
                 'not_editable_usages' => $targets['not_editable'],
-            ]);
+            ] + $outOfScope);
         }
         if ($targets['editable'] === []) {
             return $this->softError(
@@ -124,6 +130,7 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
             'published' => false,
             'not_changed' => $targets['not_editable'],
             'skipped_types_no_permission' => array_values(array_diff($requested, $types)),
+        ] + $outOfScope + [
             'next_step' => 'Review the drafts and publish each entity with hyva_cms.publish.',
         ], ['old_path' => $old, 'new_path' => $new, 'entities' => count($results)]);
     }

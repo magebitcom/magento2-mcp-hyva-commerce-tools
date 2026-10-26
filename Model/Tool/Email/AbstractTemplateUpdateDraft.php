@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ContentSchema;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 
 /**
  * Edit the Hyvä CMS draft of an email or newsletter template; settings apply immediately.
@@ -30,6 +31,7 @@ abstract class AbstractTemplateUpdateDraft extends AbstractEmailTool
      * @param EmailGatewayInterface $emailGateway
      * @param ContentService $contentService
      * @param PreviewService $previewService
+     * @param StoreScopeGuard $storeScopeGuard
      * @param DraftEditor $draftEditor
      */
     public function __construct(
@@ -37,9 +39,10 @@ abstract class AbstractTemplateUpdateDraft extends AbstractEmailTool
         EmailGatewayInterface $emailGateway,
         ContentService $contentService,
         PreviewService $previewService,
+        StoreScopeGuard $storeScopeGuard,
         private readonly DraftEditor $draftEditor
     ) {
-        parent::__construct($featureChecker, $emailGateway, $contentService, $previewService);
+        parent::__construct($featureChecker, $emailGateway, $contentService, $previewService, $storeScopeGuard);
     }
 
     /**

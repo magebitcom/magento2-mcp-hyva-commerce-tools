@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Form\FormRules;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Form\AbstractFormTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
@@ -36,6 +37,7 @@ class FormCreate extends AbstractFormTool
      * @param FormGatewayInterface $formGateway
      * @param ContentService $contentService
      * @param FormRules $formRules
+     * @param StoreScopeGuard $storeScopeGuard
      * @param ComponentTree $componentTree
      * @param DraftEditor $draftEditor
      * @param PreviewService $previewService
@@ -45,11 +47,12 @@ class FormCreate extends AbstractFormTool
         FormGatewayInterface $formGateway,
         ContentService $contentService,
         FormRules $formRules,
+        StoreScopeGuard $storeScopeGuard,
         private readonly ComponentTree $componentTree,
         private readonly DraftEditor $draftEditor,
         private readonly PreviewService $previewService
     ) {
-        parent::__construct($featureChecker, $formGateway, $contentService, $formRules);
+        parent::__construct($featureChecker, $formGateway, $contentService, $formRules, $storeScopeGuard);
     }
 
     /**
@@ -99,6 +102,7 @@ class FormCreate extends AbstractFormTool
     protected function executeForm(array $arguments): ToolResultInterface
     {
         $storeIds = Cast::intList($arguments['store_ids'] ?? [0]) ?: [0];
+        $this->storeScopeGuard->assertAssignable('the new form', [], $storeIds);
         $title = $this->requireString($arguments, 'title');
         $identifier = $this->stringArg($arguments, 'identifier')
             ?? $this->formGateway->suggestIdentifier($this->slug($title), $storeIds);

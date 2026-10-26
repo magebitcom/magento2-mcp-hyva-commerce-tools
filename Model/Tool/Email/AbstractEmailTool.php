@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magento\Framework\Exception\LocalizedException;
 
 /**
@@ -32,16 +33,24 @@ abstract class AbstractEmailTool extends AbstractTool
     public const UNDERLYING_ACL_RESOURCE = 'Hyva_EmailTemplates::email_template_view';
 
     /**
+     * Whether the write tool changes templates. Templates have no store view assignment (global data), so a role
+     * restricted to some websites or store views may not change them.
+     */
+    public const CHANGES_TEMPLATES = true;
+
+    /**
      * @param FeatureCheckerInterface $featureChecker
      * @param EmailGatewayInterface $emailGateway
      * @param ContentService $contentService
      * @param PreviewService $previewService
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         protected readonly FeatureCheckerInterface $featureChecker,
         protected readonly EmailGatewayInterface $emailGateway,
         protected readonly ContentService $contentService,
-        protected readonly PreviewService $previewService
+        protected readonly PreviewService $previewService,
+        protected readonly StoreScopeGuard $storeScopeGuard
     ) {
     }
 
@@ -69,6 +78,9 @@ abstract class AbstractEmailTool extends AbstractTool
             return $this->featureUnavailable(
                 $this->featureChecker->getUnavailableResponse(FeatureCheckerInterface::EMAIL_TEMPLATES)
             );
+        }
+        if (static::IS_WRITE && static::CHANGES_TEMPLATES) {
+            $this->storeScopeGuard->assertUnrestricted(ucfirst(static::LABEL) . 's');
         }
         return $this->executeEmail($arguments);
     }

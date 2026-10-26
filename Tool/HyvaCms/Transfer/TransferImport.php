@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\EntityWriter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractContentTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
@@ -47,6 +48,7 @@ class TransferImport extends AbstractContentTool
      * @param ImageReferenceExtractor $imageReferenceExtractor
      * @param MediaFileInfo $mediaFileInfo
      * @param ContentAcl $contentAcl
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         private readonly ContentLocator $contentLocator,
@@ -57,7 +59,8 @@ class TransferImport extends AbstractContentTool
         private readonly EntityWriter $entityWriter,
         private readonly ImageReferenceExtractor $imageReferenceExtractor,
         private readonly MediaFileInfo $mediaFileInfo,
-        private readonly ContentAcl $contentAcl
+        private readonly ContentAcl $contentAcl,
+        private readonly StoreScopeGuard $storeScopeGuard
     ) {
     }
 
@@ -156,12 +159,15 @@ class TransferImport extends AbstractContentTool
             if ($type === ContentLocator::TYPE_MENU) {
                 return $this->softError('Create the menu with hyva_menu.create first, then import into it.');
             }
-            $entityId = $this->entityWriter->create(
-                $type,
-                $this->entityFields(Cast::array($payload['entity'] ?? null))
+            $fields = $this->entityFields(Cast::array($payload['entity'] ?? null));
+            $this->storeScopeGuard->assertAssignable(
+                sprintf('the new %s "%s"', $type, Cast::string($fields['identifier'])),
+                [],
+                Cast::intList($fields['store_ids'])
             );
+            $entityId = $this->entityWriter->create($type, $fields);
         } else {
-            $entityId = $this->contentLocator->locate($type, $arguments)['id'];
+            $entityId = $this->contentLocator->locateForWrite($type, $arguments)['id'];
             $current = $this->contentService->getDocuments($type, $entityId);
             $dirty = $current['draft'] !== null && !$this->contentIndex->sameContent(
                 (string) json_encode($current['draft']),

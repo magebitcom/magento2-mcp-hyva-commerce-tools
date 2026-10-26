@@ -15,6 +15,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Form\FormRules;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormUpdateDraft;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -81,6 +82,7 @@ class FormUpdateDraftTest extends TestCase
             $this->gateway,
             $this->createMock(ContentService::class),
             new FormRules($this->createMock(ComponentTree::class)),
+            $this->createMock(StoreScopeGuard::class),
             $this->createMock(DraftEditor::class)
         );
     }

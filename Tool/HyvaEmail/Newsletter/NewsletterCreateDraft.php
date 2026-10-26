@@ -19,6 +19,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Email\AbstractEmailTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 
 /**
  * `hyva_email.newsletter.create_draft`.
@@ -37,6 +38,7 @@ class NewsletterCreateDraft extends AbstractEmailTool
      * @param EmailGatewayInterface $emailGateway
      * @param ContentService $contentService
      * @param PreviewService $previewService
+     * @param StoreScopeGuard $storeScopeGuard
      * @param ComponentTree $componentTree
      * @param DraftEditor $draftEditor
      */
@@ -45,10 +47,11 @@ class NewsletterCreateDraft extends AbstractEmailTool
         EmailGatewayInterface $emailGateway,
         ContentService $contentService,
         PreviewService $previewService,
+        StoreScopeGuard $storeScopeGuard,
         private readonly ComponentTree $componentTree,
         private readonly DraftEditor $draftEditor
     ) {
-        parent::__construct($featureChecker, $emailGateway, $contentService, $previewService);
+        parent::__construct($featureChecker, $emailGateway, $contentService, $previewService, $storeScopeGuard);
     }
 
     /**

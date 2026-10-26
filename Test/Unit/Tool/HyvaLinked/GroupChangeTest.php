@@ -13,6 +13,7 @@ use Magebit\McpHyvaCommerceTools\Api\Adapter\LinkedProductsGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupSave;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupValidate;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -50,7 +51,7 @@ class GroupChangeTest extends TestCase
         $this->gateway->expects($this->once())->method('check')
             ->with(5, 'Tees', ['color'], [1, 3])
             ->willReturn(['issues' => [], 'members' => []]);
-        $payload = $this->payload((new GroupValidate($this->features, $this->gateway))->execute([
+        $payload = $this->payload((new GroupValidate($this->features, $this->gateway, $this->guard()))->execute([
             'id' => 5, 'add_skus' => ['C'], 'remove_skus' => ['B'],
         ]));
         $this->assertTrue($payload['valid']);
@@ -66,13 +67,13 @@ class GroupChangeTest extends TestCase
                 return ['issues' => [], 'members' => []];
             }
         );
-        $payload = $this->payload((new GroupValidate($this->features, $this->gateway))->execute([
+        $payload = $this->payload((new GroupValidate($this->features, $this->gateway, $this->guard()))->execute([
             'id' => 5, 'add_skus' => ['c'], 'remove_skus' => ['b', 'C'],
         ]));
         $this->assertTrue($payload['valid'], 'no unknown_sku for a different spelling');
         $this->assertSame(['A'], $payload['skus'], 'remove_skus matches B and the added c regardless of case');
 
-        $payload = $this->payload((new GroupValidate($this->features, $this->gateway))->execute([
+        $payload = $this->payload((new GroupValidate($this->features, $this->gateway, $this->guard()))->execute([
             'name' => 'New', 'skus' => ['a', 'b'],
         ]));
         $this->assertSame(['A', 'B'], $payload['skus'], 'stored spelling is kept');
@@ -83,7 +84,7 @@ class GroupChangeTest extends TestCase
     {
         $this->gateway->method('check')->willReturn(['issues' => [], 'members' => []]);
         $this->gateway->expects($this->never())->method('save');
-        $result = (new GroupSave($this->features, $this->gateway))->execute([
+        $result = (new GroupSave($this->features, $this->gateway, $this->guard()))->execute([
             'name' => 'New', 'skus' => ['A', 'ZZ'], 'confirm' => true,
         ]);
         $this->assertTrue($result->isError());
@@ -94,7 +95,7 @@ class GroupChangeTest extends TestCase
     {
         $this->gateway->method('check')->willReturn(['issues' => [], 'members' => []]);
         $this->gateway->expects($this->never())->method('save');
-        $payload = $this->payload((new GroupSave($this->features, $this->gateway))->execute([
+        $payload = $this->payload((new GroupSave($this->features, $this->gateway, $this->guard()))->execute([
             'name' => 'New', 'skus' => ['A', 'B'],
         ]));
         $this->assertTrue($payload['confirmation_required']);
@@ -112,5 +113,15 @@ class GroupChangeTest extends TestCase
         $payload = json_decode($text, true);
         $this->assertIsArray($payload, $text);
         return $payload;
+    }
+
+    /**
+     * Unrestricted scope guard.
+     *
+     * @return StoreScopeGuard
+     */
+    private function guard(): StoreScopeGuard
+    {
+        return $this->createMock(StoreScopeGuard::class);
     }
 }

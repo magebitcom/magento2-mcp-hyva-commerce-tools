@@ -23,6 +23,7 @@ class TemplateSendTest extends AbstractEmailTool
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_email_template_send_test';
     public const UNDERLYING_ACL_RESOURCE = 'Hyva_EmailTemplates::email_template_view';
     public const IS_WRITE = true;
+    public const CHANGES_TEMPLATES = false;
 
     /**
      * @inheritDoc
@@ -64,7 +65,11 @@ class TemplateSendTest extends AbstractEmailTool
             return $this->softError(sprintf('"%s" is not a valid email address.', $recipient));
         }
         $template = $this->locateTemplate($arguments);
-        $this->emailGateway->sendTest($template['id'], $recipient, $this->intArg($arguments, 'store_id'));
+        $storeId = $this->intArg($arguments, 'store_id');
+        if ($storeId !== null) {
+            $this->storeScopeGuard->assertReadable('store view ' . $storeId, [$storeId]);
+        }
+        $this->emailGateway->sendTest($template['id'], $recipient, $storeId);
         return $this->jsonResult(
             ['sent' => true, 'id' => $template['id'], 'recipient' => $recipient],
             ['id' => $template['id']]

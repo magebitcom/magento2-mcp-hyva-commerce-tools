@@ -14,6 +14,7 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Form\FormRules;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Form\AbstractFormTool;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
@@ -33,6 +34,7 @@ class VersionRestore extends AbstractFormTool
      * @param FormGatewayInterface $formGateway
      * @param ContentService $contentService
      * @param FormRules $formRules
+     * @param StoreScopeGuard $storeScopeGuard
      * @param VersionHistoryManager $versionHistoryManager
      */
     public function __construct(
@@ -40,9 +42,10 @@ class VersionRestore extends AbstractFormTool
         FormGatewayInterface $formGateway,
         ContentService $contentService,
         FormRules $formRules,
+        StoreScopeGuard $storeScopeGuard,
         private readonly VersionHistoryManager $versionHistoryManager
     ) {
-        parent::__construct($featureChecker, $formGateway, $contentService, $formRules);
+        parent::__construct($featureChecker, $formGateway, $contentService, $formRules, $storeScopeGuard);
     }
 
     /**
@@ -78,7 +81,7 @@ class VersionRestore extends AbstractFormTool
      */
     protected function executeForm(array $arguments): ToolResultInterface
     {
-        $form = $this->locateForm($arguments);
+        $form = $this->locateFormForWrite($arguments);
         $versionId = $this->intArg($arguments, 'version_id') ?? 0;
         $result = $this->versionHistoryManager->restoreVersion(self::CONTENT_TYPE, $form['id'], $versionId);
         if (empty($result['success'])) {
