@@ -437,3 +437,11 @@ constructors, mirroring the core's `Pagination::maxPageSize()`) and a few string
 ## License
 
 Released under the [MIT License](LICENSE).
+
+---
+
+![Magebit](https://github.com/user-attachments/assets/cdc904ce-e839-40a0-a86f-792f7ab7961f)
+
+Magebit - Full-service e-commerce agency
+
+[magebit.com](https://magebit.com)
