@@ -11,6 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Menu\AbstractMenuTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
@@ -30,11 +31,13 @@ class MenuRenderCheck extends AbstractMenuTool
      * @param FeatureCheckerInterface $featureChecker
      * @param MenuService $menuService
      * @param MenuGatewayInterface $menuGateway
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         FeatureCheckerInterface $featureChecker,
         MenuService $menuService,
-        private readonly MenuGatewayInterface $menuGateway
+        private readonly MenuGatewayInterface $menuGateway,
+        private readonly StoreScopeGuard $storeScopeGuard
     ) {
         parent::__construct($featureChecker, $menuService);
     }
@@ -77,11 +80,16 @@ class MenuRenderCheck extends AbstractMenuTool
     {
         $menu = $this->menuService->locate($arguments);
         $storeId = $this->intArg($arguments, 'store_id');
-        $storeIds = $storeId !== null ? [$storeId] : array_values(
-            array_filter(Cast::intList($menu['store_ids'] ?? []), static fn (int $id): bool => $id > 0)
+        // A restricted role renders only in store views it may read: an explicit one outside it is refused, the
+        // menu's own are narrowed to it, and the fallback is its first store view instead of the default one.
+        $storeIds = $storeId !== null ? [$this->menuService->resolveImportStoreId($storeId, [])] : array_values(
+            array_filter(
+                Cast::intList($menu['store_ids'] ?? []),
+                fn (int $id): bool => $id > 0 && $this->storeScopeGuard->allowsRead([$id])
+            )
         );
         if ($storeIds === []) {
-            $storeIds = [$this->menuService->lookupStoreId([])];
+            $storeIds = [$this->menuService->resolveImportStoreId(null, [])];
         }
         $checks = [];
         foreach ($storeIds as $id) {
