@@ -11,6 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image;
 use Magebit\Mcp\Api\ContextualAclAwareInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageContentEditor;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Media\AbstractMediaTool;
 use Magebit\Mcp\Api\ToolResultInterface;
@@ -32,11 +33,13 @@ class ImageUpdateAlt extends AbstractMediaTool implements ContextualAclAwareInte
      * @param ImageContentEditor $editor
      * @param ContentAcl $contentAcl
      * @param ContentLocator $contentLocator
+     * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
         private readonly ImageContentEditor $editor,
         private readonly ContentAcl $contentAcl,
-        private readonly ContentLocator $contentLocator
+        private readonly ContentLocator $contentLocator,
+        private readonly ContentScopeFilter $scopeFilter
     ) {
     }
 
@@ -92,6 +95,14 @@ class ImageUpdateAlt extends AbstractMediaTool implements ContextualAclAwareInte
         $inScope = $this->contentLocator->partitionByScope($targets['editable']);
         $targets['editable'] = $inScope['writable'];
         $outOfScope = $inScope['read_only'] !== [] ? ['skipped_out_of_scope' => $inScope['read_only']] : [];
+        // Usages that are only reported (Magento CMS, catalog) are listed only for content the role may see.
+        $notEditable = $this->scopeFilter->filter($targets['not_editable']);
+        $targets['not_editable'] = $notEditable['visible'];
+        $outOfScope = $this->scopeFilter->withHidden(
+            $outOfScope,
+            'usages_hidden_by_permissions',
+            $notEditable['hidden']
+        );
         if ($targets['editable'] === []) {
             return $this->softError(
                 sprintf('"%s" is not used in Hyvä content for this scope.', $path),

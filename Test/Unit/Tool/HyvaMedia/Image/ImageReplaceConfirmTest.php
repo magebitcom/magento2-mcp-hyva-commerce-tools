@@ -11,6 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\Image;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageContentEditor;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageReplace;
@@ -114,7 +115,12 @@ class ImageReplaceConfirmTest extends TestCase
                 ? ['writable' => [], 'read_only' => $targets]
                 : ['writable' => $targets, 'read_only' => []]
         );
-        return new ImageReplace($this->editor, $files, $acl, $locator);
+        $scopeFilter = $this->createMock(ContentScopeFilter::class);
+        $scopeFilter->method('filter')->willReturnCallback(
+            static fn (array $items): array => ['visible' => $items, 'hidden' => 0]
+        );
+        $scopeFilter->method('withHidden')->willReturnArgument(0);
+        return new ImageReplace($this->editor, $files, $acl, $locator, $scopeFilter);
     }
 
     /**
