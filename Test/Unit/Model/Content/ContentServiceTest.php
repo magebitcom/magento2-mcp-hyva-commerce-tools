@@ -103,6 +103,18 @@ class ContentServiceTest extends TestCase
         $this->service->saveDraft('cms_page', 5, $document);
     }
 
+    public function testAStructurallyInvalidDraftIsNeverPublished(): void
+    {
+        $this->storedDraft = $this->tree->encode($this->tree->insertNode(
+            $this->tree->newDocument('cms_page', 5),
+            ['uid' => 'u', 'component' => 'unknown', 'children' => []]
+        ));
+        $this->provider->expects($this->never())->method('saveContent');
+        $this->expectException(LocalizedException::class);
+        $this->expectExceptionMessageMatches('/^Not published: \[u\] /');
+        $this->service->publish('cms_page', 5);
+    }
+
     public function testPublishWithoutDraftFails(): void
     {
         $this->provider->expects($this->never())->method('saveContent');

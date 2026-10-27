@@ -201,9 +201,10 @@ class ContentService
             $source = 'draft';
         }
 
+        // A draft or version saved before a component was removed can fail the structural checks saveDraft() applies.
         $validation = $this->validate($document);
-        if ($validation['schema_error'] !== null) {
-            throw new LocalizedException(__('Not published: %1', $validation['schema_error']));
+        if (!$validation['valid']) {
+            throw new LocalizedException(__('Not published: %1', $this->describeErrors($validation)));
         }
 
         $document = $this->stamp($document, 'published');
