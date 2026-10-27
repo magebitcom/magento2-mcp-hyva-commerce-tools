@@ -111,9 +111,9 @@ class ScheduleList extends AbstractContentTool
         $items = $this->scheduleService->getItems($filters);
         if (count($items) > self::HISTORY_ROW_CAP) {
             $truncated = true;
-            $items = array_slice($items, count($items) - self::HISTORY_ROW_CAP);
-            // The oldest release of the window may continue below the cut: leave it out rather than return it partial.
+            // The dropped oldest row's release may continue in the window: leave it out rather than return it partial.
             $cutRelease = $items[0]['release_id'];
+            $items = array_slice($items, count($items) - self::HISTORY_ROW_CAP);
             $items = array_values(array_filter(
                 $items,
                 static fn (array $item): bool => $item['release_id'] !== $cutRelease
