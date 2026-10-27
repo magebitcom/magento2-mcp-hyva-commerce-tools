@@ -31,6 +31,8 @@
                 type="Magebit\McpHyvaCommerceTools\Model\Adapter\AiTranslations\TranslationGateway\Proxy"/>
     <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\AiWorkerGatewayInterface"
                 type="Magebit\McpHyvaCommerceTools\Model\Adapter\AiWorker\AiWorkerGateway\Proxy"/>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\CmsTailwindGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\CmsTailwind\CmsTailwindGateway\Proxy"/>
     <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\AdminPermissionsGatewayInterface"
                 type="Magebit\McpHyvaCommerceTools\Model\Adapter\AdminPermissions\AdminPermissionsGateway\Proxy"/>
     <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\AdminScopeGatewayInterface"
@@ -142,6 +144,13 @@
                     <item name="package" xsi:type="string">hyva-themes/commerce-module-cms-ai-translations</item>
                     <item name="modules" xsi:type="array">
                         <item name="cms_ai_translations" xsi:type="string">Hyva_CmsAiTranslations</item>
+                    </item>
+                </item>
+                <item name="cms_tailwind" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä CMS Tailwind Compiler</item>
+                    <item name="package" xsi:type="string">hyva-themes/magento2-cms-tailwind-compiler</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="cms_tailwind" xsi:type="string">Hyva_CmsTailwindCompiler</item>
                     </item>
                 </item>
                 <item name="admin_permissions" xsi:type="array">
@@ -377,6 +386,7 @@
                 <item name="hyva_menu.schedule.cancel" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuScheduleCancel</item>
                 <item name="hyva_cms.permission.check" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Permission\PermissionCheck</item>
                 <item name="hyva_cms.translation.status" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Translation\TranslationStatus</item>
+                <item name="hyva_cms.tailwind.status" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Tailwind\TailwindStatus</item>
                 <item name="hyva_cms.translation.run" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Translation\TranslationRun</item>
                 <item name="hyva_store_credit.status" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaStoreCredit\Status</item>
                 <item name="hyva_store_credit.balance.get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaStoreCredit\Balance\BalanceGet</item>
