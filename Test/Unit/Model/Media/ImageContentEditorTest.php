@@ -73,6 +73,24 @@ class ImageContentEditorTest extends TestCase
         ];
     }
 
+    public function testReplaceRewriteSwapsUrlEncodedReferences(): void
+    {
+        $rewrite = $this->editor->replaceRewrite('wysiwyg/my image.jpg', 'wysiwyg/new image.jpg', null);
+        $node = $rewrite([
+            'uid' => 'x',
+            'component' => 'text',
+            'children' => [],
+            'text' => '<img src="/media/wysiwyg/my%20image.jpg"><img src="/media/wysiwyg/my%20image.jpg.bak">'
+                . '{{media url="wysiwyg/my image.jpg"}}<img src="/media/wysiwyg%2Fmy%20image.jpg">',
+        ]);
+
+        $this->assertSame(
+            '<img src="/media/wysiwyg/new%20image.jpg"><img src="/media/wysiwyg/my%20image.jpg.bak">'
+                . '{{media url="wysiwyg/new image.jpg"}}<img src="/media/wysiwyg/new%20image.jpg">',
+            $node['text']
+        );
+    }
+
     public function testReplaceRewriteSwapsImageFieldsAndHtml(): void
     {
         $rewrite = $this->editor->replaceRewrite('wysiwyg/a.jpg', 'wysiwyg/b.jpg', 'New alt');

@@ -190,7 +190,9 @@ class ImageContentEditor
     private function replaceIn(mixed $value, string $oldPath, string $newPath, ?string $alt): mixed
     {
         if (is_string($value)) {
-            return str_contains($value, $oldPath) ? $this->replacePathInText($value, $oldPath, $newPath) : $value;
+            return str_contains($value, $oldPath) || str_contains($value, '%')
+                ? $this->replacePathInText($value, $oldPath, $newPath)
+                : $value;
         }
         if (!is_array($value)) {
             return $value;
@@ -278,7 +280,8 @@ class ImageContentEditor
      * Replace whole references to a media path inside text/HTML, never a longer path that merely contains it.
      *
      * Matches "wysiwyg/a.jpg" in `src="/media/wysiwyg/a.jpg"`, `{{media url="wysiwyg/a.jpg"}}` or `url(wysiwyg/a.jpg)`,
-     * but not in "wysiwyg/a.jpg.bak" or "other/wysiwyg/a.jpg".
+     * but not in "wysiwyg/a.jpg.bak" or "other/wysiwyg/a.jpg". URL-encoded references ("my%20image.jpg"), which the
+     * usage index decodes, match too and get the new path URL-encoded.
      *
      * @param string $text
      * @param string $oldPath
@@ -287,8 +290,29 @@ class ImageContentEditor
      */
     public function replacePathInText(string $text, string $oldPath, string $newPath): string
     {
-        $pattern = '#(?<=^|["\'(=\s]|/media/|url=)' . preg_quote($oldPath, '#') . '(?=$|["\')?\#\s}&])#';
-        return (string) preg_replace($pattern, $newPath, $text);
+        $encodedNew = implode('/', array_map('rawurlencode', explode('/', $newPath)));
+        $pattern = '#(?<=^|["\'(=\s]|/media/|url=)' . $this->encodingTolerantPattern($oldPath)
+            . '(?=$|["\')?\#\s}&])#';
+        return (string) preg_replace_callback(
+            $pattern,
+            static fn (array $match): string => str_contains($match[0], '%') ? $encodedNew : $newPath,
+            $text
+        );
+    }
+
+    /**
+     * Regex for a path where every byte may also appear percent-encoded (as rawurldecode() reads it).
+     *
+     * @param string $path
+     * @return string
+     */
+    private function encodingTolerantPattern(string $path): string
+    {
+        $pattern = '';
+        foreach (str_split($path) as $byte) {
+            $pattern .= sprintf('(?:%s|(?i:%%%02X))', preg_quote($byte, '#'), ord($byte));
+        }
+        return $pattern;
     }
 
     /**
