@@ -125,7 +125,8 @@ class AuditMenu extends AbstractTool
             $totals['unplaced'] += $placements === [] ? 1 : 0;
             $totals['inactive'] += Cast::bool($menu['is_active'] ?? false) ? 0 : 1;
             foreach ($result['issues'] as $issue) {
-                $codes[$issue['code']] = ($codes[$issue['code']] ?? 0) + 1;
+                $code = Cast::string($issue['code']);
+                $codes[$code] = ($codes[$code] ?? 0) + 1;
             }
             $menus[] = [
                 'id' => $menu['id'],

@@ -49,7 +49,8 @@ class ComponentCatalog
                 continue;
             }
             if ($search !== null && stripos(
-                $summary['name'] . ' ' . $summary['label'] . ' ' . $summary['description'],
+                Cast::string($summary['name']) . ' ' . Cast::string($summary['label']) . ' '
+                    . Cast::string($summary['description']),
                 $search
             ) === false
             ) {
@@ -101,7 +102,7 @@ class ComponentCatalog
                         array_flip(['min', 'max', 'minlength', 'maxlength', 'pattern', 'step'])
                     ),
                     'comment' => $attributes['comment'] ?? null,
-                    'value_format' => $this->fieldValueFormat->get((string) $fieldDefinition['type']),
+                    'value_format' => $this->fieldValueFormat->get(Cast::string($fieldDefinition['type'])),
                 ], static fn ($value): bool => $value !== null && $value !== []);
             }
         }

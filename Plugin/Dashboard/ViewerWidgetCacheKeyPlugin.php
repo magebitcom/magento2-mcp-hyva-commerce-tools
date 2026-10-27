@@ -58,7 +58,7 @@ class ViewerWidgetCacheKeyPlugin
      * @param string $result
      * @param WidgetInstanceInterface $widgetInstance
      * @return string
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     * @SuppressWarnings("PHPMD.UnusedFormalParameter")
      */
     public function afterGetWidgetInstanceDisplayDataCacheKey(
         AdminDashboard $subject,

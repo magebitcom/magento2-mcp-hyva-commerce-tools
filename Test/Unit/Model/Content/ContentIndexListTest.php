@@ -89,7 +89,10 @@ class ContentIndexListTest extends TestCase
         $this->assertStringContainsString('IFNULL(h.is_liveview_enabled, 0) <> 0', $sql);
         $this->assertStringContainsString('TRIM(h.published_content)', $sql);
         $this->assertStringContainsString('e.page_id NOT IN (9)', $sql);
-        $this->assertStringNotContainsString('draft_content', implode(' ', array_merge(...$this->columns)));
+        $this->assertStringNotContainsString('draft_content', implode(' ', array_map(
+            static fn (mixed $column): string => is_scalar($column) ? (string) $column : '',
+            array_merge(...$this->columns)
+        )));
     }
 
     public function testUnfilteredListAddsNoConditions(): void
@@ -129,7 +132,7 @@ class ContentIndexListTest extends TestCase
     private function quoteInto(string $text, mixed $value): string
     {
         $quoted = is_array($value)
-            ? implode(',', array_map('strval', $value))
+            ? implode(',', array_map(static fn (mixed $v): string => is_scalar($v) ? (string) $v : '', $value))
             : (is_int($value) ? (string) $value : "'" . (string) (is_scalar($value) ? $value : '') . "'");
         return str_replace('?', $quoted, $text);
     }

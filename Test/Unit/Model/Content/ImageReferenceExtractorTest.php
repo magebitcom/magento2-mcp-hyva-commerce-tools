@@ -9,7 +9,6 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content;
 
 use Hyva\CmsLiveviewEditor\Api\ImageAssetPathResolverInterface;
-use Hyva\CmsLiveviewEditor\Api\ImageAssetPrefetchInterface;
 use Hyva\CmsLiveviewEditor\Model\Component\Provider as ComponentProvider;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
@@ -134,10 +133,8 @@ class ImageReferenceExtractorTest extends TestCase
 
     public function testAssetIdsArePrefetchedInOneBatch(): void
     {
-        /** @var ImageAssetPathResolverInterface&ImageAssetPrefetchInterface&MockObject $resolver */
-        $resolver = $this->createMockForIntersectionOfInterfaces(
-            [ImageAssetPathResolverInterface::class, ImageAssetPrefetchInterface::class]
-        );
+        /** @var PrefetchingImageAssetPathResolver&MockObject $resolver */
+        $resolver = $this->createMock(PrefetchingImageAssetPathResolver::class);
         $resolver->expects($this->once())->method('prefetchPathsByIds')->with([12, 7, 3]);
         $extractor = new ImageReferenceExtractor(
             new ComponentTree($this->createMock(ComponentProvider::class)),

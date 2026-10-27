@@ -77,8 +77,9 @@ class ContentServiceTest extends TestCase
             ->method('saveContent')
             ->with('cms_page', 5, $this->callback(static function (string $json): bool {
                 $data = json_decode($json, true);
-                return is_array($data) && ($data['version']['version_state'] ?? null) === 'draft'
-                    && ($data['version']['author'] ?? null) === 'MCP';
+                $version = is_array($data) ? ($data['version'] ?? null) : null;
+                return is_array($version) && ($version['version_state'] ?? null) === 'draft'
+                    && ($version['author'] ?? null) === 'MCP';
             }), false)
             ->willReturn(new DataObject());
         $this->provider->expects($this->once())->method('saveVersionHistoryItem')->with(

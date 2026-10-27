@@ -12,6 +12,7 @@ use Magebit\Mcp\Api\ContextualAclAwareInterface;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 /**
  * Tool whose Hyvä permission depends on the entity_type argument (Hyvä Commerce 1.4 per-type verbs).
@@ -148,7 +149,7 @@ abstract class AbstractContentTool extends AbstractTool implements ContextualAcl
             unset($schema['properties']['entity_type']);
         }
         if (is_array($schema['required'] ?? null)) {
-            $schema['required'] = array_values(array_diff($schema['required'], ['entity_type']));
+            $schema['required'] = array_values(array_diff(Cast::stringList($schema['required']), ['entity_type']));
             if ($schema['required'] === []) {
                 unset($schema['required']);
             }

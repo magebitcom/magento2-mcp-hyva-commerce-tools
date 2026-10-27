@@ -193,7 +193,7 @@ class ContentIndex
         if ($limit !== null) {
             $select->limit($limit, $offset);
         }
-        return array_map('intval', $this->resourceConnection->getConnection()->fetchCol($select));
+        return array_values(array_map('intval', $this->resourceConnection->getConnection()->fetchCol($select)));
     }
 
     /**

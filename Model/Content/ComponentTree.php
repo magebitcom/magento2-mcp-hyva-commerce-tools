@@ -123,7 +123,13 @@ class ComponentTree
         }
         // Hyvä presets (e.g. email templates) store root nodes as a list; the content-group schema wants a uid map.
         if ($document['content'] !== [] && array_is_list($document['content'])) {
-            $document = $this->withRootNodes($document, array_values(array_filter($document['content'], 'is_array')));
+            $document = $this->withRootNodes(
+                $document,
+                array_values(array_map(
+                    static fn ($root): array => Cast::stringKeyed($root),
+                    array_filter($document['content'], 'is_array')
+                ))
+            );
         }
         if (!is_array($document['version'])) {
             $document['version'] = [];
@@ -583,7 +589,7 @@ class ComponentTree
                 $parent = $this->findNode($document, $parentUid);
                 $parentName = is_string($parent['component'] ?? null) ? $parent['component'] : '';
                 $parentDefinition = $components[$parentName] ?? null;
-                if (is_array($parentDefinition) && !$this->acceptsChild($parentDefinition, $name)) {
+                if (is_array($parentDefinition) && !$this->acceptsChild(Cast::stringKeyed($parentDefinition), $name)) {
                     $issues[] = $this->issue(
                         'error',
                         'invalid_child',
@@ -605,7 +611,8 @@ class ComponentTree
                     sprintf('"%s" does not accept children.', $name)
                 );
             }
-            $maxChildren = is_array($childConfig) ? ($childConfig['config']['max_children'] ?? null) : null;
+            $childSettings = is_array($childConfig) ? Cast::array($childConfig['config'] ?? null) : [];
+            $maxChildren = $childSettings['max_children'] ?? null;
             if (is_numeric($maxChildren) && count($children) > (int) $maxChildren) {
                 $issues[] = $this->issue(
                     'error',
@@ -738,7 +745,7 @@ class ComponentTree
             ));
         }
         $disallowed = is_array($constraints['disallowed_components'] ?? null)
-            ? array_map('strval', $constraints['disallowed_components'])
+            ? array_map(static fn ($component): string => Cast::string($component), $constraints['disallowed_components'])
             : [];
         $visitor = function (array $node, ?string $parentUid) use (&$issues, $disallowed, $components, $roots): void {
             $name = Cast::string($node['component'] ?? '');

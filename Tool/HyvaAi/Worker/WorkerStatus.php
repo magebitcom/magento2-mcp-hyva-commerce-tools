@@ -11,6 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaAi\Worker;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AiWorker\AbstractAiWorkerTool;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 class WorkerStatus extends AbstractAiWorkerTool
 {
@@ -66,8 +67,8 @@ class WorkerStatus extends AbstractAiWorkerTool
         }
         $scheduler = is_array($status['scheduler'] ?? null) ? $status['scheduler'] : [];
         // With active jobs Hyvä's own problems already report the stale cron.
-        if (!empty($scheduler['cron_stale']) && (int) ($scheduler['active_jobs'] ?? 0) === 0) {
-            $issues[] = 'Cron is not running (last run: ' . (string) ($scheduler['cron_last_run'] ?? 'never')
+        if (!empty($scheduler['cron_stale']) && Cast::int($scheduler['active_jobs'] ?? 0) === 0) {
+            $issues[] = 'Cron is not running (last run: ' . Cast::string($scheduler['cron_last_run'] ?? 'never')
                 . '); bulk jobs are never picked up.';
         }
         foreach (is_array($scheduler['problems'] ?? null) ? $scheduler['problems'] : [] as $problem) {

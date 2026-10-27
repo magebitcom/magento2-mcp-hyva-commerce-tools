@@ -12,6 +12,7 @@ use Hyva\CmsLiveviewEditor\Model\Provider as ContentProvider;
 use Magento\Backend\Model\UrlInterface as BackendUrl;
 use Magebit\Mcp\Api\LoggerInterface;
 use Throwable;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 /**
  * Signed storefront preview URLs (Hyvä GetPreviewQuery, valid ~7 days, tied to the current draft uid)
@@ -64,11 +65,11 @@ class PreviewService
             if (!is_array($store)) {
                 continue;
             }
-            if ($storeId !== null && (int) ($store['store_id'] ?? -1) !== $storeId) {
+            if ($storeId !== null && Cast::int($store['store_id'] ?? -1) !== $storeId) {
                 continue;
             }
             $stores[] = [
-                'store_id' => (int) ($store['store_id'] ?? 0),
+                'store_id' => Cast::int($store['store_id'] ?? 0),
                 'code' => $store['code'] ?? null,
                 'is_assigned' => (bool) ($store['is_assigned'] ?? false),
                 'preview_url' => $store['preview_url'] ?? null,
@@ -113,7 +114,7 @@ class PreviewService
         foreach ($data as $store) {
             if (is_array($store) && is_string($store['published_url'] ?? null) && $store['published_url'] !== '') {
                 $urls[] = [
-                    'store_id' => (int) ($store['store_id'] ?? 0),
+                    'store_id' => Cast::int($store['store_id'] ?? 0),
                     'code' => is_string($store['code'] ?? null) ? $store['code'] : null,
                     'published_url' => $store['published_url'],
                 ];

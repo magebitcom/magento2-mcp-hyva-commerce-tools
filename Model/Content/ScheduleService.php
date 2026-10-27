@@ -116,7 +116,7 @@ class ScheduleService
         $status = $filters['status'] ?? 'pending';
         if ($status === 'pending') {
             $select->where('i.status = ?', 'pending')->where('r.status = ?', 'pending');
-        } elseif ($status !== null && $status !== 'any') {
+        } elseif ($status !== 'any') {
             $select->where('i.status = ?', $status);
         }
         if (!empty($filters['entity_type'])) {
@@ -271,8 +271,7 @@ class ScheduleService
             throw $e;
         }
 
-        $itemIds = json_decode((string) $releaseModel->getScheduledItems(), true);
-        $itemIds = is_array($itemIds) ? $itemIds : [];
+        $itemIds = Cast::intList(json_decode((string) $releaseModel->getScheduledItems(), true));
         $itemIds[] = $this->modelId($item);
         $releaseModel->setScheduledItems((string) json_encode(array_values(array_unique($itemIds))));
         $releaseModel->setRevisionLog(

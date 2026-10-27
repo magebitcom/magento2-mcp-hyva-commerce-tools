@@ -20,6 +20,7 @@ use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\AuthorizationInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\User\Model\User;
+use Magento\User\Model\ResourceModel\User as UserResource;
 use Magento\User\Model\UserFactory;
 use PHPUnit\Framework\TestCase;
 
@@ -91,7 +92,8 @@ class DashboardCatalogTest extends TestCase
             $config,
             $authorization,
             $this->createMock(ResourceConnection::class),
-            $users
+            $users,
+            $this->createMock(UserResource::class)
         );
     }
 }

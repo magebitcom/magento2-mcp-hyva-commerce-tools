@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Model\Content;
 
 use Magento\Framework\Exception\LocalizedException;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 /**
  * Applies a list of draft operations to a content document.
@@ -290,7 +291,7 @@ class DraftEditor
         if ($find === '') {
             throw new LocalizedException(__('"find" is required.'));
         }
-        $onlyFields = is_array($operation['fields'] ?? null) ? array_map('strval', $operation['fields']) : [];
+        $onlyFields = is_array($operation['fields'] ?? null) ? Cast::stringList($operation['fields']) : [];
         $count = 0;
         $document = $this->componentTree->mapNodes($document, function (array $node) use (
             $find,

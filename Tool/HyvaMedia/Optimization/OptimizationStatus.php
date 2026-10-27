@@ -80,7 +80,7 @@ class OptimizationStatus extends AbstractOptimizationTool
         $path = $this->editor->normalize($this->requireString($arguments, 'path'));
         $variants = $this->gateway->getVariants($path);
         $settings = $this->gateway->getConfigSummary();
-        $expected = Cast::array($settings['output_formats'] ?? []);
+        $expected = Cast::stringList($settings['output_formats'] ?? []);
         return $this->jsonResult([
             'path' => $path,
             'exists' => $this->fileInfo->exists($path),

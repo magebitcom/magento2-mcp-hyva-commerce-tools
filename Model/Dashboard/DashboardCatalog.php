@@ -21,6 +21,7 @@ use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\AuthorizationInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\User\Model\ResourceModel\User as UserResource;
 use Magento\User\Model\UserFactory;
 
 /**
@@ -53,6 +54,7 @@ class DashboardCatalog
      * @param AuthorizationInterface $authorization
      * @param ResourceConnection $resourceConnection
      * @param UserFactory $userFactory
+     * @param UserResource $userResource
      */
     public function __construct(
         private readonly ViewListProvider $viewListProvider,
@@ -63,7 +65,8 @@ class DashboardCatalog
         private readonly WidgetConfig $widgetConfig,
         private readonly AuthorizationInterface $authorization,
         private readonly ResourceConnection $resourceConnection,
-        private readonly UserFactory $userFactory
+        private readonly UserFactory $userFactory,
+        private readonly UserResource $userResource
     ) {
     }
 
@@ -172,7 +175,7 @@ class DashboardCatalog
     private function roleIds(int $adminId): array
     {
         $user = $this->userFactory->create();
-        $user->load($adminId);
+        $this->userResource->load($user, $adminId);
         return $user->getId() ? array_values(array_map('intval', $user->getRoles())) : [];
     }
 }

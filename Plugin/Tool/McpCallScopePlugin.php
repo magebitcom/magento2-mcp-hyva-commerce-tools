@@ -34,7 +34,7 @@ class McpCallScopePlugin
      * @return ToolResultInterface
      * @phpstan-param callable(array<string, mixed>): ToolResultInterface $proceed
      * @phpstan-param array<string, mixed> $arguments
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     * @SuppressWarnings("PHPMD.UnusedFormalParameter")
      */
     public function aroundExecute(ToolInterface $subject, callable $proceed, array $arguments): ToolResultInterface
     {

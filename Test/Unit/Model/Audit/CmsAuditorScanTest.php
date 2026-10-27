@@ -131,7 +131,8 @@ class CmsAuditorScanTest extends TestCase
         $this->assertSame(1, $restricted['counts'][ContentLocator::TYPE_PAGE]['total']);
         $this->assertSame(1, $restricted['counts'][ContentLocator::TYPE_BLOCK]['total']);
         $this->assertSame(['cms_page1', 'cms_block1'], array_values(array_unique(
-            array_column($restricted['issues'], 'identifier')
+            array_column($restricted['issues'], 'identifier'),
+            SORT_REGULAR
         )));
         $this->assertSame(2, $restricted['entities_hidden_by_permissions'] ?? null);
         $this->assertSame(1, $restricted['scheduling']['pending_items']);

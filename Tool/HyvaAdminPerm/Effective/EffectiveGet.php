@@ -19,6 +19,7 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Security\AdminScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magento\User\Model\ResourceModel\User as UserResource;
 use Magento\User\Model\UserFactory;
 
 class EffectiveGet extends AbstractTool
@@ -32,6 +33,7 @@ class EffectiveGet extends AbstractTool
      * @param AdminPermissionsGatewayInterface $permissions
      * @param AdminScopeGuard $scopeGuard
      * @param UserFactory $userFactory
+     * @param UserResource $userResource
      * @param CallerContext $callerContext
      */
     public function __construct(
@@ -39,6 +41,7 @@ class EffectiveGet extends AbstractTool
         private readonly AdminPermissionsGatewayInterface $permissions,
         private readonly AdminScopeGuard $scopeGuard,
         private readonly UserFactory $userFactory,
+        private readonly UserResource $userResource,
         private readonly CallerContext $callerContext
     ) {
     }
@@ -91,7 +94,7 @@ class EffectiveGet extends AbstractTool
         $userId = $this->intArg($arguments, 'user_id');
         $username = $this->stringArg($arguments, 'username');
         if ($userId !== null) {
-            $user->load($userId);
+            $this->userResource->load($user, $userId);
         } elseif ($username !== null) {
             $user->loadByUsername($username);
         } else {

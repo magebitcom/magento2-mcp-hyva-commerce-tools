@@ -37,7 +37,7 @@ class McpAdminUserIdPlugin
      * @param AdminUserIdResolverInterface $subject
      * @param int|null $result
      * @return int|null
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     * @SuppressWarnings("PHPMD.UnusedFormalParameter")
      */
     public function afterGetUserId(AdminUserIdResolverInterface $subject, ?int $result): ?int
     {

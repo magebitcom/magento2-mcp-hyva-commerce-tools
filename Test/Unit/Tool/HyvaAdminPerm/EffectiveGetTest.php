@@ -21,6 +21,7 @@ use Magebit\McpHyvaCommerceTools\Model\Security\AdminScopeGuard;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaAdminPerm\Effective\EffectiveGet;
 use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\User\Model\User;
+use Magento\User\Model\ResourceModel\User as UserResource;
 use Magento\User\Model\UserFactory;
 use PHPUnit\Framework\TestCase;
 
@@ -57,8 +58,7 @@ class EffectiveGetTest extends TestCase
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('getStatus')->willReturn(['enabled' => true]);
         $target = $this->createMock(User::class);
-        $target->method('load')->willReturnSelf();
-        $target->method('getId')->willReturn(6);
+                $target->method('getId')->willReturn(6);
         $users = $this->createMock(UserFactory::class);
         $users->method('create')->willReturn($target);
         $modules = $this->createMock(ModuleManager::class);
@@ -73,7 +73,8 @@ class EffectiveGetTest extends TestCase
         $context = new AuthenticatedContextProvider();
         $context->set(new AuthenticatedContext($this->createMock(TokenInterface::class), $caller));
         $caller = new CallerContext($context, $this->createMock(AclChecker::class));
-        return new EffectiveGet($features, $permissions, new AdminScopeGuard($modules, $scopes), $users, $caller);
+        return new EffectiveGet($features, $permissions, new AdminScopeGuard($modules, $scopes), $users,
+            $this->createMock(UserResource::class), $caller);
     }
 
     /**

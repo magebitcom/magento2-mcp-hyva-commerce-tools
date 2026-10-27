@@ -65,14 +65,17 @@ class MigrationStatus extends AbstractHealthWidget
         $waiting = 0;
         $rows = [];
         foreach ($legacy as $item) {
-            $complexity[$item['complexity']] = ($complexity[$item['complexity']] ?? 0) + 1;
-            $kinds[$item['kind']] = ($kinds[$item['kind']] ?? 0) + 1;
+            $itemComplexity = Cast::string($item['complexity']);
+            $itemKind = Cast::string($item['kind']);
+            $complexity[$itemComplexity] = ($complexity[$itemComplexity] ?? 0) + 1;
+            $kinds[$itemKind] = ($kinds[$itemKind] ?? 0) + 1;
             $waiting += $item['converted_draft_waiting'] ? 1 : 0;
         }
         foreach (array_slice($legacy, 0, $this->intProperty($widgetInstance, 'row_count', 8)) as $item) {
             $rows[] = $this->row(
-                $item['title'] . ' (' . $item['identifier'] . ')',
-                $item['entity_type'] . ' · ' . $item['kind'] . ' · ' . $item['element_count'] . ' elements',
+                Cast::string($item['title']) . ' (' . Cast::string($item['identifier']) . ')',
+                Cast::string($item['entity_type']) . ' · ' . Cast::string($item['kind']) . ' · '
+                    . Cast::string($item['element_count']) . ' elements',
                 $item['converted_draft_waiting'] ? 'draft ready' : Cast::string($item['complexity']),
                 $item['converted_draft_waiting'] ? 'success' : ($item['complexity'] === 'high' ? 'danger' : 'warning'),
                 $this->url->getUrl('liveview/editor/index', ['type' => $item['entity_type'], 'id' => $item['id']])

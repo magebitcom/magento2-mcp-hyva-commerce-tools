@@ -94,14 +94,21 @@ class TranslationScanner
     public function status(array $document, array $storeIds, int $sampleLimit = 50): array
     {
         $texts = $this->texts($document);
-        $stores = array_fill_keys($storeIds, ['translated' => 0, 'missing' => 0]);
+        /** @var array<int, array{translated: int, missing: int}> $stores */
+        $stores = [];
+        foreach ($storeIds as $storeId) {
+            $stores[$storeId] = ['translated' => 0, 'missing' => 0];
+        }
         $sample = [];
         foreach ($texts as $row) {
             $missing = [];
             foreach ($storeIds as $storeId) {
                 $done = trim($row['translations'][$storeId] ?? '') !== '';
-                $stores[$storeId][$done ? 'translated' : 'missing']++;
-                if (!$done) {
+                $current = $stores[$storeId] ?? ['translated' => 0, 'missing' => 0];
+                if ($done) {
+                    $stores[$storeId] = ['translated' => $current['translated'] + 1, 'missing' => $current['missing']];
+                } else {
+                    $stores[$storeId] = ['translated' => $current['translated'], 'missing' => $current['missing'] + 1];
                     $missing[] = $storeId;
                 }
             }

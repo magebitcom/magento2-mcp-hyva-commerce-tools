@@ -21,6 +21,7 @@ use Magento\Cms\Model\ResourceModel\Page\Collection as PageCollection;
 use Magento\Cms\Model\ResourceModel\Page\CollectionFactory as PageCollectionFactory;
 use Magento\Framework\Exception\AuthorizationException;
 use PHPUnit\Framework\TestCase;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 /**
  * The shared locator applies the caller's website/store view restriction (finding: scope not enforced on /mcp).
@@ -110,7 +111,7 @@ class ContentLocatorScopeTest extends TestCase
         $contentIndex = $this->createMock(ContentIndex::class);
         $contentIndex->expects($this->exactly(2))->method('getStoreIds')->willReturnCallback(
             fn (string $type, array $ids): array => $type === ContentLocator::TYPE_PAGE
-                ? $this->contentIndex()->getStoreIds($type, $ids)
+                ? $this->contentIndex()->getStoreIds($type, Cast::intList($ids))
                 : [7 => [1]]
         );
         $locator = $this->locator([1], [], $contentIndex);

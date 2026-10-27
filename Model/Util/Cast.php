@@ -72,6 +72,38 @@ class Cast
     }
 
     /**
+     * String keyed array.
+     *
+     * @param mixed $value
+     * @return array
+     * @phpstan-return array<string, mixed>
+     */
+    public static function stringKeyed(mixed $value): array
+    {
+        $result = [];
+        foreach (is_array($value) ? $value : [] as $key => $item) {
+            $result[(string) $key] = $item;
+        }
+        return $result;
+    }
+
+    /**
+     * String list.
+     *
+     * @param mixed $value
+     * @return array
+     * @phpstan-return list<string>
+     */
+    public static function stringList(mixed $value): array
+    {
+        $result = [];
+        foreach (is_array($value) ? $value : [] as $item) {
+            $result[] = Cast::string($item);
+        }
+        return $result;
+    }
+
+    /**
      * Int list.
      *
      * @param mixed $value

@@ -65,7 +65,8 @@ class MenuHealth extends AbstractHealthWidget
                 Cast::bool($menu['is_published'] ?? false) ? 'published' : 'draft'
             );
             foreach ($result['issues'] as $issue) {
-                $codes[$issue['code']] = ($codes[$issue['code']] ?? 0) + 1;
+                $code = Cast::string($issue['code']);
+                $codes[$code] = ($codes[$code] ?? 0) + 1;
             }
             $placements = array_column(
                 $this->menuService->getAssignments(Cast::string($menu['identifier'])),

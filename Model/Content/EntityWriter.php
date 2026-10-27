@@ -20,6 +20,7 @@ use Magento\Framework\App\State as AppState;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Model\AbstractModel;
 use Throwable;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 /**
  * Creates and updates the Magento side (cms_page / cms_block) of a Hyvä CMS entity.
@@ -188,7 +189,7 @@ class EntityWriter
                 throw new LocalizedException(__('page_layout cannot be empty; omit it to keep the current layout.'));
             }
             if ($name === 'store_ids') {
-                $ids = array_values(array_map('intval', is_array($value) ? $value : [$value]));
+                $ids = array_map(static fn ($id): int => Cast::int($id), is_array($value) ? array_values($value) : [$value]);
                 $entity->setData('store_id', $ids);
                 $entity->setData('stores', $ids);
             } elseif ($name === 'is_active') {

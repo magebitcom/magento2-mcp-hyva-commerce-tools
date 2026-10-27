@@ -32,6 +32,11 @@ use Throwable;
 
 /**
  * Menu-level operations shared by the hyva_menu.* tools, the menu audit and the menu health widget.
+ *
+ * @phpstan-type CategoryImportPlan array{tree: list<array<string, mixed>>, create: list<array<string, mixed>>,
+ *     skip_existing: list<array<string, mixed>>, inactive: list<array<string, mixed>>,
+ *     hidden: list<array<string, mixed>>, missing_url_rewrites: list<array<string, mixed>>,
+ *     duplicate_labels: list<string>}
  */
 class MenuService
 {
@@ -334,9 +339,7 @@ class MenuService
      * @param bool $includeHidden Categories with include_in_menu = No.
      * @return array
      * @phpstan-param array<string, mixed> $document
-     * @phpstan-return array{tree: list<array<string, mixed>>, create: list<array<string, mixed>>,
-     *     skip_existing: list<array<string, mixed>>, inactive: list<array<string, mixed>>, hidden: list<array<string,
-     *     mixed>>, missing_url_rewrites: list<array<string, mixed>>, duplicate_labels: list<string>}
+     * @phpstan-return CategoryImportPlan
      */
     public function planCategoryImport(
         array $document,
@@ -354,6 +357,7 @@ class MenuService
             }
         });
 
+        /** @var CategoryImportPlan $plan */
         $plan = [
             'tree' => [],
             'create' => [],
@@ -648,7 +652,7 @@ class MenuService
      * @return array
      * @phpstan-param list<array<string, mixed>> $nodes
      * @phpstan-param array<int, list<string>> $linked
-     * @phpstan-param array<string, mixed> $plan
+     * @phpstan-param CategoryImportPlan $plan
      * @phpstan-param list<string> $names
      * @phpstan-return list<array<string, mixed>>
      */

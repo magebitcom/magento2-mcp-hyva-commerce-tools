@@ -51,7 +51,7 @@ class MediaGalleryGateway implements MediaGalleryGatewayInterface
      * @param ScopeConfigInterface $scopeConfig
      * @param Filesystem $filesystem
      * @param LoggerInterface $logger
-     * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+     * @SuppressWarnings("PHPMD.CouplingBetweenObjects")
      */
     public function __construct(
         private readonly SearchAssetsList $searchAssetsList,
@@ -105,10 +105,10 @@ class MediaGalleryGateway implements MediaGalleryGatewayInterface
         if ($ids === []) {
             return [];
         }
-        return array_map(
+        return array_values(array_map(
             fn (AssetInterface $asset): array => $this->toRow($asset),
             $this->getAssetsByIds->execute($ids)
-        );
+        ));
     }
 
     /**
@@ -261,6 +261,7 @@ class MediaGalleryGateway implements MediaGalleryGatewayInterface
             is_array($configured) ? array_values($configured) : []
         )));
         $media = $this->filesystem->getDirectoryRead(DirectoryList::MEDIA);
+        /** @var list<string> $files */
         $files = [];
         $pending = $folders;
         while ($pending !== []) {
@@ -290,11 +291,11 @@ class MediaGalleryGateway implements MediaGalleryGatewayInterface
             }
         }
         $connection = $this->resourceConnection->getConnection();
-        $assetPaths = array_map(
+        $assetPaths = array_values(array_map(
             static fn ($path): string => Cast::string($path),
             $connection->fetchCol($connection->select()
                 ->from($this->resourceConnection->getTableName('media_gallery_asset'), ['path']))
-        );
+        ));
         $queue = [];
         $statusRows = $connection->fetchAll($connection->select()
             ->from(['m' => $this->resourceConnection->getTableName('queue_message')], [])

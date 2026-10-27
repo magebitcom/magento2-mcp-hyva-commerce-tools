@@ -119,7 +119,7 @@ class OptimizationPreviewPicture extends AbstractOptimizationTool
                 $imgAttributes[$attribute] = $value;
             }
         }
-        $preview = $this->gateway->previewPicture(array_values($images), $imgAttributes);
+        $preview = $this->gateway->previewPicture($images, $imgAttributes);
         return $this->jsonResult(
             [
                 'html' => $preview['html'],

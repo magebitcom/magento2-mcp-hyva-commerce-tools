@@ -17,6 +17,7 @@ use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 /**
  * `hyva_cms.migration.scan` MCP tool.
@@ -94,7 +95,7 @@ class MigrationScan extends AbstractContentTool
             'converted_drafts_waiting' => 0,
         ];
         foreach ($rows as $row) {
-            $summary[$row['kind']]++;
+            $summary[Cast::string($row['kind'])]++;
             $summary['converted_drafts_waiting'] += $row['converted_draft_waiting'] ? 1 : 0;
         }
         return $this->jsonResult([

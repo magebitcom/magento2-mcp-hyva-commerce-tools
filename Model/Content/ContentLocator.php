@@ -22,6 +22,7 @@ use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Model\AbstractModel;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 /**
  * Resolves a Hyvä CMS entity (cms_page, cms_block, menu) from tool arguments: `id`, or `identifier` + optional
@@ -408,7 +409,7 @@ class ContentLocator
         $menu = $this->menuGateway->get($id);
         $storeIds = [];
         foreach (is_array($menu['store_ids'] ?? null) ? $menu['store_ids'] : [] as $menuStoreId) {
-            $storeIds[] = (int) $menuStoreId;
+            $storeIds[] = Cast::int($menuStoreId);
         }
         return [
             'type' => self::TYPE_MENU,

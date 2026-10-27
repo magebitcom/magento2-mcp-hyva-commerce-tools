@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Model\Form\FormRules;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Delivery\DeliveryAudit;
 use PHPUnit\Framework\TestCase;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 /**
  * hyva_form.delivery.audit without a form audits only the forms of the caller's store views.
@@ -131,7 +132,10 @@ class DeliveryAuditScopeTest extends TestCase
     {
         $forms = $payload['forms'];
         $this->assertIsArray($forms);
-        return array_values(array_filter($forms, 'is_array'));
+        return array_values(array_map(
+            static fn (array $form): array => Cast::stringKeyed($form),
+            array_filter($forms, 'is_array')
+        ));
     }
 
     /**

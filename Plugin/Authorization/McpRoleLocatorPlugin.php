@@ -40,7 +40,7 @@ class McpRoleLocatorPlugin
      * @param RoleLocatorInterface $subject
      * @param mixed $result Role id; the default frontend locator returns ''.
      * @return mixed
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     * @SuppressWarnings("PHPMD.UnusedFormalParameter")
      */
     public function afterGetAclRoleId(RoleLocatorInterface $subject, mixed $result): mixed
     {

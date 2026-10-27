@@ -180,14 +180,12 @@ class ContentScopeFilter
         if (!$this->isRestricted()) {
             return ['visible' => $rows, 'hidden' => 0];
         }
-        $visible = [];
-        foreach ($rows as $row) {
+        $visible = array_values(array_filter($rows, function (array $row) use ($storeIdsKey): bool {
             $storeIds = $row[$storeIdsKey] ?? [];
-            $storeIds = Cast::intList(is_string($storeIds) ? explode(',', $storeIds) : $storeIds);
-            if ($this->storeScopeGuard->allowsRead($storeIds)) {
-                $visible[] = $row;
-            }
-        }
+            return $this->storeScopeGuard->allowsRead(
+                Cast::intList(is_string($storeIds) ? explode(',', $storeIds) : $storeIds)
+            );
+        }));
         return ['visible' => $visible, 'hidden' => count($rows) - count($visible)];
     }
 
@@ -357,7 +355,7 @@ class ContentScopeFilter
         $list = [];
         foreach (is_array($value) ? $value : [] as $item) {
             if (is_array($item)) {
-                $list[] = $item;
+                $list[] = Cast::stringKeyed($item);
             }
         }
         return $list;

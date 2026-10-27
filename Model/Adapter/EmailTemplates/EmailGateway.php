@@ -26,6 +26,7 @@ use Hyva\EmailTemplates\Model\TemplateLoader;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\EmailGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Hyva\EmailTemplates\Api\ConfigInterface as HyvaEmailConfig;
+use Magento\Email\Model\ResourceModel\Template as EmailResource;
 use Magento\Email\Model\ResourceModel\Template\CollectionFactory as EmailCollectionFactory;
 use Magento\Email\Model\Template as EmailTemplate;
 use Magento\Framework\App\Area;
@@ -66,12 +67,13 @@ class EmailGateway implements EmailGatewayInterface
      * @param NewsletterCollectionFactory $newsletterCollectionFactory
      * @param NewsletterTemplateFactory $newsletterTemplateFactory
      * @param NewsletterResource $newsletterResource
+     * @param EmailResource $emailResource
      * @param TransportBuilder $transportBuilder
      * @param ResourceConnection $resourceConnection
      * @param StoreManagerInterface $storeManager
      * @param SearchCriteriaBuilder $searchCriteriaBuilder
-     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
-     * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+     * @SuppressWarnings("PHPMD.ExcessiveParameterList")
+     * @SuppressWarnings("PHPMD.CouplingBetweenObjects")
      */
     public function __construct(
         private readonly OptionalServiceFactory $optionalServices,
@@ -79,6 +81,7 @@ class EmailGateway implements EmailGatewayInterface
         private readonly NewsletterCollectionFactory $newsletterCollectionFactory,
         private readonly NewsletterTemplateFactory $newsletterTemplateFactory,
         private readonly NewsletterResource $newsletterResource,
+        private readonly EmailResource $emailResource,
         private readonly TransportBuilder $transportBuilder,
         private readonly ResourceConnection $resourceConnection,
         private readonly StoreManagerInterface $storeManager,
@@ -105,7 +108,7 @@ class EmailGateway implements EmailGatewayInterface
         $total = $collection->getSize();
         $collection->setPageSize(max(1, min(200, $pageSize)))->setCurPage(max(1, $page));
         $assigned = $type === self::TYPE_EMAIL ? $this->assignments() : [];
-        $this->prefetchRecords($type, array_map('intval', $collection->getColumnValues('template_id')));
+        $this->prefetchRecords($type, array_map('intval', array_values($collection->getColumnValues('template_id'))));
         $items = [];
         foreach ($collection as $template) {
             if ($template instanceof AbstractModel) {
@@ -265,7 +268,9 @@ class EmailGateway implements EmailGatewayInterface
             }
         }
         if ($changed !== []) {
-            $template->save();
+            $type === self::TYPE_NEWSLETTER
+                ? $this->newsletterResource->save($template)
+                : $this->emailResource->save($template);
         }
         if (array_key_exists('preheader', $settings)) {
             $record = $this->hyvaRecord($type, $id);

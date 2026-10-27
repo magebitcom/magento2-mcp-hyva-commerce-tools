@@ -50,6 +50,9 @@ class CmsAuditorTest extends TestCase
 
         $counts = $this->auditor()->countRows($rows);
 
+        $nonZero = array_filter($counts['status']);
+        ksort($nonZero);
+
         $this->assertSame(6, $counts['total']);
         $this->assertSame([
             ContentIndex::STATUS_PUBLISHED => 1,
@@ -59,8 +62,6 @@ class CmsAuditorTest extends TestCase
         ], $counts['status']);
         $perRow = array_count_values(array_column($rows, 'status'));
         ksort($perRow);
-        $nonZero = array_filter($counts['status']);
-        ksort($nonZero);
         $this->assertSame($perRow, $nonZero, 'status buckets equal the per-row status of page.list');
         $this->assertSame(['hyva_cms' => 3, 'magento' => 3], $counts['rendered_by']);
         $this->assertSame(2, $counts['legacy']['total']);

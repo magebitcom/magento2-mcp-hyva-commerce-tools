@@ -44,7 +44,7 @@ class WidgetInstanceCacheTagPlugin
      * @return array
      * @phpstan-param array<mixed> $tags
      * @phpstan-return array{0: mixed, 1: mixed, 2: array<mixed>, 3: mixed}
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
+     * @SuppressWarnings("PHPMD.UnusedFormalParameter")
      */
     public function beforeSave(
         AdminDashboard $subject,
