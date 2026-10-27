@@ -4,7 +4,7 @@
 - Constructors name only hard requirements (Hyvä CMS 1.3 incl. Media Gallery, Admin Dashboard); optional Hyvä services come from that factory.
 - `Model/Auth/CallerContext` is the one adapter over the core's non-API caller classes; a public core API is proposed upstream.
 - `hyva_ai.*` is monitoring only and `hyva_admin_perm.*` read only, by design; no generation or permission writes through MCP.
-- Not covered on purpose (README "Not covered"): Image Editor, Admin Theme, Commerce Module, CMS Google Maps, Tailwind JIT bridge, AI providers.
+- Not covered on purpose (README "Not covered"): Image Editor, Admin Theme, Commerce Module, CMS Google Maps.
 - Tools with `entity_type` are listed for any Hyvä CMS role and refused per call (`-32004`): `tools/list` has no arguments to decide on.
 - Store scope: menus and forms are scoped by their store views although the Hyvä admin does not scope them; stricter on purpose.
 - Store scope: email/newsletter templates, linked groups and category positions have no store view; restricted roles read them, never write.
