@@ -66,7 +66,7 @@ class ScheduleServiceTest extends TestCase
 
         $items = $service->getItems(['status' => 'any', 'limit' => 2]);
 
-        $this->assertSame(['r.time_scheduled DESC', 'i.id DESC'], $orders);
+        $this->assertSame(['r.time_scheduled DESC', 'r.id DESC', 'i.id DESC'], $orders);
         $this->assertSame([2], $limits);
         $this->assertSame([2, 3], array_column($items, 'item_id'));
     }

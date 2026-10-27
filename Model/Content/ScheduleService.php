@@ -107,10 +107,10 @@ class ScheduleService
             );
         $limit = $filters['limit'] ?? null;
         if ($limit !== null && $limit > 0) {
-            $select->order(['r.time_scheduled DESC', 'i.id DESC'])->limit($limit);
+            $select->order(['r.time_scheduled DESC', 'r.id DESC', 'i.id DESC'])->limit($limit);
         } else {
             $limit = null;
-            $select->order(['r.time_scheduled ASC', 'i.id ASC']);
+            $select->order(['r.time_scheduled ASC', 'r.id ASC', 'i.id ASC']);
         }
 
         $status = $filters['status'] ?? 'pending';
