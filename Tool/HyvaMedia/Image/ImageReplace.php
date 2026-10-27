@@ -125,7 +125,7 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
         }
         if ($targets['editable'] === []) {
             return $this->softError(
-                $outOfScope !== []
+                isset($outOfScope['skipped_out_of_scope'])
                     ? sprintf('"%s" is used only in %s Hyvä content outside your role\'s store views.', $old, $scope)
                     : sprintf('"%s" is not used in any %s Hyvä content.', $old, $scope),
                 ['not_editable_usages' => $targets['not_editable']] + $outOfScope

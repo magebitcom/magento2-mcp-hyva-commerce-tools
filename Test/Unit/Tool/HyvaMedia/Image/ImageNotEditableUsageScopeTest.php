@@ -78,6 +78,7 @@ class ImageNotEditableUsageScopeTest extends TestCase
         ));
 
         $this->assertSame([5], array_column($this->listOf($payload, 'not_editable_usages'), 'id'));
+        $this->assertSame('"wysiwyg/old.jpg" is not used in any cms_page Hyvä content.', $payload['error'] ?? null);
     }
 
     public function testTheAltUpdateDropsOutOfScopeUsagesWithAndWithoutTargets(): void
