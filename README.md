@@ -148,7 +148,7 @@ Hyvä Commerce 1.4.0 (`hyva-themes/commerce` 1.4.0) and what this module offers 
 
 | Module (version) | Tools | Notes |
 |---|---|---|
-| Hyvä CMS 1.3.1 (Liveview editor, Connect, Admin Styles) | `hyva_cms.*` (27) | Pages, blocks, drafts, versions, scheduling, components, export/import, PageBuilder migration, preview, `permission.check`; per-type verbs from `ContentTypeAuthorization` |
+| Hyvä CMS 1.3.1 (Liveview editor, Connect, Admin Styles) | `hyva_cms.*` (27, without `translation.*` and `tailwind.status`) | Pages, blocks, drafts, versions, scheduling, components, export/import, PageBuilder migration, preview, `permission.check`; per-type verbs from `ContentTypeAuthorization` |
 | CMS AI Translations 1.0.2 | `hyva_cms.translation.*` (2) | Status per store view; run returns proposals and can write the draft, never publishes |
 | Menu Builder 1.1.0 | `hyva_menu.*` (20) | Includes publish, versions and schedules (1.1 per-verb permissions) |
 | Media Gallery 1.0.0 | `hyva_media.asset.*`, `trash.*`, `folder.create`, `sync.status`, `audit.literal_urls` (9) | Asset ids in content (`imageOptions.id`), move, trash/restore, sync drift, literal-URL audit |
@@ -159,7 +159,9 @@ Hyvä Commerce 1.4.0 (`hyva-themes/commerce` 1.4.0) and what this module offers 
 | Store Credit 1.0.1 | `hyva_store_credit.*` (5) | Balances, history, credit/debit with preview and idempotency key. Its GraphQL API is for shoppers and has no admin use here |
 | Linked Products 1.0.0 | `hyva_linked.*` (4) | Groups, validation with storefront warnings, save with page cache refresh |
 | Category Merchandiser 1.0.0 | `hyva_merch.category.*` (2) | Reorder only. The Enterprise package is not installed. Reports when another module (ElasticSuite) owns storefront sorting |
-| AI Worker 1.0.0 and AI Worker CMS 1.0.0 | `hyva_ai.*` (5) | Monitoring only (status, jobs, usage, errors); AI Worker CMS jobs show in `hyva_ai.job.list`. No generation by design |
+| AI Worker 1.0.0 and AI Worker CMS 1.0.0 | `hyva_ai.*` (5, without `provider.status`) | Monitoring only (status, jobs, usage, errors); AI Worker CMS jobs show in `hyva_ai.job.list`. No generation by design |
+| AI providers 1.3.0 (`magento2-module-ai` 1.3.1 with the Anthropic, DeepL, Gemini and OpenAI modules) | `hyva_ai.provider.status` (1) | Which providers are configured and their models, plus whether CMS AI Translation is ready to run. API keys are never read or shown |
+| CMS Tailwind compiler 1.0.x and JIT bridge 1.0.3 | `hyva_cms.tailwind.status` (1) | Compiler daemon health, daemon management, compilation strategy and compiler version, with a hint when new CMS content is not being compiled. Read only: no start, stop or restart |
 | Advanced Admin Permissions 1.0.0 | `hyva_admin_perm.*` (2) | Read only (effective permissions, audit log). Scope restrictions are applied by the module itself, see [Store scope](#safety-model) |
 | Admin Dashboard 2.0.3 (+ API 3.0.1, CMS widgets, CrUX history widget) | `hyva_dashboard.*` (3) + [widgets](#dashboard-widgets) | Views and widget types as the caller sees them; MCP activity and content health widgets |
 | Audits | `hyva_commerce.audit.*` (4) | `audit.overview` adds one health line per 1.4 module |
@@ -172,8 +174,6 @@ Not covered, on purpose:
 | Commerce Module 1.0.6 | Shared base and branding fixes (logo); no data of its own |
 | Image Editor 1.1.0 | Interactive in-browser editor; its saved edits show in `hyva_media.image.get` |
 | CMS Google Maps 1.0.0 | Only a CMS component; listed and validated by `hyva_cms.component.list` / `schema` / `validate` |
-| CMS Tailwind JIT bridge 1.0.3 | Build plumbing for CMS styles; its daemon status is a dashboard widget |
-| AI providers 1.3.0 (`magento2-ai-providers`: `magento2-module-ai` 1.3.1 with the Anthropic, DeepL, Gemini and OpenAI modules) | Provider credentials and model settings in the store configuration, no content of their own; the models they serve are used by `hyva_cms.translation.run`, and AI Worker usage and errors are covered by `hyva_ai.*` |
 
 ## Tool catalog
 
@@ -206,6 +206,7 @@ Not covered, on purpose:
 | `hyva_cms.schedule.create` | write | `Hyva_Cms::cms` | entity_type → schedule_save (+ version_history with version_id) | Schedule Hyvä CMS Content |
 | `hyva_cms.schedule.detect_conflicts` | read | `Hyva_Cms::cms` | entity_type → scheduling | Detect Hyvä CMS Schedule Conflicts |
 | `hyva_cms.schedule.list` | read | `Hyva_Cms::cms` | entity_type → scheduling | List Hyvä CMS Schedules |
+| `hyva_cms.tailwind.status` | read | `Magento_Config::config_system` |  | Hyvä CMS Tailwind Status (compiler daemon health, strategy; hint when classes are not compiled) |
 | `hyva_cms.translation.run` | write | `Hyva_Cms::cms` | entity_type → view + `Hyva_CmsAiTranslations::translate` | Run Hyvä CMS AI Translation |
 | `hyva_cms.translation.status` | read | `Hyva_Cms::cms` | entity_type → view | Hyvä CMS Translation Status |
 | `hyva_cms.version.list` | read | `Hyva_Cms::cms` | entity_type → version_history | List Hyvä CMS Versions |
@@ -267,79 +268,80 @@ Not covered, on purpose:
 
 ### Hyvä Form Builder
 
-| Tool | Mode | Listed with | Checked per call (Hyvä verb) | What it does |
-|---|---|---|---|---|
-| `hyva_form.delivery.audit` | read | `Hyva_FormBuilder::form_view` |  | Audit Hyvä Form Delivery |
-| `hyva_form.form.create` | write | `Hyva_FormBuilder::form_save` |  | Create Hyvä Form |
-| `hyva_form.form.get` | read | `Hyva_FormBuilder::form_view` |  | Get Hyvä Form |
-| `hyva_form.form.list` | read | `Hyva_FormBuilder::form_view` |  | List Hyvä Forms |
-| `hyva_form.form.publish` | write | `Hyva_FormBuilder::form_publish` |  | Publish Hyvä Form |
-| `hyva_form.form.update_draft` | write | `Hyva_FormBuilder::form_save` |  | Update Hyvä Form Draft |
-| `hyva_form.form.validate` | read | `Hyva_FormBuilder::form_view` |  | Validate Hyvä Form |
-| `hyva_form.version.list` | read | `Hyva_FormBuilder::form_version_history` |  | List Hyvä Form Versions |
-| `hyva_form.version.restore` | write | `Hyva_FormBuilder::form_save` |  | Restore Hyvä Form Version |
+| Tool | Mode | Listed with | What it does |
+|---|---|---|---|
+| `hyva_form.delivery.audit` | read | `Hyva_FormBuilder::form_view` | Audit Hyvä Form Delivery |
+| `hyva_form.form.create` | write | `Hyva_FormBuilder::form_save` | Create Hyvä Form |
+| `hyva_form.form.get` | read | `Hyva_FormBuilder::form_view` | Get Hyvä Form |
+| `hyva_form.form.list` | read | `Hyva_FormBuilder::form_view` | List Hyvä Forms |
+| `hyva_form.form.publish` | write | `Hyva_FormBuilder::form_publish` | Publish Hyvä Form |
+| `hyva_form.form.update_draft` | write | `Hyva_FormBuilder::form_save` | Update Hyvä Form Draft |
+| `hyva_form.form.validate` | read | `Hyva_FormBuilder::form_view` | Validate Hyvä Form |
+| `hyva_form.version.list` | read | `Hyva_FormBuilder::form_version_history` | List Hyvä Form Versions |
+| `hyva_form.version.restore` | write | `Hyva_FormBuilder::form_save` | Restore Hyvä Form Version |
 
 ### Hyvä Email & Newsletter Templates
 
-| Tool | Mode | Listed with | Checked per call (Hyvä verb) | What it does |
-|---|---|---|---|---|
-| `hyva_email.audit.coverage` | read | `Hyva_EmailTemplates::email_template_view` |  | Audit Hyvä Email Coverage |
-| `hyva_email.newsletter.create_draft` | write | `Hyva_EmailTemplates::newsletter_template_save` |  | Create Hyvä Newsletter Template |
-| `hyva_email.newsletter.get` | read | `Hyva_EmailTemplates::newsletter_template_view` |  | Get Hyvä Newsletter Template |
-| `hyva_email.newsletter.list` | read | `Hyva_EmailTemplates::newsletter_template_view` |  | List Hyvä Newsletter Templates |
-| `hyva_email.newsletter.preview` | read | `Hyva_EmailTemplates::newsletter_template_view` |  | Preview Hyvä Newsletter Template |
-| `hyva_email.newsletter.publish` | write | `Hyva_EmailTemplates::newsletter_template_publish` |  | Publish Hyvä Newsletter Template |
-| `hyva_email.newsletter.update_draft` | write | `Hyva_EmailTemplates::newsletter_template_save` |  | Update Hyvä Newsletter Template Draft |
-| `hyva_email.template.create_draft` | write | `Hyva_EmailTemplates::email_template_save` |  | Create Hyvä Email Template |
-| `hyva_email.template.get` | read | `Hyva_EmailTemplates::email_template_view` |  | Get Hyvä Email Template |
-| `hyva_email.template.list` | read | `Hyva_EmailTemplates::email_template_view` |  | List Hyvä Email Templates |
-| `hyva_email.template.preview` | read | `Hyva_EmailTemplates::email_template_view` |  | Preview Hyvä Email Template |
-| `hyva_email.template.publish` | write | `Hyva_EmailTemplates::email_template_publish` |  | Publish Hyvä Email Template |
-| `hyva_email.template.send_test` | write | `Hyva_EmailTemplates::email_template_view` |  | Send Hyvä Email Template Test |
-| `hyva_email.template.update_draft` | write | `Hyva_EmailTemplates::email_template_save` |  | Update Hyvä Email Template Draft |
+| Tool | Mode | Listed with | What it does |
+|---|---|---|---|
+| `hyva_email.audit.coverage` | read | `Hyva_EmailTemplates::email_template_view` | Audit Hyvä Email Coverage |
+| `hyva_email.newsletter.create_draft` | write | `Hyva_EmailTemplates::newsletter_template_save` | Create Hyvä Newsletter Template |
+| `hyva_email.newsletter.get` | read | `Hyva_EmailTemplates::newsletter_template_view` | Get Hyvä Newsletter Template |
+| `hyva_email.newsletter.list` | read | `Hyva_EmailTemplates::newsletter_template_view` | List Hyvä Newsletter Templates |
+| `hyva_email.newsletter.preview` | read | `Hyva_EmailTemplates::newsletter_template_view` | Preview Hyvä Newsletter Template |
+| `hyva_email.newsletter.publish` | write | `Hyva_EmailTemplates::newsletter_template_publish` | Publish Hyvä Newsletter Template |
+| `hyva_email.newsletter.update_draft` | write | `Hyva_EmailTemplates::newsletter_template_save` | Update Hyvä Newsletter Template Draft |
+| `hyva_email.template.create_draft` | write | `Hyva_EmailTemplates::email_template_save` | Create Hyvä Email Template |
+| `hyva_email.template.get` | read | `Hyva_EmailTemplates::email_template_view` | Get Hyvä Email Template |
+| `hyva_email.template.list` | read | `Hyva_EmailTemplates::email_template_view` | List Hyvä Email Templates |
+| `hyva_email.template.preview` | read | `Hyva_EmailTemplates::email_template_view` | Preview Hyvä Email Template |
+| `hyva_email.template.publish` | write | `Hyva_EmailTemplates::email_template_publish` | Publish Hyvä Email Template |
+| `hyva_email.template.send_test` | write | `Hyva_EmailTemplates::email_template_view` | Send Hyvä Email Template Test |
+| `hyva_email.template.update_draft` | write | `Hyva_EmailTemplates::email_template_save` | Update Hyvä Email Template Draft |
 
 ### Hyvä Store Credit
 
-| Tool | Mode | Listed with | Checked per call (Hyvä verb) | What it does |
-|---|---|---|---|---|
-| `hyva_store_credit.balance.credit` | write | `Hyva_StoreCredit::balance_adjust` |  | Credit Store Credit |
-| `hyva_store_credit.balance.debit` | write | `Hyva_StoreCredit::balance_adjust` |  | Debit Store Credit |
-| `hyva_store_credit.balance.get` | read | `Hyva_StoreCredit::balance_view` |  | Get Store Credit Balance |
-| `hyva_store_credit.history.list` | read | `Hyva_StoreCredit::balance_view` |  | List Store Credit History |
-| `hyva_store_credit.status` | read | `Hyva_StoreCredit::balance_view` |  | Hyvä Store Credit Status |
+| Tool | Mode | Listed with | What it does |
+|---|---|---|---|
+| `hyva_store_credit.balance.credit` | write | `Hyva_StoreCredit::balance_adjust` | Credit Store Credit |
+| `hyva_store_credit.balance.debit` | write | `Hyva_StoreCredit::balance_adjust` | Debit Store Credit |
+| `hyva_store_credit.balance.get` | read | `Hyva_StoreCredit::balance_view` | Get Store Credit Balance |
+| `hyva_store_credit.history.list` | read | `Hyva_StoreCredit::balance_view` | List Store Credit History |
+| `hyva_store_credit.status` | read | `Hyva_StoreCredit::balance_view` | Hyvä Store Credit Status |
 
 ### Hyvä Linked Products
 
-| Tool | Mode | Listed with | Checked per call (Hyvä verb) | What it does |
-|---|---|---|---|---|
-| `hyva_linked.group.get` | read | `Hyva_LinkedProducts::group_view` |  | Get Linked Product Group |
-| `hyva_linked.group.list` | read | `Hyva_LinkedProducts::group_view` |  | List Linked Product Groups |
-| `hyva_linked.group.save` | write | `Hyva_LinkedProducts::group_save` |  | Save Linked Product Group |
-| `hyva_linked.group.validate` | read | `Hyva_LinkedProducts::group_view` |  | Validate Linked Product Group |
+| Tool | Mode | Listed with | What it does |
+|---|---|---|---|
+| `hyva_linked.group.get` | read | `Hyva_LinkedProducts::group_view` | Get Linked Product Group |
+| `hyva_linked.group.list` | read | `Hyva_LinkedProducts::group_view` | List Linked Product Groups |
+| `hyva_linked.group.save` | write | `Hyva_LinkedProducts::group_save` | Save Linked Product Group |
+| `hyva_linked.group.validate` | read | `Hyva_LinkedProducts::group_view` | Validate Linked Product Group |
 
 ### Hyvä Category Merchandiser
 
-| Tool | Mode | Listed with | Checked per call (Hyvä verb) | What it does |
-|---|---|---|---|---|
-| `hyva_merch.category.positions_get` | read | `Magento_Catalog::categories` |  | Get Category Product Order |
-| `hyva_merch.category.positions_set` | write | `Magento_Catalog::categories` |  | Reorder Category Products |
+| Tool | Mode | Listed with | What it does |
+|---|---|---|---|
+| `hyva_merch.category.positions_get` | read | `Magento_Catalog::categories` | Get Category Product Order |
+| `hyva_merch.category.positions_set` | write | `Magento_Catalog::categories` | Reorder Category Products |
 
-### Hyvä AI Worker (monitoring)
+### Hyvä AI (monitoring)
 
-| Tool | Mode | Listed with | Checked per call (Hyvä verb) | What it does |
-|---|---|---|---|---|
-| `hyva_ai.error.list` | read | `Hyva_AiWorker::jobs` |  | List Hyvä AI Worker Errors |
-| `hyva_ai.job.get` | read | `Hyva_AiWorker::manage` |  | Get Hyvä AI Worker Job |
-| `hyva_ai.job.list` | read | `Hyva_AiWorker::manage` |  | List Hyvä AI Worker Jobs |
-| `hyva_ai.usage.summary` | read | `Hyva_AiWorker::jobs` |  | Hyvä AI Worker Token Usage |
-| `hyva_ai.worker.status` | read | `Hyva_AiWorker::config` |  | Hyvä AI Worker Status |
+| Tool | Mode | Listed with | What it does |
+|---|---|---|---|
+| `hyva_ai.error.list` | read | `Hyva_AiWorker::jobs` | List Hyvä AI Worker Errors |
+| `hyva_ai.job.get` | read | `Hyva_AiWorker::manage` | Get Hyvä AI Worker Job |
+| `hyva_ai.job.list` | read | `Hyva_AiWorker::manage` | List Hyvä AI Worker Jobs |
+| `hyva_ai.provider.status` | read | `Hyva_Ai::config` | Hyvä AI Provider Status (providers configured or not, CMS translation readiness; API keys never shown) |
+| `hyva_ai.usage.summary` | read | `Hyva_AiWorker::jobs` | Hyvä AI Worker Token Usage |
+| `hyva_ai.worker.status` | read | `Hyva_AiWorker::config` | Hyvä AI Worker Status |
 
 ### Hyvä Advanced Admin Permissions (read only)
 
-| Tool | Mode | Listed with | Checked per call (Hyvä verb) | What it does |
-|---|---|---|---|---|
-| `hyva_admin_perm.audit.list` | read | `Hyva_AdvancedAdminPermissions::audit` |  | List Admin Role Assignment Audit |
-| `hyva_admin_perm.effective.get` | read | `Magento_User::acl_users` |  | Get Effective Admin Permissions |
+| Tool | Mode | Listed with | What it does |
+|---|---|---|---|
+| `hyva_admin_perm.audit.list` | read | `Hyva_AdvancedAdminPermissions::audit` | List Admin Role Assignment Audit |
+| `hyva_admin_perm.effective.get` | read | `Magento_User::acl_users` | Get Effective Admin Permissions |
 
 ### Audits and dashboard
 
@@ -437,3 +439,11 @@ constructors, mirroring the core's `Pagination::maxPageSize()`) and a few string
 ## License
 
 Released under the [MIT License](LICENSE).
+
+---
+
+![Magebit](https://github.com/user-attachments/assets/cdc904ce-e839-40a0-a86f-792f7ab7961f)
+
+Magebit - Full-service e-commerce agency
+
+[magebit.com](https://magebit.com)

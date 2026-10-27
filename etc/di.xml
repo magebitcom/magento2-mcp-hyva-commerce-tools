@@ -1,0 +1,478 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * @author    Magebit <info@magebit.com>
+ * @copyright Copyright (c) Magebit, Ltd. (https://magebit.com)
+ * @license   MIT
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <preference for="Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Feature\FeatureChecker"/>
+
+    <!-- Optional Hyvä modules: the Proxy defers building the real gateway (and its Hyvä dependencies)
+         until a tool has confirmed the feature is available. -->
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\MenuBuilder\MenuGateway\Proxy"/>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\MediaOptimizationGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\MediaOptimization\MediaOptimizationGateway\Proxy"/>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\FormGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\FormBuilder\FormGateway\Proxy"/>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\EmailGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\EmailTemplates\EmailGateway\Proxy"/>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\MediaGalleryGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\MediaGallery\MediaGalleryGateway\Proxy"/>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\StoreCreditGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\StoreCredit\StoreCreditGateway\Proxy"/>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\LinkedProductsGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\LinkedProducts\LinkedProductsGateway\Proxy"/>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\TranslationGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\AiTranslations\TranslationGateway\Proxy"/>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\AiWorkerGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\AiWorker\AiWorkerGateway\Proxy"/>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\CmsTailwindGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\CmsTailwind\CmsTailwindGateway\Proxy"/>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\AiProviderGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\AiProviders\AiProviderGateway\Proxy"/>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\AdminPermissionsGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\AdminPermissions\AdminPermissionsGateway\Proxy"/>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\AdminScopeGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\AdminPermissions\AdminScopeGateway\Proxy"/>
+
+    <type name="Magebit\McpHyvaCommerceTools\Model\Feature\FeatureChecker">
+        <arguments>
+            <argument name="features" xsi:type="array">
+                <item name="cms" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä CMS</item>
+                    <item name="package" xsi:type="string">hyva-themes/commerce-module-cms</item>
+                    <item name="acl" xsi:type="string">Hyva_Cms::cms</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="liveview" xsi:type="string">Hyva_CmsLiveviewEditor</item>
+                        <item name="magento" xsi:type="string">Hyva_CmsMagento</item>
+                        <item name="scheduling" xsi:type="string">Hyva_CmsScheduling</item>
+                    </item>
+                </item>
+                <item name="menu_builder" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä Menu Builder</item>
+                    <item name="package" xsi:type="string">hyva-themes/commerce-module-menu-builder</item>
+                    <item name="acl" xsi:type="string">Hyva_MenuBuilder::menu_view</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="menu_builder" xsi:type="string">Hyva_MenuBuilder</item>
+                    </item>
+                </item>
+                <item name="media_optimization" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä Media Optimization</item>
+                    <item name="package" xsi:type="string">hyva-themes/commerce-module-media-optimization</item>
+                    <item name="acl" xsi:type="string">Hyva_MediaGallery::asset_view</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="media_optimization" xsi:type="string">Hyva_MediaOptimization</item>
+                    </item>
+                </item>
+                <item name="image_editor" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä Image Editor</item>
+                    <item name="package" xsi:type="string">hyva-themes/commerce-module-image-editor</item>
+                    <item name="acl" xsi:type="string">Hyva_ImageEditor::image_save</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="image_editor" xsi:type="string">Hyva_ImageEditor</item>
+                    </item>
+                </item>
+                <item name="admin_dashboard" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä Admin Dashboard</item>
+                    <item name="package" xsi:type="string">hyva-themes/commerce-module-admin-dashboard</item>
+                    <item name="acl" xsi:type="string">Hyva_AdminDashboardFramework::dashboard</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="api" xsi:type="string">Hyva_AdminDashboardApi</item>
+                        <item name="framework" xsi:type="string">Hyva_AdminDashboardFramework</item>
+                    </item>
+                </item>
+                <item name="media_gallery" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä Media Gallery</item>
+                    <item name="package" xsi:type="string">hyva-themes/commerce-module-media-gallery</item>
+                    <item name="acl" xsi:type="string">Hyva_MediaGallery::asset_view</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="media_gallery" xsi:type="string">Hyva_MediaGallery</item>
+                    </item>
+                </item>
+                <item name="form_builder" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä Form Builder</item>
+                    <item name="package" xsi:type="string">hyva-themes/commerce-module-form-builder</item>
+                    <item name="acl" xsi:type="string">Hyva_FormBuilder::form_view</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="form_builder" xsi:type="string">Hyva_FormBuilder</item>
+                    </item>
+                </item>
+                <item name="email_templates" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä Email &amp; Newsletter Templates</item>
+                    <item name="package" xsi:type="string">hyva-themes/commerce-module-email-templates</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="email_templates" xsi:type="string">Hyva_EmailTemplates</item>
+                    </item>
+                </item>
+                <item name="store_credit" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä Store Credit</item>
+                    <item name="package" xsi:type="string">hyva-themes/commerce-module-store-credit</item>
+                    <item name="acl" xsi:type="string">Hyva_StoreCredit::balance_view</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="store_credit" xsi:type="string">Hyva_StoreCredit</item>
+                    </item>
+                </item>
+                <item name="linked_products" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä Linked Products</item>
+                    <item name="package" xsi:type="string">hyva-themes/commerce-module-linked-products</item>
+                    <item name="acl" xsi:type="string">Hyva_LinkedProducts::group_view</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="linked_products" xsi:type="string">Hyva_LinkedProducts</item>
+                    </item>
+                </item>
+                <item name="category_merchandiser" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä Category Merchandiser</item>
+                    <item name="package" xsi:type="string">hyva-themes/commerce-module-category-merchandiser</item>
+                    <item name="acl" xsi:type="string">Magento_Catalog::categories</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="category_merchandiser" xsi:type="string">Hyva_CategoryMerchandiser</item>
+                    </item>
+                </item>
+                <item name="ai_worker" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä AI Worker</item>
+                    <item name="package" xsi:type="string">hyva-themes/commerce-module-ai-worker</item>
+                    <item name="acl" xsi:type="string">Hyva_AiWorker::jobs</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="ai_worker" xsi:type="string">Hyva_AiWorker</item>
+                    </item>
+                </item>
+                <item name="cms_ai_translations" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä CMS AI Translations</item>
+                    <item name="package" xsi:type="string">hyva-themes/commerce-module-cms-ai-translations</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="cms_ai_translations" xsi:type="string">Hyva_CmsAiTranslations</item>
+                    </item>
+                </item>
+                <item name="cms_tailwind" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä CMS Tailwind Compiler</item>
+                    <item name="package" xsi:type="string">hyva-themes/magento2-cms-tailwind-compiler</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="cms_tailwind" xsi:type="string">Hyva_CmsTailwindCompiler</item>
+                    </item>
+                </item>
+                <item name="ai_providers" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä AI</item>
+                    <item name="package" xsi:type="string">hyva-themes/magento2-module-ai</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="ai_providers" xsi:type="string">Hyva_Ai</item>
+                    </item>
+                </item>
+                <item name="admin_permissions" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä Advanced Admin Permissions</item>
+                    <item name="package" xsi:type="string">hyva-themes/commerce-module-advanced-admin-permissions</item>
+                    <item name="acl" xsi:type="string">Hyva_AdvancedAdminPermissions::audit</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="admin_permissions" xsi:type="string">Hyva_AdvancedAdminPermissions</item>
+                    </item>
+                </item>
+            </argument>
+        </arguments>
+    </type>
+
+    <!-- Dashboard widget category "Magebit / AI / MCP" (categories come from DI, not from the widget XML). -->
+    <type name="Hyva\AdminDashboardFramework\Model\Config\Widget\Converter">
+        <arguments>
+            <argument name="categoryNames" xsi:type="array">
+                <item name="magebit_mcp" xsi:type="array">
+                    <item name="enabled" xsi:type="boolean">true</item>
+                    <item name="label" xsi:type="string" translatable="true">Magebit / AI / MCP</item>
+                    <item name="sortOrder" xsi:type="number">800</item>
+                </item>
+            </argument>
+        </arguments>
+    </type>
+
+    <type name="Magebit\Mcp\Model\Util\ToolDomain">
+        <arguments>
+            <argument name="labels" xsi:type="array">
+                <item name="hyva_cms" xsi:type="string">Hyvä CMS</item>
+                <item name="hyva_menu" xsi:type="string">Hyvä Menu Builder</item>
+                <item name="hyva_media" xsi:type="string">Hyvä Media</item>
+                <item name="hyva_commerce" xsi:type="string">Hyvä Commerce</item>
+                <item name="hyva_form" xsi:type="string">Hyvä Form Builder</item>
+                <item name="hyva_email" xsi:type="string">Hyvä Email Templates</item>
+                <item name="hyva_store_credit" xsi:type="string">Hyvä Store Credit</item>
+                <item name="hyva_linked" xsi:type="string">Hyvä Linked Products</item>
+                <item name="hyva_merch" xsi:type="string">Hyvä Category Merchandiser</item>
+                <item name="hyva_ai" xsi:type="string">Hyvä AI Worker</item>
+                <item name="hyva_admin_perm" xsi:type="string">Hyvä Admin Permissions</item>
+                <item name="hyva_dashboard" xsi:type="string">Hyvä Dashboard</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <!-- The registry holds this tool, so it gets a proxy to avoid a circular dependency. -->
+    <type name="Magebit\McpHyvaCommerceTools\Tool\HyvaCommerce\Audit\AuditOverview">
+        <arguments>
+            <argument name="toolRegistry" xsi:type="object">Magebit\Mcp\Api\ToolRegistryInterface\Proxy</argument>
+        </arguments>
+    </type>
+
+    <!-- get tools: response keys come from field resolvers (extend by adding items) -->
+    <type name="Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageGet">
+        <arguments>
+            <argument name="fieldResolvers" xsi:type="array">
+                <item name="identity" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\IdentityResolver</item>
+                <item name="status" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\StatusResolver</item>
+                <item name="outline" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\OutlineResolver</item>
+                <item name="draft" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\DraftResolver</item>
+                <item name="published" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\PublishedResolver</item>
+                <item name="preview" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\PreviewResolver</item>
+                <item name="versions" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\VersionsResolver</item>
+                <item name="images" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\ImagesResolver</item>
+            </argument>
+        </arguments>
+    </type>
+    <type name="Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockGet">
+        <arguments>
+            <argument name="fieldResolvers" xsi:type="array">
+                <item name="identity" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\IdentityResolver</item>
+                <item name="status" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\StatusResolver</item>
+                <item name="outline" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\OutlineResolver</item>
+                <item name="draft" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\DraftResolver</item>
+                <item name="published" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\PublishedResolver</item>
+                <item name="preview" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\PreviewResolver</item>
+                <item name="versions" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\VersionsResolver</item>
+                <item name="images" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\ImagesResolver</item>
+                <item name="usage" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\BlockUsageResolver</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <type name="Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuGet">
+        <arguments>
+            <argument name="fieldResolvers" xsi:type="array">
+                <item name="settings" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Menu\MenuSettingsResolver</item>
+                <item name="placement" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Menu\PlacementResolver</item>
+                <item name="structure" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Menu\StructureResolver</item>
+                <item name="links" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Menu\LinksResolver</item>
+                <item name="preview" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\PreviewResolver</item>
+                <item name="versions" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\VersionsResolver</item>
+                <item name="images" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\ImagesResolver</item>
+                <item name="usage" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Menu\MenuUsageResolver</item>
+            </argument>
+        </arguments>
+    </type>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\LinkTargetResolverInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Menu\LinkTargetResolver"/>
+
+    <type name="Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageGet">
+        <arguments>
+            <argument name="fieldResolvers" xsi:type="array">
+                <item name="file" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Image\FileResolver</item>
+                <item name="gallery" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Image\GalleryResolver</item>
+                <item name="usage" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Image\UsageResolver</item>
+                <item name="optimization" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Image\OptimizationResolver</item>
+                <item name="image_editor" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\FieldResolver\Image\ImageEditorResolver</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <!-- The widgets only need the write set on a cache miss; MenuHealth/MediaHealth never need it. -->
+    <type name="Magebit\McpHyvaCommerceTools\Model\Audit\McpActivityReader">
+        <arguments>
+            <argument name="toolRegistry" xsi:type="object">Magebit\Mcp\Api\ToolRegistryInterface\Proxy</argument>
+        </arguments>
+    </type>
+
+    <!-- Hyvä's widget type dispatcher needs the adminhtml-only WidgetAuthInterface; WidgetRefresh only needs the
+         instance's id and type for the cache key, so the dispatcher stays lazy on /mcp. -->
+    <type name="Magebit\McpHyvaCommerceTools\Model\Dashboard\WidgetInstanceFactory">
+        <arguments>
+            <argument name="widgetTypeDispatcher" xsi:type="object">Hyva\AdminDashboardFramework\Model\WidgetType\WidgetTypeDispatcher\Proxy</argument>
+        </arguments>
+    </type>
+
+    <!-- Tag every cached display data variant of a widget instance so widget.refresh can clean them all. -->
+    <type name="Hyva\AdminDashboardFramework\Model\Cache\Type\AdminDashboard">
+        <plugin name="magebit_mcp_hyva_commerce_widget_instance_cache_tag"
+                type="Magebit\McpHyvaCommerceTools\Plugin\Dashboard\WidgetInstanceCacheTagPlugin"/>
+    </type>
+
+    <!-- Keep the dashboard cache lazy so CLI tool listing does not touch the dashboard framework. -->
+    <type name="Magebit\McpHyvaCommerceTools\Tool\HyvaDashboard\Widget\WidgetRefresh">
+        <arguments>
+            <argument name="cache" xsi:type="object">Hyva\AdminDashboardFramework\Model\Cache\Type\AdminDashboard\Proxy</argument>
+        </arguments>
+    </type>
+
+    <!-- Entity-type editor settings Hyvä enforces only in the admin JS (Form Builder core-settings/form.phtml). -->
+    <type name="Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree">
+        <arguments>
+            <argument name="contentTypeConstraints" xsi:type="array">
+                <item name="email_template" xsi:type="array">
+                    <item name="root_component" xsi:type="string">email_wrapper</item>
+                    <item name="max_root_components" xsi:type="number">1</item>
+                </item>
+                <item name="newsletter_template" xsi:type="array">
+                    <item name="root_component" xsi:type="string">email_wrapper</item>
+                    <item name="max_root_components" xsi:type="number">1</item>
+                </item>
+                <item name="form" xsi:type="array">
+                    <item name="root_component" xsi:type="string">hyva_form</item>
+                    <item name="max_root_components" xsi:type="number">1</item>
+                    <item name="disallowed_components" xsi:type="array">
+                        <item name="form_widget" xsi:type="string">hyva_form_widget</item>
+                    </item>
+                </item>
+            </argument>
+        </arguments>
+    </type>
+
+    <!-- MCP Prompts: guided workflows on top of the tools (prompts/list, prompts/get). -->
+    <type name="Magebit\Mcp\Model\Prompt\PromptRegistry">
+        <arguments>
+            <argument name="prompts" xsi:type="array">
+                <item name="hyva_cms.landing_page_draft" xsi:type="object">Magebit\McpHyvaCommerceTools\Prompt\HyvaCommerce\LandingPageDraftPrompt</item>
+                <item name="hyva_menu.health_check" xsi:type="object">Magebit\McpHyvaCommerceTools\Prompt\HyvaCommerce\MenuHealthCheckPrompt</item>
+                <item name="hyva_media.audit_report" xsi:type="object">Magebit\McpHyvaCommerceTools\Prompt\HyvaCommerce\MediaAuditReportPrompt</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <type name="Magebit\Mcp\Model\Tool\ToolRegistry">
+        <arguments>
+            <argument name="tools" xsi:type="array">
+                <item name="hyva_commerce.audit.overview" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCommerce\Audit\AuditOverview</item>
+                <item name="hyva_commerce.audit.cms" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCommerce\Audit\AuditCms</item>
+                <item name="hyva_cms.page.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageList</item>
+                <item name="hyva_cms.page.get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageGet</item>
+                <item name="hyva_cms.block.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockList</item>
+                <item name="hyva_cms.block.get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockGet</item>
+                <item name="hyva_cms.preview" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Content\Preview</item>
+                <item name="hyva_cms.version.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Version\VersionList</item>
+                <item name="hyva_cms.component.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Component\ComponentList</item>
+                <item name="hyva_cms.component.schema" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Component\ComponentSchema</item>
+                <item name="hyva_cms.component.validate" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Component\ComponentValidate</item>
+                <item name="hyva_cms.schedule.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule\ScheduleList</item>
+                <item name="hyva_cms.schedule.detect_conflicts" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule\ScheduleDetectConflicts</item>
+                <item name="hyva_cms.migration.scan" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Migration\MigrationScan</item>
+                <item name="hyva_cms.migration.analyze" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Migration\MigrationAnalyze</item>
+                <item name="hyva_cms.export" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Transfer\TransferExport</item>
+                <item name="hyva_menu.status" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuStatus</item>
+                <item name="hyva_media.status" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Media\MediaStatus</item>
+                <item name="hyva_menu.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuList</item>
+                <item name="hyva_menu.get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuGet</item>
+                <item name="hyva_menu.validate" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuValidate</item>
+                <item name="hyva_menu.audit_all" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuAuditAll</item>
+                <item name="hyva_menu.find_usage" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuFindUsage</item>
+                <item name="hyva_menu.preview" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuPreview</item>
+                <item name="hyva_menu.render_check" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuRenderCheck</item>
+                <item name="hyva_menu.category.sync_preview" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Category\CategorySyncPreview</item>
+                <item name="hyva_dashboard.widget.refresh" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaDashboard\Widget\WidgetRefresh</item>
+                <item name="hyva_email.template.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateList</item>
+                <item name="hyva_email.template.get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateGet</item>
+                <item name="hyva_email.template.preview" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplatePreview</item>
+                <item name="hyva_email.newsletter.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterList</item>
+                <item name="hyva_email.newsletter.get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterGet</item>
+                <item name="hyva_email.newsletter.preview" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterPreview</item>
+                <item name="hyva_email.audit.coverage" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Audit\AuditCoverage</item>
+                <item name="hyva_email.template.create_draft" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateCreateDraft</item>
+                <item name="hyva_email.template.update_draft" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateUpdateDraft</item>
+                <item name="hyva_email.template.publish" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplatePublish</item>
+                <item name="hyva_email.template.send_test" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateSendTest</item>
+                <item name="hyva_email.newsletter.create_draft" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterCreateDraft</item>
+                <item name="hyva_email.newsletter.update_draft" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterUpdateDraft</item>
+                <item name="hyva_email.newsletter.publish" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterPublish</item>
+                <item name="hyva_media.asset.search" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset\AssetSearch</item>
+                <item name="hyva_media.asset.resolve" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset\AssetResolve</item>
+                <item name="hyva_media.trash.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Trash\TrashList</item>
+                <item name="hyva_media.sync.status" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Sync\SyncStatus</item>
+                <item name="hyva_media.audit.literal_urls" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Audit\AuditLiteralUrls</item>
+                <item name="hyva_media.asset.move" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset\AssetMove</item>
+                <item name="hyva_media.asset.trash" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset\AssetTrash</item>
+                <item name="hyva_media.trash.restore" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Trash\TrashRestore</item>
+                <item name="hyva_media.folder.create" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Folder\FolderCreate</item>
+                <item name="hyva_menu.version.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuVersionList</item>
+                <item name="hyva_menu.publish" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuPublish</item>
+                <item name="hyva_menu.version.restore" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuVersionRestore</item>
+                <item name="hyva_menu.schedule.create" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuScheduleCreate</item>
+                <item name="hyva_menu.schedule.cancel" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuScheduleCancel</item>
+                <item name="hyva_cms.permission.check" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Permission\PermissionCheck</item>
+                <item name="hyva_cms.translation.status" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Translation\TranslationStatus</item>
+                <item name="hyva_cms.tailwind.status" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Tailwind\TailwindStatus</item>
+                <item name="hyva_cms.translation.run" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Translation\TranslationRun</item>
+                <item name="hyva_store_credit.status" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaStoreCredit\Status</item>
+                <item name="hyva_store_credit.balance.get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaStoreCredit\Balance\BalanceGet</item>
+                <item name="hyva_store_credit.history.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaStoreCredit\History\HistoryList</item>
+                <item name="hyva_store_credit.balance.credit" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaStoreCredit\Balance\BalanceCredit</item>
+                <item name="hyva_store_credit.balance.debit" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaStoreCredit\Balance\BalanceDebit</item>
+                <item name="hyva_linked.group.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupList</item>
+                <item name="hyva_linked.group.get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupGet</item>
+                <item name="hyva_linked.group.validate" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupValidate</item>
+                <item name="hyva_linked.group.save" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupSave</item>
+                <item name="hyva_ai.provider.status" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaAi\Provider\ProviderStatus</item>
+                <item name="hyva_ai.worker.status" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaAi\Worker\WorkerStatus</item>
+                <item name="hyva_ai.job.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaAi\Job\JobList</item>
+                <item name="hyva_ai.job.get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaAi\Job\JobGet</item>
+                <item name="hyva_ai.usage.summary" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaAi\Usage\UsageSummary</item>
+                <item name="hyva_ai.error.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaAi\Error\ErrorList</item>
+                <item name="hyva_merch.category.positions_get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMerch\Category\PositionsGet</item>
+                <item name="hyva_merch.category.positions_set" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMerch\Category\PositionsSet</item>
+                <item name="hyva_admin_perm.effective.get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaAdminPerm\Effective\EffectiveGet</item>
+                <item name="hyva_admin_perm.audit.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaAdminPerm\Audit\AuditList</item>
+                <item name="hyva_dashboard.view.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaDashboard\View\ViewList</item>
+                <item name="hyva_dashboard.widget.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaDashboard\View\WidgetList</item>
+                <item name="hyva_form.form.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormList</item>
+                <item name="hyva_form.form.get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormGet</item>
+                <item name="hyva_form.form.validate" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormValidate</item>
+                <item name="hyva_form.version.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Version\VersionList</item>
+                <item name="hyva_form.delivery.audit" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Delivery\DeliveryAudit</item>
+                <item name="hyva_form.form.create" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormCreate</item>
+                <item name="hyva_form.form.update_draft" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormUpdateDraft</item>
+                <item name="hyva_form.form.publish" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormPublish</item>
+                <item name="hyva_form.version.restore" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Version\VersionRestore</item>
+                <item name="hyva_commerce.audit.media" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCommerce\Audit\AuditMedia</item>
+                <item name="hyva_commerce.audit.menu" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCommerce\Audit\AuditMenu</item>
+                <item name="hyva_media.image.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageList</item>
+                <item name="hyva_media.image.get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageGet</item>
+                <item name="hyva_media.image.find_usage" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageFindUsage</item>
+                <item name="hyva_media.image.validate" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageValidate</item>
+                <item name="hyva_media.audit_all" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Audit\AuditAll</item>
+                <item name="hyva_media.audit_cms" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Audit\AuditCms</item>
+                <item name="hyva_media.audit_menu" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Audit\AuditMenu</item>
+                <item name="hyva_media.optimization.status" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Optimization\OptimizationStatus</item>
+                <item name="hyva_media.optimization.preview_picture" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Optimization\OptimizationPreviewPicture</item>
+                <item name="hyva_media.optimization.config_get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Optimization\OptimizationConfigGet</item>
+                <item name="hyva_media.optimization.config_validate" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Optimization\OptimizationConfigValidate</item>
+                <item name="hyva_cms.page.create" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageCreate</item>
+                <item name="hyva_cms.page.update" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageUpdate</item>
+                <item name="hyva_cms.block.create" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockCreate</item>
+                <item name="hyva_cms.block.update" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockUpdate</item>
+                <item name="hyva_cms.draft.create" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Draft\DraftCreate</item>
+                <item name="hyva_cms.draft.update" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Draft\DraftUpdate</item>
+                <item name="hyva_cms.publish" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Content\Publish</item>
+                <item name="hyva_cms.version.restore" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Version\VersionRestore</item>
+                <item name="hyva_cms.schedule.create" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule\ScheduleCreate</item>
+                <item name="hyva_cms.schedule.cancel" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule\ScheduleCancel</item>
+                <item name="hyva_cms.migration.convert_to_draft" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Migration\MigrationConvertToDraft</item>
+                <item name="hyva_cms.import" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Transfer\TransferImport</item>
+                <item name="hyva_menu.create" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuCreate</item>
+                <item name="hyva_menu.update" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuUpdate</item>
+                <item name="hyva_menu.item.add" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Item\ItemAdd</item>
+                <item name="hyva_menu.item.update" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Item\ItemUpdate</item>
+                <item name="hyva_menu.item.remove" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Item\ItemRemove</item>
+                <item name="hyva_menu.category.import" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Category\CategoryImport</item>
+                <item name="hyva_media.image.replace" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageReplace</item>
+                <item name="hyva_media.image.update_alt" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageUpdateAlt</item>
+                <item name="hyva_media.optimization.clear" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Optimization\OptimizationClear</item>
+            </argument>
+        </arguments>
+    </type>
+    <!-- The dashboard services need an area when built; build them only when a dashboard tool runs. -->
+    <type name="Magebit\McpHyvaCommerceTools\Tool\HyvaDashboard\View\ViewList">
+        <arguments>
+            <argument name="catalog" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\Dashboard\DashboardCatalog\Proxy</argument>
+        </arguments>
+    </type>
+    <type name="Magebit\McpHyvaCommerceTools\Tool\HyvaDashboard\View\WidgetList">
+        <arguments>
+            <argument name="catalog" xsi:type="object">Magebit\McpHyvaCommerceTools\Model\Dashboard\DashboardCatalog\Proxy</argument>
+        </arguments>
+    </type>
+</config>

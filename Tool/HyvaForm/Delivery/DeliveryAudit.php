@@ -1,0 +1,107 @@
+<?php
+/**
+ * @author    Magebit <info@magebit.com>
+ * @copyright Copyright (c) Magebit, Ltd. (https://magebit.com)
+ * @license   MIT
+ */
+declare(strict_types=1);
+
+namespace Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Delivery;
+
+use Magebit\McpHyvaCommerceTools\Model\Tool\Form\AbstractFormTool;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Form\ReadableFormsTrait;
+use Magebit\Mcp\Api\ToolResultInterface;
+use Magebit\Mcp\Model\Tool\Schema\Schema;
+
+/**
+ * `hyva_form.delivery.audit`.
+ */
+class DeliveryAudit extends AbstractFormTool
+{
+    use ReadableFormsTrait;
+
+    public const TOOL_NAME = 'hyva_form.delivery.audit';
+    public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_form_delivery_audit';
+
+    /**
+     * Forms audited per call; forms_total and truncated tell when there are more.
+     */
+    private const MAX_FORMS = 200;
+
+    /**
+     * @inheritDoc
+     */
+    public function getTitle(): string
+    {
+        return 'Audit Hyvä Form Delivery';
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getDescription(): string
+    {
+        return 'Check where submissions of every form (or one) end up: forms that send nowhere, invalid recipient '
+            . 'addresses, webhooks Hyvä would refuse or that are not HTTPS, reply-to and routing rules pointing at '
+            . 'missing fields, CAPTCHA off, enabled-but-unpublished forms. Hyvä stores no submissions, so a broken '
+            . 'destination loses them.';
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getInputSchema(): array
+    {
+        return $this->withFormTarget(Schema::object())->toArray();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function executeForm(array $arguments): ToolResultInterface
+    {
+        $total = 1;
+        $hidden = 0;
+        if (isset($arguments['id']) || isset($arguments['identifier'])) {
+            $forms = [$this->locateForm($arguments)];
+        } else {
+            if ($this->storeScopeGuard->restrictedStoreIds() === null) {
+                $list = $this->formGateway->getList(null, null, 1, self::MAX_FORMS);
+                $forms = $list['items'];
+                $total = $list['total'];
+            } else {
+                // Forms of store views outside the caller's website/store view restriction are not audited.
+                $readable = $this->readableForms(null, null);
+                $hidden = $readable['hidden'];
+                $total = count($readable['items']);
+                $forms = array_slice($readable['items'], 0, self::MAX_FORMS);
+            }
+        }
+        $report = [];
+        $counts = ['error' => 0, 'warning' => 0, 'info' => 0];
+        foreach ($forms as $form) {
+            $documents = $this->contentService->getDocuments(self::CONTENT_TYPE, $form['id']);
+            $issues = $this->formRules->deliveryIssues($form, $documents['published'] ?? $documents['draft']);
+            foreach ($issues as $issue) {
+                $counts[$issue['severity']] = ($counts[$issue['severity']] ?? 0) + 1;
+            }
+            $report[] = [
+                'id' => $form['id'],
+                'identifier' => $form['identifier'],
+                'title' => $form['title'],
+                'is_active' => $form['is_active'],
+                'recipients' => $this->formRules->addresses($form['recipient_to']),
+                'webhook_url' => $form['webhook_url'],
+                'issues' => $issues,
+            ];
+        }
+        return $this->jsonResult([
+            'forms_checked' => count($report),
+            'forms_total' => $total,
+            'truncated' => $total > count($report),
+            'forms_hidden_by_permissions' => $hidden,
+            'counts' => $counts,
+            'forms' => $report,
+        ], $counts);
+    }
+}

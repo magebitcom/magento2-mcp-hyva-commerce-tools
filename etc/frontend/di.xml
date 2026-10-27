@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * @author    Magebit <info@magebit.com>
+ * @copyright Copyright (c) Magebit, Ltd. (https://magebit.com)
+ * @license   MIT
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <!-- Hyvä Commerce 1.4 checks ACL inside its services; give it the MCP caller's role during tool calls. -->
+    <type name="Magento\Framework\Authorization\RoleLocatorInterface">
+        <plugin name="magebit_mcp_hyva_commerce_role_locator"
+                type="Magebit\McpHyvaCommerceTools\Plugin\Authorization\McpRoleLocatorPlugin"/>
+    </type>
+    <!-- Hyvä Advanced Admin Permissions: evaluate the MCP caller's union / deny roles, not only the primary one. -->
+    <type name="Hyva\AdvancedAdminPermissions\Api\AdminUserIdResolverInterface">
+        <plugin name="magebit_mcp_hyva_commerce_admin_user_id"
+                type="Magebit\McpHyvaCommerceTools\Plugin\Authorization\McpAdminUserIdPlugin"/>
+    </type>
+    <!-- Marks this module's tool calls only. The two plugins above act inside that scope, so core and sibling
+         tools see Magento's authorization unchanged. -->
+    <type name="Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool">
+        <plugin name="magebit_mcp_hyva_commerce_call_scope"
+                type="Magebit\McpHyvaCommerceTools\Plugin\Tool\McpCallScopePlugin"/>
+    </type>
+</config>

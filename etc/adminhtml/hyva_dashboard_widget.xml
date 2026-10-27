@@ -1,0 +1,102 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * @author    Magebit <info@magebit.com>
+ * @copyright Copyright (c) Magebit, Ltd. (https://magebit.com)
+ * @license   MIT
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Hyva_AdminDashboardApi:etc/adminhtml/hyva_dashboard_widget.xsd">
+    <widget id="magebit_mcp_activity_widget">
+        <title>MCP Activity</title>
+        <class>Magebit\McpHyvaCommerceTools\Model\Widget\McpActivity</class>
+        <category>magebit_mcp</category>
+        <tags>mcp,ai,audit</tags>
+        <display_type>template</display_type>
+        <template>Magebit_McpHyvaCommerceTools::widget/health-summary.phtml</template>
+        <acl>Magebit_McpHyvaCommerceTools::widget_mcp_activity</acl>
+        <cache_lifetime>300</cache_lifetime>
+        <icon>activity</icon>
+        <min_height>9</min_height>
+        <min_width>2</min_width>
+    </widget>
+    <widget id="magebit_content_health_widget">
+        <title>Hyvä Content Health</title>
+        <class>Magebit\McpHyvaCommerceTools\Model\Widget\ContentHealth</class>
+        <category>magebit_mcp</category>
+        <tags>content,cms,hyva,health</tags>
+        <display_type>template</display_type>
+        <template>Magebit_McpHyvaCommerceTools::widget/health-summary.phtml</template>
+        <acl>Magebit_McpHyvaCommerceTools::widget_content_health</acl>
+        <cache_lifetime>300</cache_lifetime>
+        <icon>heart-pulse</icon>
+        <min_height>9</min_height>
+        <min_width>2</min_width>
+    </widget>
+    <widget id="magebit_menu_health_widget">
+        <title>Hyvä Menu Health</title>
+        <class>Magebit\McpHyvaCommerceTools\Model\Widget\MenuHealth</class>
+        <category>magebit_mcp</category>
+        <tags>menu,navigation,hyva,health</tags>
+        <display_type>template</display_type>
+        <template>Magebit_McpHyvaCommerceTools::widget/health-summary.phtml</template>
+        <acl>Magebit_McpHyvaCommerceTools::widget_menu_health</acl>
+        <cache_lifetime>300</cache_lifetime>
+        <icon>menu</icon>
+        <min_height>9</min_height>
+        <min_width>2</min_width>
+    </widget>
+    <widget id="magebit_media_health_widget">
+        <title>Media Health</title>
+        <class>Magebit\McpHyvaCommerceTools\Model\Widget\MediaHealth</class>
+        <category>magebit_mcp</category>
+        <tags>media,images,optimization,health</tags>
+        <display_type>template</display_type>
+        <template>Magebit_McpHyvaCommerceTools::widget/health-summary.phtml</template>
+        <acl>Magebit_McpHyvaCommerceTools::widget_media_health</acl>
+        <cache_lifetime>300</cache_lifetime>
+        <icon>image</icon>
+        <min_height>9</min_height>
+        <min_width>2</min_width>
+    </widget>
+    <widget id="magebit_campaign_calendar_widget">
+        <title>Campaign Calendar</title>
+        <class>Magebit\McpHyvaCommerceTools\Model\Widget\CampaignCalendar</class>
+        <category>magebit_mcp</category>
+        <tags>campaign,schedule,cms,hyva</tags>
+        <display_type>template</display_type>
+        <template>Magebit_McpHyvaCommerceTools::widget/health-summary.phtml</template>
+        <acl>Magebit_McpHyvaCommerceTools::widget_campaign_calendar</acl>
+        <cache_lifetime>300</cache_lifetime>
+        <icon>calendar</icon>
+        <min_height>9</min_height>
+        <min_width>2</min_width>
+    </widget>
+    <widget id="magebit_migration_status_widget">
+        <title>Page Builder Migration Status</title>
+        <class>Magebit\McpHyvaCommerceTools\Model\Widget\MigrationStatus</class>
+        <category>magebit_mcp</category>
+        <tags>migration,pagebuilder,cms,hyva</tags>
+        <display_type>template</display_type>
+        <template>Magebit_McpHyvaCommerceTools::widget/health-summary.phtml</template>
+        <acl>Magebit_McpHyvaCommerceTools::widget_migration_status</acl>
+        <cache_lifetime>300</cache_lifetime>
+        <icon>arrow-right-left</icon>
+        <min_height>9</min_height>
+        <min_width>2</min_width>
+    </widget>
+    <widget id="magebit_campaign_asset_readiness_widget">
+        <title>Campaign Asset Readiness</title>
+        <class>Magebit\McpHyvaCommerceTools\Model\Widget\CampaignAssetReadiness</class>
+        <category>magebit_mcp</category>
+        <tags>campaign,media,menu,readiness</tags>
+        <display_type>template</display_type>
+        <template>Magebit_McpHyvaCommerceTools::widget/health-summary.phtml</template>
+        <acl>Magebit_McpHyvaCommerceTools::widget_campaign_asset_readiness</acl>
+        <cache_lifetime>300</cache_lifetime>
+        <icon>badge-check</icon>
+        <min_height>9</min_height>
+        <min_width>2</min_width>
+    </widget>
+</config>
