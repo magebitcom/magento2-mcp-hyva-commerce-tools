@@ -33,6 +33,8 @@
                 type="Magebit\McpHyvaCommerceTools\Model\Adapter\AiWorker\AiWorkerGateway\Proxy"/>
     <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\CmsTailwindGatewayInterface"
                 type="Magebit\McpHyvaCommerceTools\Model\Adapter\CmsTailwind\CmsTailwindGateway\Proxy"/>
+    <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\AiProviderGatewayInterface"
+                type="Magebit\McpHyvaCommerceTools\Model\Adapter\AiProviders\AiProviderGateway\Proxy"/>
     <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\AdminPermissionsGatewayInterface"
                 type="Magebit\McpHyvaCommerceTools\Model\Adapter\AdminPermissions\AdminPermissionsGateway\Proxy"/>
     <preference for="Magebit\McpHyvaCommerceTools\Api\Adapter\AdminScopeGatewayInterface"
@@ -151,6 +153,13 @@
                     <item name="package" xsi:type="string">hyva-themes/magento2-cms-tailwind-compiler</item>
                     <item name="modules" xsi:type="array">
                         <item name="cms_tailwind" xsi:type="string">Hyva_CmsTailwindCompiler</item>
+                    </item>
+                </item>
+                <item name="ai_providers" xsi:type="array">
+                    <item name="label" xsi:type="string">Hyvä AI</item>
+                    <item name="package" xsi:type="string">hyva-themes/magento2-module-ai</item>
+                    <item name="modules" xsi:type="array">
+                        <item name="ai_providers" xsi:type="string">Hyva_Ai</item>
                     </item>
                 </item>
                 <item name="admin_permissions" xsi:type="array">
@@ -397,6 +406,7 @@
                 <item name="hyva_linked.group.get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupGet</item>
                 <item name="hyva_linked.group.validate" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupValidate</item>
                 <item name="hyva_linked.group.save" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupSave</item>
+                <item name="hyva_ai.provider.status" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaAi\Provider\ProviderStatus</item>
                 <item name="hyva_ai.worker.status" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaAi\Worker\WorkerStatus</item>
                 <item name="hyva_ai.job.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaAi\Job\JobList</item>
                 <item name="hyva_ai.job.get" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaAi\Job\JobGet</item>

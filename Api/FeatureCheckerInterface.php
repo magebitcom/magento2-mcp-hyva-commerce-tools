@@ -28,6 +28,7 @@ interface FeatureCheckerInterface
     public const ADMIN_PERMISSIONS = 'admin_permissions';
     public const CMS_AI_TRANSLATIONS = 'cms_ai_translations';
     public const CMS_TAILWIND = 'cms_tailwind';
+    public const AI_PROVIDERS = 'ai_providers';
 
     /**
      * Installed, enabled and allowed for the current admin (when one is known).

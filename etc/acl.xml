@@ -170,6 +170,8 @@
                                           title="Tool: List Hyvä Dashboard Widgets" sortOrder="175"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_tailwind_status"
                                           title="Tool: Hyvä CMS Tailwind Status" sortOrder="176"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_ai_provider_status"
+                                          title="Tool: Hyvä AI Provider Status" sortOrder="177"/>
                                 <!-- Write tools -->
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_template_create_draft"
                                           title="Tool: Create Hyvä Email Template" sortOrder="200"/>
