@@ -46,6 +46,52 @@ class ConflictReportScopeTest extends TestCase
         $this->assertSame(3, $scoped['hidden']);
     }
 
+    public function testAnOverdueReleaseFromTheRealDetectorIsJudgedByItsItems(): void
+    {
+        $due = gmdate('Y-m-d H:i:s', time() - 3600);
+        $service = $this->createMock(ScheduleService::class);
+        // Release 1 holds page 6 (store view 2) only; release 2 holds page 5 (store view 1) and page 6.
+        $service->method('getItems')->willReturn([
+            ['release_id' => 1] + $this->item(1, 'cms_page', 6),
+            ['release_id' => 2] + $this->item(2, 'cms_page', 5),
+            ['release_id' => 2] + $this->item(3, 'cms_page', 6),
+        ]);
+        $service->method('getReleases')->willReturn([
+            1 => ['release_id' => 1, 'name' => 'Other store', 'time_scheduled' => $due, 'status' => 'pending'],
+            2 => ['release_id' => 2, 'name' => 'Mixed', 'time_scheduled' => $due, 'status' => 'pending'],
+        ]);
+        $locator = $this->createMock(ContentLocator::class);
+        $locator->method('isScopeRestricted')->willReturn(true);
+        $report = $this->report($service, $locator, new ScheduleConflictDetector(), [1]);
+
+        $scoped = $report->getConflictsWithinCallerScope();
+
+        $overdue = array_values(array_filter(
+            $scoped['conflicts'],
+            static fn (array $c): bool => $c['code'] === 'overdue'
+        ));
+        $this->assertSame([[2]], array_column($overdue, 'release_ids'));
+        $messages = implode(' ', array_column($scoped['conflicts'], 'message'));
+        $this->assertStringNotContainsString('Other store', $messages);
+    }
+
+    public function testAReleaseLevelConflictOfTypesTheCallerMayNotSeeIsDropped(): void
+    {
+        $due = gmdate('Y-m-d H:i:s', time() - 3600);
+        $service = $this->createMock(ScheduleService::class);
+        $service->method('getItems')->willReturn([$this->item(3, 'menu', 3)]);
+        $service->method('getReleases')->willReturn([
+            1 => ['release_id' => 1, 'name' => 'Menus', 'time_scheduled' => $due, 'status' => 'pending'],
+        ]);
+        $locator = $this->createMock(ContentLocator::class);
+        $locator->method('isScopeRestricted')->willReturn(false);
+        $report = $this->report($service, $locator, new ScheduleConflictDetector(), null);
+
+        $this->assertContains('overdue', array_column($report->getConflictsWithinCallerScope()['conflicts'], 'code'));
+        $scoped = $report->getConflictsWithinCallerScope(60, null, null, ['cms_page']);
+        $this->assertSame([], $scoped['conflicts']);
+    }
+
     public function testOnlyTheScheduledEntitiesAreReadWithoutContent(): void
     {
         $service = $this->createMock(ScheduleService::class);

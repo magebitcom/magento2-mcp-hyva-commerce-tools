@@ -59,39 +59,56 @@ class ConflictReport
 
     /**
      * Conflicts, without those naming a scheduled item of content outside the MCP caller's website/store view
-     * restriction, and how many were dropped.
+     * restriction or of a content type outside $allowedTypes, and how many were dropped.
      *
-     * Release-level conflicts and identifier collisions, which carry no single entity, are judged by their items.
-     * The scope check reuses the items and the page/block store views the detection read; only menu items cost one
-     * more store view query, and only for a restricted caller.
+     * Identifier collisions are judged by their items. Release-level conflicts (overdue release) name no item: they
+     * are judged by the release's pending items and kept when one of them is visible, as `hyva_cms.schedule.list`
+     * shows a release; a release without pending items names no content and is kept. The scope check reuses the items
+     * and the page/block store views the detection read; only menu items cost one more store view query, and only for
+     * a restricted caller.
      *
      * @param int $windowMinutes
      * @param string|null $entityType Only conflicts touching this entity.
      * @param int|null $entityId
+     * @param array|null $allowedTypes Content types the caller may see items of; null for all.
      * @return array
+     * @phpstan-param list<string>|null $allowedTypes
      * @phpstan-return array{conflicts: list<Conflict>, hidden: int}
      */
     public function getConflictsWithinCallerScope(
         int $windowMinutes = 60,
         ?string $entityType = null,
-        ?int $entityId = null
+        ?int $entityId = null,
+        ?array $allowedTypes = null
     ): array {
         $items = $this->pendingItems();
         $entities = $this->getEntities($items);
         $conflicts = $this->detect($items, $entities, $windowMinutes, $entityType, $entityId);
-        if ($conflicts === [] || !$this->contentLocator->isScopeRestricted()) {
+        $restricted = $this->contentLocator->isScopeRestricted();
+        if ($conflicts === [] || (!$restricted && $allowedTypes === null)) {
             return ['conflicts' => $conflicts, 'hidden' => 0];
         }
-        $menus = array_values(array_filter(
-            $items,
-            static fn (array $item): bool => $item['entity_type'] === ContentLocator::TYPE_MENU
-        ));
-        $this->contentLocator->prefetchScope(array_map(
-            static fn (array $item): array => ['entity_type' => $item['entity_type'], 'id' => $item['entity_id']],
-            $menus
-        ));
+        if ($restricted) {
+            $menus = array_values(array_filter(
+                $items,
+                static fn (array $item): bool => $item['entity_type'] === ContentLocator::TYPE_MENU
+            ));
+            $this->contentLocator->prefetchScope(array_map(
+                static fn (array $item): array => ['entity_type' => $item['entity_type'], 'id' => $item['entity_id']],
+                $menus
+            ));
+        }
         $hidden = [];
+        $releaseItems = [];
         foreach ($items as $item) {
+            $releaseItems[$item['release_id']][] = $item['item_id'];
+            if ($allowedTypes !== null && !in_array($item['entity_type'], $allowedTypes, true)) {
+                $hidden[$item['item_id']] = true;
+                continue;
+            }
+            if (!$restricted) {
+                continue;
+            }
             $entity = $entities[$item['entity_type'] . ':' . $item['entity_id']] ?? ['exists' => false];
             // Menus come without store views here (the detector treats them as every store view).
             $readable = $item['entity_type'] === ContentLocator::TYPE_MENU
@@ -101,13 +118,25 @@ class ConflictReport
                 $hidden[$item['item_id']] = true;
             }
         }
-        $visible = array_values(array_filter(
-            $conflicts,
-            static fn (array $conflict): bool => array_filter(
-                $conflict['item_ids'],
-                static fn (int $itemId): bool => isset($hidden[$itemId])
-            ) === []
-        ));
+        $visible = [];
+        foreach ($conflicts as $conflict) {
+            if ($conflict['item_ids'] !== []) {
+                $keep = array_filter(
+                    $conflict['item_ids'],
+                    static fn (int $itemId): bool => isset($hidden[$itemId])
+                ) === [];
+            } else {
+                $ofReleases = [];
+                foreach ($conflict['release_ids'] as $releaseId) {
+                    $ofReleases = array_merge($ofReleases, $releaseItems[$releaseId] ?? []);
+                }
+                $keep = $ofReleases === []
+                    || array_filter($ofReleases, static fn (int $itemId): bool => !isset($hidden[$itemId])) !== [];
+            }
+            if ($keep) {
+                $visible[] = $conflict;
+            }
+        }
         return ['conflicts' => $visible, 'hidden' => count($conflicts) - count($visible)];
     }
 

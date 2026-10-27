@@ -83,18 +83,15 @@ class ScheduleDetectConflicts extends AbstractContentTool
             $entityId = $this->contentLocator->locate($type, $arguments)['id'];
         }
         // Conflicts of content types the role may not schedule, or naming content outside its website/store view
-        // restriction, are hidden.
+        // restriction, are hidden; release-level conflicts are judged by the release's items.
         $scoped = $this->conflictReport->getConflictsWithinCallerScope(
             $this->intArg($arguments, 'window_minutes', 60) ?? 60,
             $type,
-            $entityId
+            $entityId,
+            $this->contentAcl->allowedTypes(ContentLocator::TYPES, ContentAcl::VERB_SCHEDULING)
         );
-        $conflicts = array_values(array_filter(
-            $scoped['conflicts'],
-            fn (array $c): bool => !isset($c['entity_type'])
-                || $this->contentAcl->isAllowed($c['entity_type'], ContentAcl::VERB_SCHEDULING)
-        ));
-        $hidden = $scoped['hidden'] + count($scoped['conflicts']) - count($conflicts);
+        $conflicts = $scoped['conflicts'];
+        $hidden = $scoped['hidden'];
         $counts = ['error' => 0, 'warning' => 0, 'info' => 0];
         foreach ($conflicts as $conflict) {
             $counts[$conflict['severity']]++;
