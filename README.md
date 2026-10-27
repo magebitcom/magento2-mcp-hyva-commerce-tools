@@ -81,7 +81,7 @@ bin/magento cache:flush
   (`forms_hidden_by_permissions`); `migration.scan` lists only the role's pages and blocks.
   `hyva_menu.find_usage` leaves out the design configuration scopes the role may not open (Default, websites it does
   not fully hold, other store views) and counts them in `usages_hidden_by_permissions`; category import keeps to the
-  role's category roots.
+  role's category roots and, without a `store_id`, reads in the menu's first store view the role may read.
   Usage lists, previews and audits (`hyva_media.image.find_usage`, `image.list`, `image.validate`, `asset.resolve`, the
   `asset.move` / `asset.trash` previews, the `usage` field of `image.get`, `cms_block.get` and `hyva_menu.get`,
   `hyva_menu.find_usage`, the `hyva_commerce.audit.*`, `hyva_media.audit*` and `hyva_menu.audit_all` audits, the forms

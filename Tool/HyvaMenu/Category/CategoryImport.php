@@ -90,11 +90,10 @@ class CategoryImport extends AbstractMenuEditTool
     {
         $menu = $this->locateMenu($arguments);
         $menuId = Cast::int($menu['id']);
-        $storeId = $this->intArg($arguments, 'store_id');
-        if ($storeId !== null) {
-            $this->menuService->assertStoreViewReadable($storeId);
-        }
-        $storeId ??= $this->menuService->lookupStoreId(Cast::intList($menu['store_ids'] ?? []));
+        $storeId = $this->menuService->resolveImportStoreId(
+            $this->intArg($arguments, 'store_id'),
+            Cast::intList($menu['store_ids'] ?? [])
+        );
         $rootCategoryId = $this->requireInt($arguments, 'root_category_id');
         $mode = $this->stringArg($arguments, 'mode', 'nested') ?? 'nested';
         $document = $this->contentService->getWorkingDocument(ContentLocator::TYPE_MENU, $menuId);

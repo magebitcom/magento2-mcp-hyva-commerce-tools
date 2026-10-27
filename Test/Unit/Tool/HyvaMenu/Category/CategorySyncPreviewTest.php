@@ -39,45 +39,70 @@ class CategorySyncPreviewTest extends TestCase
         $this->assertTrue($this->at($result, 'dry_run'));
     }
 
-    public function testAnExplicitStoreViewIsCheckedAgainstTheRole(): void
+    public function testTheStoreViewIsResolvedAgainstTheRoleWithTheMenusOwnViews(): void
     {
-        $menus = $this->menus();
-        $menus->expects($this->once())->method('assertStoreViewReadable')->with(2);
+        $menus = $this->menus([1, 3], false);
+        $menus->expects($this->once())->method('resolveImportStoreId')->with(null, [1, 3])->willReturn(3);
+        $menus->expects($this->once())->method('planCategoryImport')->with(
+            $this->anything(),
+            2,
+            2,
+            3,
+            false,
+            false
+        )->willReturn($this->emptyPlan());
+
+        $this->assertFalse($this->runTool([], $menus)->isError());
+    }
+
+    public function testAnExplicitStoreViewIsHandedToTheRoleCheck(): void
+    {
+        $menus = $this->menus([1], false);
+        $menus->expects($this->once())->method('resolveImportStoreId')->with(2, [1])->willReturn(2);
 
         $this->assertFalse($this->runTool(['store_id' => 2], $menus)->isError());
     }
 
-    public function testAStoreViewOutsideTheRoleIsRefusedBeforeAnythingIsRead(): void
+    public function testAStoreViewRefusedByTheRoleIsRefusedBeforeAnythingIsRead(): void
     {
-        $menus = $this->menus();
-        $menus->method('assertStoreViewReadable')->willThrowException(new AuthorizationException(__('Outside.')));
+        $menus = $this->menus([1], false);
+        $menus->method('resolveImportStoreId')->willThrowException(new AuthorizationException(__('Outside.')));
         $menus->expects($this->never())->method('planCategoryImport');
 
-        $result = $this->runTool(['store_id' => 2], $menus);
+        $result = $this->runTool(['store_id' => 0], $menus);
 
         $this->assertTrue($result->isError());
         $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
     }
 
-    public function testWithoutAStoreViewTheMenusOwnIsUsedWithoutTheCheck(): void
-    {
-        $menus = $this->menus();
-        $menus->expects($this->never())->method('assertStoreViewReadable');
-
-        $this->assertFalse($this->runTool([], $menus)->isError());
-    }
-
     /**
      * Menu service for menu 3 with an empty plan.
      *
+     * @param array $storeIds Store views of the menu.
+     * @param bool $resolvesToOne Whether the store view resolution answers 1 by default.
      * @return MenuService&MockObject
+     * @phpstan-param list<int> $storeIds
      */
-    private function menus(): MenuService&MockObject
+    private function menus(array $storeIds = [1], bool $resolvesToOne = true): MenuService&MockObject
     {
         $menus = $this->createMock(MenuService::class);
-        $menus->method('locate')->willReturn(['id' => 3, 'store_ids' => [1]]);
-        $menus->method('lookupStoreId')->willReturn(1);
-        $menus->method('planCategoryImport')->willReturn([
+        $menus->method('locate')->willReturn(['id' => 3, 'store_ids' => $storeIds]);
+        if ($resolvesToOne) {
+            $menus->method('resolveImportStoreId')->willReturn(1);
+        }
+        $menus->method('planCategoryImport')->willReturn($this->emptyPlan());
+        return $menus;
+    }
+
+    /**
+     * Import plan without any category.
+     *
+     * @return array
+     * @phpstan-return array<string, list<mixed>>
+     */
+    private function emptyPlan(): array
+    {
+        return [
             'tree' => [],
             'create' => [],
             'skip_existing' => [],
@@ -85,8 +110,7 @@ class CategorySyncPreviewTest extends TestCase
             'hidden' => [],
             'missing_url_rewrites' => [],
             'duplicate_labels' => [],
-        ]);
-        return $menus;
+        ];
     }
 
     /**

@@ -589,15 +589,33 @@ class MenuService
     }
 
     /**
-     * Refuse a store view the caller's role may not read (names and URLs of its categories are read in it).
+     * Store view a category import or sync preview reads names and URLs in
      *
-     * @param int $storeId
-     * @return void
+     * An explicit store view must be one the role may read (store view 0 is refused for a restricted role). Without
+     * one, an unrestricted caller gets the menu's own store view; a restricted caller gets the menu's first store view
+     * its role may read, else the first one the role may read at all.
+     *
+     * @param int|null $storeId
+     * @param array $menuStoreIds
+     * @return int
      * @throws AuthorizationException
+     * @phpstan-param list<int> $menuStoreIds
      */
-    public function assertStoreViewReadable(int $storeId): void
+    public function resolveImportStoreId(?int $storeId, array $menuStoreIds): int
     {
-        $this->storeScopeGuard->assertReadable('store view ' . $storeId, [$storeId]);
+        if ($storeId !== null) {
+            return (int) $this->storeScopeGuard->resolveStoreId($storeId);
+        }
+        $allowed = $this->storeScopeGuard->restrictedStoreIds();
+        if ($allowed === null) {
+            return $this->lookupStoreId($menuStoreIds);
+        }
+        foreach ($menuStoreIds as $menuStoreId) {
+            if ($menuStoreId > 0 && in_array($menuStoreId, $allowed, true)) {
+                return $menuStoreId;
+            }
+        }
+        return (int) $this->storeScopeGuard->resolveStoreId(null);
     }
 
     /**

@@ -187,6 +187,46 @@ class MenuServiceTest extends TestCase
         $this->assertSame([11], array_column($plan['tree'], 'id'));
     }
 
+    public function testImportStoreOfARestrictedCallerIsTheMenusFirstViewItMayRead(): void
+    {
+        $this->assertSame(3, $this->service([3])->resolveImportStoreId(null, [1, 3]));
+    }
+
+    public function testImportStoreOfARestrictedCallerFallsBackToItsFirstViewForAMenuOnStoreZero(): void
+    {
+        $this->assertSame(2, $this->service([2])->resolveImportStoreId(null, [0]));
+        $this->assertSame(2, $this->service([2])->resolveImportStoreId(null, []));
+    }
+
+    public function testImportStoreOfARestrictedCallerWithoutAnyViewIsRefused(): void
+    {
+        $this->expectException(AuthorizationException::class);
+        $this->service([])->resolveImportStoreId(null, [1]);
+    }
+
+    public function testImportStoreZeroIsRefusedForARestrictedCaller(): void
+    {
+        $this->expectException(AuthorizationException::class);
+        $this->service([2])->resolveImportStoreId(0, [2]);
+    }
+
+    public function testImportStoreOutsideTheRoleIsRefused(): void
+    {
+        $this->expectException(AuthorizationException::class);
+        $this->service([2])->resolveImportStoreId(1, [2]);
+    }
+
+    public function testImportStoreGivenWithinTheRoleIsKept(): void
+    {
+        $this->assertSame(2, $this->service([1, 2])->resolveImportStoreId(2, [1]));
+    }
+
+    public function testImportStoreOfAnUnrestrictedCallerIsTheMenusFirstStoreView(): void
+    {
+        $this->assertSame(1, $this->service(null)->resolveImportStoreId(null, [0, 1, 3]));
+        $this->assertSame(3, $this->service(null)->resolveImportStoreId(3, [1]));
+    }
+
     /**
      * Menu service for a caller restricted to the store views, or unrestricted (null).
      *
