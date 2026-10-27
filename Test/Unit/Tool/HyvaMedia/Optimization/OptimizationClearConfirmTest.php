@@ -52,9 +52,9 @@ class OptimizationClearConfirmTest extends TestCase
         $result = $this->tool->execute(['all_images' => true, 'mode' => 'resized']);
 
         $this->assertFalse($result->isError());
-        $this->assertTrue($this->at($result, 'confirmation_required'));
-        $this->assertSame('clear_all_optimized_images', $this->at($result, 'action'));
-        $this->assertSame(['resized' => 40, 'converted' => 2, 'mode' => 'resized'], $this->at($result, 'affected.0'));
+        $this->assertTrue($this->payloadAt($result, 'confirmation_required'));
+        $this->assertSame('clear_all_optimized_images', $this->payloadAt($result, 'action'));
+        $this->assertSame(['resized' => 40, 'converted' => 2, 'mode' => 'resized'], $this->payloadAt($result, 'affected.0'));
     }
 
     public function testConfirmClearsAllImages(): void
@@ -64,8 +64,8 @@ class OptimizationClearConfirmTest extends TestCase
         $result = $this->tool->execute(['all_images' => true, 'mode' => 'resized', 'confirm' => true]);
 
         $this->assertFalse($result->isError());
-        $this->assertSame('all_images', $this->at($result, 'cleared'));
-        $this->assertSame(40, $this->at($result, 'files_removed'));
+        $this->assertSame('all_images', $this->payloadAt($result, 'cleared'));
+        $this->assertSame(40, $this->payloadAt($result, 'files_removed'));
     }
 
     public function testOnePathNeedsNoConfirm(): void
@@ -76,6 +76,6 @@ class OptimizationClearConfirmTest extends TestCase
         $result = $this->tool->execute(['path' => 'wysiwyg/a.jpg']);
 
         $this->assertFalse($result->isError());
-        $this->assertSame(3, $this->at($result, 'files_removed'));
+        $this->assertSame(3, $this->payloadAt($result, 'files_removed'));
     }
 }

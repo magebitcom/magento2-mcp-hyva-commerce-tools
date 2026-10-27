@@ -75,9 +75,9 @@ class DraftCreateConfirmTest extends TestCase
         $result = $this->tool->execute(['entity_type' => 'cms_page', 'id' => 7, 'source' => 'published']);
 
         $this->assertFalse($result->isError());
-        $this->assertTrue($this->at($result, 'confirmation_required'));
-        $this->assertSame('replace_draft', $this->at($result, 'action'));
-        $this->assertSame(7, $this->at($result, 'affected.0.id'));
+        $this->assertTrue($this->payloadAt($result, 'confirmation_required'));
+        $this->assertSame('replace_draft', $this->payloadAt($result, 'action'));
+        $this->assertSame(7, $this->payloadAt($result, 'affected.0.id'));
     }
 
     public function testConfirmReplacesTheDraft(): void
@@ -94,8 +94,8 @@ class DraftCreateConfirmTest extends TestCase
         ]);
 
         $this->assertFalse($result->isError());
-        $this->assertSame('v-5', $this->at($result, 'draft.version_uid'));
-        $this->assertFalse($this->at($result, 'published'));
+        $this->assertSame('v-5', $this->payloadAt($result, 'draft.version_uid'));
+        $this->assertFalse($this->payloadAt($result, 'published'));
     }
 
     public function testADraftWithoutUnpublishedChangesNeedsNoConfirm(): void
@@ -106,6 +106,6 @@ class DraftCreateConfirmTest extends TestCase
         $result = $this->tool->execute(['entity_type' => 'cms_page', 'id' => 7, 'source' => 'published']);
 
         $this->assertFalse($result->isError());
-        $this->assertSame('published', $this->at($result, 'source'));
+        $this->assertSame('published', $this->payloadAt($result, 'source'));
     }
 }

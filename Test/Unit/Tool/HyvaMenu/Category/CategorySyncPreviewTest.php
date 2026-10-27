@@ -36,7 +36,7 @@ class CategorySyncPreviewTest extends TestCase
         $result = $this->runTool([], $menus);
 
         $this->assertFalse($result->isError());
-        $this->assertTrue($this->at($result, 'dry_run'));
+        $this->assertTrue($this->payloadAt($result, 'dry_run'));
     }
 
     public function testTheStoreViewIsResolvedAgainstTheRoleWithTheMenusOwnViews(): void

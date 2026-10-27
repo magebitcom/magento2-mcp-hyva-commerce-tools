@@ -49,7 +49,7 @@ class TrashRestoreTest extends TestCase
         );
         $result = $tool->execute(['trash_ids' => [1, 2]]);
 
-        $this->assertSame(1, $this->at($result, 'restored'));
-        $this->assertSame(2, $this->at($result, 'not_restored.0.trash_id'));
+        $this->assertSame(1, $this->payloadAt($result, 'restored'));
+        $this->assertSame(2, $this->payloadAt($result, 'not_restored.0.trash_id'));
     }
 }

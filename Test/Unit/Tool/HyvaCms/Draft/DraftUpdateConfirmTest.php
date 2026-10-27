@@ -46,9 +46,9 @@ class DraftUpdateConfirmTest extends TestCase
 
         $result = $this->tool('menu')->execute(['entity_type' => 'menu', 'id' => 3, 'operations' => self::OPERATIONS]);
 
-        $this->assertTrue($this->at($result, 'confirmation_required'));
-        $this->assertSame('remove_menu_item_with_children', $this->at($result, 'action'));
-        $this->assertSame('c1', $this->at($result, 'affected.0.children.0.uid'));
+        $this->assertTrue($this->payloadAt($result, 'confirmation_required'));
+        $this->assertSame('remove_menu_item_with_children', $this->payloadAt($result, 'action'));
+        $this->assertSame('c1', $this->payloadAt($result, 'affected.0.children.0.uid'));
     }
 
     public function testConfirmSavesTheMenuDraft(): void

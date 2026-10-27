@@ -37,9 +37,9 @@ class ItemRemoveConfirmTest extends TestCase
         $result = $this->tool($contentService, $tree)->execute(['id' => 3, 'uid' => 'parent']);
 
         $this->assertFalse($result->isError());
-        $this->assertTrue($this->at($result, 'confirmation_required'));
-        $this->assertSame('remove_menu_item_with_children', $this->at($result, 'action'));
-        $this->assertSame('parent', $this->at($result, 'affected.0.uid'));
+        $this->assertTrue($this->payloadAt($result, 'confirmation_required'));
+        $this->assertSame('remove_menu_item_with_children', $this->payloadAt($result, 'action'));
+        $this->assertSame('parent', $this->payloadAt($result, 'affected.0.uid'));
     }
 
     public function testConfirmRemovesTheItemWithChildren(): void
@@ -53,8 +53,8 @@ class ItemRemoveConfirmTest extends TestCase
         $result = $this->tool($contentService, $tree)->execute(['id' => 3, 'uid' => 'parent', 'confirm' => true]);
 
         $this->assertFalse($result->isError());
-        $this->assertSame('parent', $this->at($result, 'removed.uid'));
-        $this->assertFalse($this->at($result, 'published'));
+        $this->assertSame('parent', $this->payloadAt($result, 'removed.uid'));
+        $this->assertFalse($this->payloadAt($result, 'published'));
     }
 
     public function testRemovingAnItemWithoutChildrenNeedsNoConfirm(): void
@@ -68,7 +68,7 @@ class ItemRemoveConfirmTest extends TestCase
         $result = $this->tool($contentService, $tree)->execute(['id' => 3, 'uid' => 'leaf']);
 
         $this->assertFalse($result->isError());
-        $this->assertSame('leaf', $this->at($result, 'removed.uid'));
+        $this->assertSame('leaf', $this->payloadAt($result, 'removed.uid'));
     }
 
     /**

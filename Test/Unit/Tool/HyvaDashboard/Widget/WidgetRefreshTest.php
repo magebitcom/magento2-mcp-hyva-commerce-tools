@@ -67,7 +67,7 @@ class WidgetRefreshTest extends TestCase
         $tool = new WidgetRefresh($featureChecker, $resource, $cache, $factory);
         $result = $tool->execute(['instance_ids' => [7]]);
 
-        $this->assertSame(1, $this->at($result, 'count'));
-        $this->assertSame('magebit_content_health_widget', $this->at($result, 'refreshed.0.widget_type'));
+        $this->assertSame(1, $this->payloadAt($result, 'count'));
+        $this->assertSame('magebit_content_health_widget', $this->payloadAt($result, 'refreshed.0.widget_type'));
     }
 }

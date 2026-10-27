@@ -42,12 +42,12 @@ class ImageUsageScopeTest extends TestCase
         $result = $this->findUsage($this->scope([1]))->execute(['path' => self::PATH]);
 
         $this->assertSame([['cms_page', 1], ['product', 5]], $this->targets($this->arrayAt($result, 'usages')));
-        $this->assertSame(2, $this->at($result, 'total'));
-        $this->assertSame(['hyva_cms' => 1, 'product' => 1], $this->at($result, 'by_source'));
-        $this->assertSame(2, $this->at($result, 'usages_hidden_by_permissions'));
+        $this->assertSame(2, $this->payloadAt($result, 'total'));
+        $this->assertSame(['hyva_cms' => 1, 'product' => 1], $this->payloadAt($result, 'by_source'));
+        $this->assertSame(2, $this->payloadAt($result, 'usages_hidden_by_permissions'));
 
         $all = $this->findUsage($this->scope(null))->execute(['path' => self::PATH]);
-        $this->assertSame(4, $this->at($all, 'total'));
+        $this->assertSame(4, $this->payloadAt($all, 'total'));
         $text = $all->getContent()[0]['text'] ?? '';
         $payload = json_decode(is_string($text) ? $text : '', true);
         $this->assertIsArray($payload);
@@ -89,7 +89,7 @@ class ImageUsageScopeTest extends TestCase
         $result = $tool->execute(['path' => self::PATH]);
 
         $this->assertSame([['cms_page', 1], ['product', 5]], $this->targets($checked));
-        $this->assertSame(2, $this->at($result, 'usages_hidden_by_permissions'));
+        $this->assertSame(2, $this->payloadAt($result, 'usages_hidden_by_permissions'));
     }
 
     public function testAssetResolveListsOnlyTheRolesContent(): void
@@ -104,7 +104,7 @@ class ImageUsageScopeTest extends TestCase
             $this->arrayAt($result, 'used_in.magento_tracked'),
             'entity_type'
         ));
-        $this->assertSame(3, $this->at($result, 'usages_hidden_by_permissions'));
+        $this->assertSame(3, $this->payloadAt($result, 'usages_hidden_by_permissions'));
 
         $all = $this->assetResolve($this->scope(null))->execute(['id' => 3]);
         $this->assertCount(4, $this->arrayAt($all, 'used_in.hyva_and_catalog'));

@@ -22,7 +22,7 @@ trait ToolPayloadTrait
      * @param string $path
      * @return mixed
      */
-    private function at(ToolResultInterface $result, string $path): mixed
+    private function payloadAt(ToolResultInterface $result, string $path): mixed
     {
         $text = $result->getContent()[0]['text'] ?? '';
         $value = json_decode(is_string($text) ? $text : '', true);
@@ -44,7 +44,7 @@ trait ToolPayloadTrait
      */
     private function arrayAt(ToolResultInterface $result, string $path): array
     {
-        $value = $this->at($result, $path);
+        $value = $this->payloadAt($result, $path);
         $this->assertIsArray($value, $path);
         return $value;
     }

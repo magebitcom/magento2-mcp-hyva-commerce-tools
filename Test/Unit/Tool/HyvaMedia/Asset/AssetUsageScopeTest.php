@@ -45,9 +45,9 @@ class AssetUsageScopeTest extends TestCase
             [['catalog_product', '2']],
             $this->targets($this->arrayAt($result, 'affected.assets.0.used_in.magento_tracked'), 'entity_id')
         );
-        $this->assertSame(2, $this->at($result, 'affected.assets.0.usages_hidden_by_permissions'));
-        $this->assertSame([], $this->at($result, 'affected.assets.1.used_in.hyva_and_catalog'));
-        $this->assertSame(1, $this->at($result, 'affected.assets.1.usages_hidden_by_permissions'));
+        $this->assertSame(2, $this->payloadAt($result, 'affected.assets.0.usages_hidden_by_permissions'));
+        $this->assertSame([], $this->payloadAt($result, 'affected.assets.1.used_in.hyva_and_catalog'));
+        $this->assertSame(1, $this->payloadAt($result, 'affected.assets.1.usages_hidden_by_permissions'));
     }
 
     public function testTheTrashPreviewListsOnlyTheRolesUsagesButCountsEveryUseInInUse(): void
@@ -62,11 +62,11 @@ class AssetUsageScopeTest extends TestCase
             [['catalog_product', '2']],
             $this->targets($this->arrayAt($result, 'affected.assets.0.used_in.magento_tracked'), 'entity_id')
         );
-        $this->assertSame(2, $this->at($result, 'affected.assets.0.usages_hidden_by_permissions'));
-        $this->assertSame([], $this->at($result, 'affected.assets.1.used_in.hyva_and_catalog'));
-        $this->assertSame(1, $this->at($result, 'affected.assets.1.usages_hidden_by_permissions'));
+        $this->assertSame(2, $this->payloadAt($result, 'affected.assets.0.usages_hidden_by_permissions'));
+        $this->assertSame([], $this->payloadAt($result, 'affected.assets.1.used_in.hyva_and_catalog'));
+        $this->assertSame(1, $this->payloadAt($result, 'affected.assets.1.usages_hidden_by_permissions'));
         // Asset 2 is used only in store view 2's page: still in use.
-        $this->assertSame(2, $this->at($result, 'affected.in_use'));
+        $this->assertSame(2, $this->payloadAt($result, 'affected.in_use'));
     }
 
     public function testAssetResolveLeavesOutProductsAndCategoriesOfOtherWebsites(): void
@@ -87,7 +87,7 @@ class AssetUsageScopeTest extends TestCase
             [['catalog_product', '2']],
             $this->targets($this->arrayAt($result, 'used_in.magento_tracked'), 'entity_id')
         );
-        $this->assertSame(2, $this->at($result, 'usages_hidden_by_permissions'));
+        $this->assertSame(2, $this->payloadAt($result, 'usages_hidden_by_permissions'));
     }
 
     public function testAnUnrestrictedCallerSeesEveryUsageWithoutACounter(): void
@@ -102,7 +102,7 @@ class AssetUsageScopeTest extends TestCase
             $this->assertCount(2, $this->arrayAt($result, 'affected.assets.0.used_in.magento_tracked'));
             $this->assertCount(1, $this->arrayAt($result, 'affected.assets.1.used_in.hyva_and_catalog'));
         }
-        $this->assertSame(2, $this->at($trash, 'affected.in_use'));
+        $this->assertSame(2, $this->payloadAt($trash, 'affected.in_use'));
     }
 
     /**

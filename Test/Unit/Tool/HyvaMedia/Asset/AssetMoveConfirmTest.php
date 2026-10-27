@@ -77,9 +77,9 @@ class AssetMoveConfirmTest extends TestCase
 
         $result = $this->tool->execute(['ids' => [1, 2, 3], 'target_folder' => 'wysiwyg/campaigns']);
 
-        $this->assertTrue($this->at($result, 'confirmation_required'));
-        $this->assertSame('wysiwyg/campaigns', $this->at($result, 'affected.target_folder'));
-        $this->assertSame([], $this->at($result, 'affected.assets.0.used_in.hyva_and_catalog'));
+        $this->assertTrue($this->payloadAt($result, 'confirmation_required'));
+        $this->assertSame('wysiwyg/campaigns', $this->payloadAt($result, 'affected.target_folder'));
+        $this->assertSame([], $this->payloadAt($result, 'affected.assets.0.used_in.hyva_and_catalog'));
         $this->assertCount(1, $this->arrayAt($result, 'affected.assets.1.used_in.hyva_and_catalog'));
     }
 
@@ -96,7 +96,7 @@ class AssetMoveConfirmTest extends TestCase
             ['ids' => [1, 2, 3], 'target_folder' => 'wysiwyg/campaigns', 'confirm' => true]
         );
 
-        $this->assertSame(3, $this->at($result, 'moved'));
+        $this->assertSame(3, $this->payloadAt($result, 'moved'));
     }
 
     /**

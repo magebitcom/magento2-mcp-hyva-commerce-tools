@@ -87,7 +87,7 @@ class ImageListTest extends TestCase
 
         $result = $this->tool->execute(['types' => ['JPG'], 'sort' => 'path', 'limit' => 2]);
 
-        $this->assertSame(3, $this->at($result, 'total'));
+        $this->assertSame(3, $this->payloadAt($result, 'total'));
         $items = $this->arrayAt($result, 'items');
         $this->assertSame(['wysiwyg/a.jpg', 'wysiwyg/b.jpg'], array_column($items, 'path'));
         $this->assertSame([false, true], array_column($items, 'used'));
@@ -107,9 +107,9 @@ class ImageListTest extends TestCase
 
         $result = $this->tool->execute(['types' => ['jpg'], 'limit' => 1]);
 
-        $this->assertSame(3, $this->at($result, 'total'));
-        $this->assertSame('wysiwyg/b.jpg', $this->at($result, 'items.0.path'));
-        $this->assertSame(4, $this->at($result, 'items.0.size_kb'));
+        $this->assertSame(3, $this->payloadAt($result, 'total'));
+        $this->assertSame('wysiwyg/b.jpg', $this->payloadAt($result, 'items.0.path'));
+        $this->assertSame(4, $this->payloadAt($result, 'items.0.size_kb'));
     }
 
     /**
@@ -127,9 +127,9 @@ class ImageListTest extends TestCase
 
         $result = $this->tool->execute(['types' => ['jpg'], 'min_size_kb' => 5, 'limit' => 5]);
 
-        $this->assertSame(1, $this->at($result, 'total'));
-        $this->assertSame('wysiwyg/a.jpg', $this->at($result, 'items.0.path'));
-        $this->assertSame(7, $this->at($result, 'items.0.gallery_asset_id'));
+        $this->assertSame(1, $this->payloadAt($result, 'total'));
+        $this->assertSame('wysiwyg/a.jpg', $this->payloadAt($result, 'items.0.path'));
+        $this->assertSame(7, $this->payloadAt($result, 'items.0.gallery_asset_id'));
     }
 
     /**
@@ -144,7 +144,7 @@ class ImageListTest extends TestCase
 
         $result = $this->tool->execute(['types' => ['jpg'], 'min_width' => 5, 'limit' => 2]);
 
-        $this->assertSame(3, $this->at($result, 'total'));
+        $this->assertSame(3, $this->payloadAt($result, 'total'));
         $this->assertSame(['wysiwyg/b.jpg', 'wysiwyg/c.jpg'], array_column($this->arrayAt($result, 'items'), 'path'));
     }
 
@@ -162,9 +162,9 @@ class ImageListTest extends TestCase
 
         $result = $this->tool->execute(['missing_alt' => true, 'sort' => 'path']);
 
-        $this->assertSame(1, $this->at($result, 'total'));
-        $this->assertSame('wysiwyg/c.jpg', $this->at($result, 'items.0.path'));
-        $this->assertSame(['hyva_cms'], $this->at($result, 'items.0.used_in'));
+        $this->assertSame(1, $this->payloadAt($result, 'total'));
+        $this->assertSame('wysiwyg/c.jpg', $this->payloadAt($result, 'items.0.path'));
+        $this->assertSame(['hyva_cms'], $this->payloadAt($result, 'items.0.used_in'));
     }
 
     /**
@@ -183,7 +183,7 @@ class ImageListTest extends TestCase
         $result = $this->tool->execute(['used_in' => 'product', 'types' => ['jpg'], 'sort' => 'path']);
 
         $this->assertSame(['wysiwyg/c.jpg'], array_column($this->arrayAt($result, 'items'), 'path'));
-        $this->assertSame(1, $this->at($result, 'total'));
+        $this->assertSame(1, $this->payloadAt($result, 'total'));
     }
 
     /**
@@ -229,10 +229,10 @@ class ImageListTest extends TestCase
 
         $result = $this->tool->execute(['types' => ['jpg'], 'limit' => 1]);
 
-        $this->assertSame('wysiwyg/b.jpg', $this->at($result, 'items.0.path'));
-        $this->assertSame(1, $this->at($result, 'items.0.usage_count'));
-        $this->assertSame(['menu'], $this->at($result, 'items.0.used_in'));
-        $this->assertSame(1, $this->at($result, 'items.0.usages_hidden_by_permissions'));
+        $this->assertSame('wysiwyg/b.jpg', $this->payloadAt($result, 'items.0.path'));
+        $this->assertSame(1, $this->payloadAt($result, 'items.0.usage_count'));
+        $this->assertSame(['menu'], $this->payloadAt($result, 'items.0.used_in'));
+        $this->assertSame(1, $this->payloadAt($result, 'items.0.usages_hidden_by_permissions'));
     }
 
     /**
