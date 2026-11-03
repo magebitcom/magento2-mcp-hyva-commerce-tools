@@ -120,6 +120,23 @@ class MenuService
     }
 
     /**
+     * Whether only the re-assignment allows this change (see StoreScopeGuard::changesOnlyAfterReassignment())
+     *
+     * @param array $menu Row from locateForWrite().
+     * @param array|null $newStoreIds Store views this call assigns, or null when it keeps them.
+     * @return bool
+     * @phpstan-param array<string, mixed> $menu
+     * @phpstan-param list<int>|null $newStoreIds
+     */
+    public function changesOnlyAfterReassignment(array $menu, ?array $newStoreIds): bool
+    {
+        return $this->storeScopeGuard->changesOnlyAfterReassignment(
+            Cast::intList($menu['store_ids'] ?? []),
+            $newStoreIds
+        );
+    }
+
+    /**
      * Get document.
      *
      * @param int $menuId

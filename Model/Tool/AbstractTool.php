@@ -32,10 +32,11 @@ abstract class AbstractTool implements ToolInterface, UnderlyingAclAwareInterfac
     public const IS_WRITE = false;
 
     /**
-     * Description note for content MCP cannot delete (%s = what, e.g. "CMS page"); agents must not substitute.
+     * Description note naming the delete tool (%1$s = what, e.g. "CMS page"; %2$s = tool); agents must not substitute.
      */
-    public const ADMIN_ONLY_DELETE_NOTE = 'Deleting a %s is not possible over MCP: it is admin-only (Magento admin). '
-        . 'When asked to delete one, tell the user so; do not deactivate, empty or unassign it instead.';
+    public const DELETE_TOOL_NOTE = 'To delete a %1$s use %2$s (it previews first and deletes only with "confirm": '
+        . 'true; it needs its own MCP permission, without it tell the user deletion is not allowed). Do not '
+        . 'deactivate, empty or unassign it as a substitute.';
 
     /**
      * @inheritDoc
@@ -163,6 +164,28 @@ abstract class AbstractTool implements ToolInterface, UnderlyingAclAwareInterfac
             $code = is_int($status) ? 'status_' . $status : 'soft_error';
         }
         return $this->jsonResult(['error' => $message] + $details, ['error' => $code], true);
+    }
+
+    /**
+     * Soft error for a draft refused after the call's settings were applied (a re-assigning call moves first)
+     *
+     * @param LocalizedException|ConflictException $exception
+     * @param array $result What the call wrote so far.
+     * @return ToolResultInterface
+     * @throws LocalizedException
+     * @phpstan-param array<string, mixed> $result
+     */
+    protected function draftRefusedAfterSettings(
+        LocalizedException|ConflictException $exception,
+        array $result
+    ): ToolResultInterface {
+        return $this->softError(
+            'The settings were applied but the draft was not saved: ' . $exception->getMessage()
+                . ' Save the draft again in a separate call.',
+            ['settings_applied' => true, 'draft_saved' => false]
+                + ($exception instanceof ConflictException ? ['status' => 409] : [])
+                + $result
+        );
     }
 
     /**

@@ -88,6 +88,45 @@ class StoreScopeGuardTest extends TestCase
         $this->assertFalse($guard->allowsAssignment([1, 2], [1]));
     }
 
+    public function testAChangeMayMoveAnAllStoreViewsEntityIntoOwnStoreViewsOnly(): void
+    {
+        $guard = $this->storeScope([1]);
+        $guard->assertChangeable('CMS page #5', [0], [1]);
+        $guard->assertChangeable('CMS page #5', [1], null);
+        foreach ([[[0], null], [[0], [0]], [[0], [1, 2]], [[2], [1]]] as [$current, $new]) {
+            try {
+                $guard->assertChangeable('CMS page #5', $current, $new);
+                $this->fail('The change must be refused.');
+            } catch (AuthorizationException $e) {
+                $this->assertStringStartsWith(StoreScopeGuard::RESTRICTED, $e->getMessage());
+            }
+        }
+    }
+
+    public function testAnEmptyAssignmentIsJudgedWhereTheEntityIs(): void
+    {
+        // F1: [] enters no store view; it would only drop store view 0 and take the entity offline everywhere.
+        $guard = $this->storeScope([1]);
+        $guard->assertChangeable('CMS page #5', [1], []);
+        try {
+            $guard->assertChangeable('CMS page #5', [0], []);
+            $this->fail('Emptying an All Store Views assignment must be refused.');
+        } catch (AuthorizationException $e) {
+            $this->assertStringContainsString('may not change CMS page #5', $e->getMessage());
+        }
+        $this->storeScope(null)->assertChangeable('CMS page #5', [0], []);
+    }
+
+    public function testOnlyAMoveOutOfStoreViewsTheRoleMayNotChangeIsAllowedByTheMoveAlone(): void
+    {
+        $guard = $this->storeScope([1]);
+        $this->assertTrue($guard->changesOnlyAfterReassignment([0], [1]));
+        $this->assertFalse($guard->changesOnlyAfterReassignment([1], [1]));
+        $this->assertFalse($guard->changesOnlyAfterReassignment([0], null));
+        $this->assertFalse($guard->changesOnlyAfterReassignment([0], []));
+        $this->assertFalse($this->storeScope(null)->changesOnlyAfterReassignment([0], [1]));
+    }
+
     public function testRefusalsAreAuthorizationErrorsNamingTheEntity(): void
     {
         $guard = $this->storeScope([1]);

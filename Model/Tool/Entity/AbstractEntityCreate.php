@@ -121,6 +121,8 @@ abstract class AbstractEntityCreate extends AbstractTool implements ContextualAc
                 ->description('URL key / identifier, unique per store view.'))
             ->array('store_ids', fn (ArrayBuilder $a) => $a
                 ->ofIntegers()
+                // As in the admin form a store view is required: omit the field for all store views, never send [].
+                ->minItems(1)
                 ->description('Store views; default [0] = all.'))
             ->boolean('is_active', fn (BooleanBuilder $b) => $b
                 ->description('Default false. The Magento active flag: true makes the '

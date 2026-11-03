@@ -140,6 +140,7 @@ Give a role the Hyvä permissions that match what the agent should do; existing 
 | publish | + `Hyva_Cms::page_publish`, `Hyva_Cms::block_publish`, `Hyva_MenuBuilder::menu_publish` |
 | schedule | + `*_scheduling`, `*_schedule_save`, `*_schedule_cancel` |
 | export / import | + `*_export` / `*_save` and `Hyva_Cms::transfer` (Transfer Center) |
+| delete pages, blocks, menus | the tool's own resource (*Delete CMS Pages / CMS Blocks / Hyvä Menus via MCP*) + `Magento_Cms::page_delete` and `Hyva_Cms::page_delete`, `Magento_Cms::block` and `Hyva_Cms::block_delete`, `Hyva_MenuBuilder::menu_delete` |
 | clear optimized images | + `Hyva_MediaGallery::asset_save` |
 | manage Media Gallery files | + `Hyva_MediaGallery::asset_save` (move), `asset_delete` (trash, restore), `folder_save` |
 | forms | `Hyva_FormBuilder::form_view`, `form_save`, `form_publish`, `form_version_history` |
@@ -155,6 +156,30 @@ Give a role the Hyvä permissions that match what the agent should do; existing 
 A role without `Hyva_Cms::cms` sees none of the Hyvä CMS, menu or media tools. Roles restricted to some websites by
 Advanced Admin Permissions are held to them by the store credit tools too (Hyvä's own store credit services do not
 check scope).
+
+### Delete tools
+
+`hyva_cms.page.delete`, `hyva_cms.block.delete` and `hyva_menu.delete` delete one page, block or menu through the
+repository the admin delete action uses (Magento's page / block repository in the admin area, Hyvä's menu repository),
+so Hyvä drafts, version history and Tailwind CSS go with it as in the admin (foreign keys with `ON DELETE CASCADE`).
+Scheduled releases that name it are not removed, as in the admin.
+
+- **Permissions.** Each tool has its own resource under *MCP Tools → Hyvä Commerce Tools* (*Tool: Delete CMS Pages via
+  MCP*, *… CMS Blocks via MCP*, *… Hyvä Menus via MCP*). The module grants it to no role; only a role with *All*
+  resources (Administrators) has it without being given it. The call also needs the admin delete permission:
+  `Magento_Cms::page_delete` (the admin page Delete action) and Hyvä's `Hyva_Cms::page_delete` for pages,
+  `Magento_Cms::block` (Magento has no separate block delete permission) and `Hyva_Cms::block_delete` for blocks,
+  `Hyva_MenuBuilder::menu_delete` for menus. The core checks the tool resource and the "Listed with" resource on
+  `tools/list` and `tools/call`; the page and block tools check both delete permissions again and refuse with status
+  403.
+- **Confirm.** Without `"confirm": true` nothing is deleted; the reply is the standard preview (`action`
+  `delete_cms_page` / `delete_cms_block` / `delete_menu`, `affected` = the entity with its store views and `in_use`,
+  `details.usage` = where it is still used: home / 404 / cookies page configuration and links in content and menus for
+  a page; Hyvä CMS components, widget directives and widget instances for a block; header/footer design configuration,
+  content, widget instances, layout and templates for a menu). An entity in use can still be deleted; the hint says so.
+- **Store scope.** As for any change: every store view the entity is assigned to must be the role's (store view 0
+  needs all of them).
+- **Writes switch.** They are write tools, so `allow_writes` and the token's write flag apply.
 
 ## Optional features
 
@@ -177,9 +202,9 @@ Hyvä Commerce 1.4.0 (`hyva-themes/commerce` 1.4.0) and what this module offers 
 
 | Module (version) | Tools | Notes |
 |---|---|---|
-| Hyvä CMS 1.3.1 (Liveview editor, Connect, Admin Styles) | `hyva_cms.*` (27, without `translation.*` and `tailwind.status`) | Pages, blocks, drafts, versions, scheduling, components, export/import, PageBuilder migration, preview, `permission.check`; per-type verbs from `ContentTypeAuthorization` |
+| Hyvä CMS 1.3.1 (Liveview editor, Connect, Admin Styles) | `hyva_cms.*` (29, without `translation.*` and `tailwind.status`) | Pages, blocks, drafts, versions, scheduling, components, export/import, PageBuilder migration, preview, `permission.check`; per-type verbs from `ContentTypeAuthorization` |
 | CMS AI Translations 1.0.2 | `hyva_cms.translation.*` (2) | Status per store view; run returns proposals and can write the draft, never publishes |
-| Menu Builder 1.1.0 | `hyva_menu.*` (20) | Includes publish, versions and schedules (1.1 per-verb permissions) |
+| Menu Builder 1.1.0 | `hyva_menu.*` (21) | Includes publish, delete, versions and schedules (1.1 per-verb permissions) |
 | Media Gallery 1.0.0 | `hyva_media.asset.*`, `trash.*`, `folder.create`, `sync.status`, `audit.literal_urls` (9) | Asset ids in content (`imageOptions.id`), move, trash/restore, sync drift, literal-URL audit |
 | Media Optimization 1.1.0 | `hyva_media.optimization.*` (5) | Unchanged in 1.4 |
 | Image usage and audits (CMS + Media Gallery) | `hyva_media.image.*`, `hyva_media.audit_*`, `hyva_media.status` (10) | Find, replace and fix images across CMS content and menus |
@@ -204,9 +229,9 @@ Not covered, on purpose:
 | Image Editor 1.1.0 | Interactive in-browser editor; its saved edits show in `hyva_media.image.get` |
 | CMS Google Maps 1.0.0 | Only a CMS component; listed and validated by `hyva_cms.component.list` / `schema` / `validate` |
 
-Deleting CMS pages, blocks and menus is admin-only on purpose: there is no delete tool, and the page, block and menu
-list / update descriptions tell the agent to say so instead of deactivating or emptying the content. Single menu items
-are removed with `hyva_menu.item.remove`; media files go to the Media Gallery trash with `hyva_media.asset.trash`.
+Deleting CMS pages, blocks and menus: `hyva_cms.page.delete`, `hyva_cms.block.delete` and `hyva_menu.delete` (see
+[Delete tools](#delete-tools)). Single menu items are removed with `hyva_menu.item.remove`; media files go to the Media
+Gallery trash with `hyva_media.asset.trash`.
 
 ## Tool catalog
 
@@ -217,6 +242,7 @@ are removed with `hyva_menu.item.remove`; media files go to the Media Gallery tr
 | `hyva_cms.block.create` | write | `Hyva_Cms::block_save` | copy_from.entity_type → view | Create Hyvä CMS Block |
 | `hyva_cms.block.get` | read | `Hyva_Cms::block_view` | fields with versions → version_history | Get Hyvä CMS Block |
 | `hyva_cms.block.list` | read | `Hyva_Cms::block_view` |  | List Hyvä CMS Blocks |
+| `hyva_cms.block.delete` | write | `Hyva_Cms::block_delete` + `Magento_Cms::block` |  | Delete Hyvä CMS Block (own resource *Delete CMS Blocks via MCP*; confirm-gated) |
 | `hyva_cms.block.update` | write | `Hyva_Cms::block_save` |  | Update Hyvä CMS Block |
 | `hyva_cms.component.list` | read | `Hyva_Cms::cms` |  | List Hyvä CMS Components |
 | `hyva_cms.component.schema` | read | `Hyva_Cms::cms` |  | Get Hyvä CMS Component Schema |
@@ -231,6 +257,7 @@ are removed with `hyva_menu.item.remove`; media files go to the Media Gallery tr
 | `hyva_cms.page.create` | write | `Hyva_Cms::page_save` | copy_from.entity_type → view | Create Hyvä CMS Page |
 | `hyva_cms.page.get` | read | `Hyva_Cms::page_view` | fields with versions → version_history | Get Hyvä CMS Page |
 | `hyva_cms.page.list` | read | `Hyva_Cms::page_view` |  | List Hyvä CMS Pages |
+| `hyva_cms.page.delete` | write | `Hyva_Cms::page_delete` + `Magento_Cms::page_delete` |  | Delete Hyvä CMS Page (own resource *Delete CMS Pages via MCP*; confirm-gated) |
 | `hyva_cms.page.update` | write | `Hyva_Cms::page_save` |  | Update Hyvä CMS Page |
 | `hyva_cms.permission.check` | read | `-` |  | Check Hyvä CMS Permissions |
 | `hyva_cms.preview` | read | the verb on any type | entity_type → view (+ version_history with version_id) | Preview Hyvä CMS Content |
@@ -265,6 +292,7 @@ are removed with `hyva_menu.item.remove`; media files go to the Media Gallery tr
 | `hyva_menu.schedule.cancel` | write | `Hyva_MenuBuilder::menu_schedule_cancel` | entity_type → schedule_cancel | Cancel Hyvä Menu Schedule |
 | `hyva_menu.schedule.create` | write | `Hyva_MenuBuilder::menu_schedule_save` | entity_type → schedule_save (+ version_history with version_id) | Schedule Hyvä Menu |
 | `hyva_menu.status` | read | `Hyva_Cms::cms` |  | Menu Builder Status |
+| `hyva_menu.delete` | write | `Hyva_MenuBuilder::menu_delete` |  | Delete Hyvä Menu (own resource *Delete Hyvä Menus via MCP*; confirm-gated) |
 | `hyva_menu.update` | write | `Hyva_MenuBuilder::menu_save` |  | Update Hyvä Menu |
 | `hyva_menu.validate` | read | `Hyva_MenuBuilder::menu_view` |  | Validate Hyvä Menu |
 | `hyva_menu.version.list` | read | `Hyva_MenuBuilder::menu_version_history` | entity_type → version_history | List Hyvä Menu Versions |
@@ -452,6 +480,13 @@ reuses the same services as the audit tools. Templates are static markup (no Alp
   roots and lists them in `skipped_outside_targets` (`id`, `name`).
 - `hyva_cms.component.validate` warns (`invalid_link`) about link field values with neither `type` and `value` nor
   a non-empty `src`, such as `{"url": "..."}`, which render an empty href.
+
+## Upgrade notes
+
+- **Since 0.0.1 (breaking for custom gateways):** `Api\Adapter\MenuGatewayInterface` has a new method
+  `delete(int $menuId): void` (used by `hyva_menu.delete`). A project that replaces the module's preference for this
+  interface in its own `di.xml` must add the method, or PHP stops with a fatal error when the class is loaded.
+  Projects that keep the module's `MenuGateway` need no change.
 
 ## Development
 

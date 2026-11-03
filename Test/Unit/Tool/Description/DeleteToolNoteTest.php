@@ -18,9 +18,9 @@ use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuUpdate;
 use PHPUnit\Framework\TestCase;
 
 /**
- * T-22: there is no delete tool for pages, blocks and menus, and the descriptions say so.
+ * T-22: the page, block and menu list / update descriptions name the delete tool.
  */
-class AdminOnlyDeleteNoteTest extends TestCase
+class DeleteToolNoteTest extends TestCase
 {
     /**
      * @return array<string, array{0: class-string<ToolInterface>, 1: string}>
@@ -28,12 +28,12 @@ class AdminOnlyDeleteNoteTest extends TestCase
     public static function toolProvider(): array
     {
         return [
-            'page list' => [PageList::class, 'Deleting a CMS page is not possible over MCP'],
-            'page update' => [PageUpdate::class, 'Deleting a CMS page is not possible over MCP'],
-            'block list' => [BlockList::class, 'Deleting a CMS block is not possible over MCP'],
-            'block update' => [BlockUpdate::class, 'Deleting a CMS block is not possible over MCP'],
-            'menu list' => [MenuList::class, 'Deleting a menu is not possible over MCP'],
-            'menu update' => [MenuUpdate::class, 'Deleting a menu is not possible over MCP'],
+            'page list' => [PageList::class, 'To delete a CMS page use hyva_cms_page_delete'],
+            'page update' => [PageUpdate::class, 'To delete a CMS page use hyva_cms_page_delete'],
+            'block list' => [BlockList::class, 'To delete a CMS block use hyva_cms_block_delete'],
+            'block update' => [BlockUpdate::class, 'To delete a CMS block use hyva_cms_block_delete'],
+            'menu list' => [MenuList::class, 'To delete a menu use hyva_menu_delete'],
+            'menu update' => [MenuUpdate::class, 'To delete a menu use hyva_menu_delete'],
         ];
     }
 
@@ -42,12 +42,12 @@ class AdminOnlyDeleteNoteTest extends TestCase
      * @param class-string<ToolInterface> $class
      * @param string $note
      */
-    public function testTheDescriptionSaysDeletionIsAdminOnly(string $class, string $note): void
+    public function testTheDescriptionNamesTheDeleteTool(string $class, string $note): void
     {
         $tool = (new \ReflectionClass($class))->newInstanceWithoutConstructor();
         $description = $tool->getDescription();
         $this->assertStringContainsString($note, $description);
-        $this->assertStringContainsString('do not deactivate, empty or unassign it instead', $description);
+        $this->assertStringContainsString('Do not deactivate, empty or unassign it as a substitute', $description);
         $this->assertStringNotContainsString('%', $description);
     }
 }

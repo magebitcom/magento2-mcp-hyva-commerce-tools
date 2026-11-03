@@ -120,6 +120,36 @@ class EntityWriter
     }
 
     /**
+     * Delete a CMS page or block through the Magento repository the admin delete action ends in
+     *
+     * Runs in the admin area like save(), so the model's delete events and every observer and plugin on them (Hyvä
+     * CMS cache invalidation, Advanced Admin Permissions in the admin) run as they do there. Hyvä drafts, version
+     * history and Tailwind CSS rows go with the entity (foreign keys with ON DELETE CASCADE).
+     *
+     * @param string $type cms_page|cms_block
+     * @param int $id
+     * @return void
+     * @throws LocalizedException
+     */
+    public function delete(string $type, int $id): void
+    {
+        try {
+            $this->appState->emulateAreaCode(
+                Area::AREA_ADMINHTML,
+                fn () => match ($type) {
+                    ContentLocator::TYPE_PAGE => $this->pageRepository->deleteById($id),
+                    ContentLocator::TYPE_BLOCK => $this->blockRepository->deleteById((string) $id),
+                    default => throw new LocalizedException(__('Unexpected content type %1.', $type)),
+                }
+            );
+        } catch (LocalizedException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            throw new LocalizedException(__('Could not delete the %1: %2', $type, $e->getMessage()));
+        }
+    }
+
+    /**
      * Stored values of settings fields that the content locator does not return (page layout, heading, meta).
      *
      * Lets the update tools tell an unchanged value from a change. Loads the entity only when a field is asked.

@@ -218,7 +218,7 @@ class StoreScopeGuard
                 '%1; %2 (%3) is outside it.',
                 self::RESTRICTED,
                 $label,
-                self::storeViewList($storeIds)
+                $this->storeViewList($storeIds)
             ));
         }
     }
@@ -273,7 +273,7 @@ class StoreScopeGuard
                 . 'be changed (store view 0, "All Store Views", needs every store view).',
                 self::RESTRICTED,
                 $label,
-                self::storeViewList($storeIds)
+                $this->storeViewList($storeIds)
             ));
         }
     }
@@ -284,6 +284,8 @@ class StoreScopeGuard
      * Without a new assignment the entity's store views must be writable (assertWritable()). A save that
      * re-assigns it is judged by the assignment it enters instead: the entity must be readable and the move
      * allowed (assertAssignable()), so an "All Store Views" entity can be moved into the caller's store views.
+     * An empty new assignment enters no store view: it would only drop the current ones (the entity goes offline
+     * everywhere), so it is judged as a change where the entity is.
      *
      * @param string $label
      * @param array $storeIds Current assignment.
@@ -295,12 +297,30 @@ class StoreScopeGuard
      */
     public function assertChangeable(string $label, array $storeIds, ?array $newStoreIds): void
     {
-        if ($newStoreIds === null) {
+        if ($newStoreIds === null || $newStoreIds === []) {
             $this->assertWritable($label, $storeIds);
             return;
         }
         $this->assertReadable($label, $storeIds);
         $this->assertAssignable($label, $storeIds, $newStoreIds);
+    }
+
+    /**
+     * Whether only the re-assignment allows the change: the caller may not change the entity where it is
+     *
+     * Such a call (assertChangeable() with a new assignment) must move the entity before anything else is written
+     * to it, e.g. a draft: written first, a draft would stay on an entity the caller may not change when the move
+     * then fails.
+     *
+     * @param array $storeIds Current assignment.
+     * @param array|null $newStoreIds Assignment this call saves, or null when it keeps the current one.
+     * @return bool
+     * @phpstan-param list<int> $storeIds
+     * @phpstan-param list<int>|null $newStoreIds
+     */
+    public function changesOnlyAfterReassignment(array $storeIds, ?array $newStoreIds): bool
+    {
+        return $newStoreIds !== null && $newStoreIds !== [] && !$this->allowsWrite($storeIds);
     }
 
     /**
@@ -322,7 +342,7 @@ class StoreScopeGuard
                 . 'a store view outside your role is not allowed either).',
                 self::RESTRICTED,
                 $label,
-                self::storeViewList($newStoreIds)
+                $this->storeViewList($newStoreIds)
             ));
         }
     }
@@ -352,7 +372,7 @@ class StoreScopeGuard
      * @return string
      * @phpstan-param list<int> $storeIds
      */
-    public static function storeViewList(array $storeIds): string
+    private function storeViewList(array $storeIds): string
     {
         if ($storeIds === [0]) {
             return 'store view 0 ("All Store Views")';

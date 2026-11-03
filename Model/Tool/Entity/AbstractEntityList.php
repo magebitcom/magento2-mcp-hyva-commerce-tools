@@ -79,7 +79,8 @@ abstract class AbstractEntityList extends AbstractTool
             'List CMS %ss with their Hyvä CMS state: liveview enabled, published, draft-only or published with '
                 . 'unpublished draft changes, pending schedules, and whether the Magento content still uses Page '
                 . 'Builder/WYSIWYG. Filter by store view, status, component usage or legacy (non-Hyvä) content. '
-                . sprintf(self::ADMIN_ONLY_DELETE_NOTE, 'CMS %1$s') . ' ' . ListPagination::DESCRIPTION_NOTE,
+                . sprintf(self::DELETE_TOOL_NOTE, 'CMS %1$s', 'hyva_cms_%1$s_delete') . ' '
+                . ListPagination::DESCRIPTION_NOTE,
             strtolower(static::ENTITY_LABEL)
         );
     }

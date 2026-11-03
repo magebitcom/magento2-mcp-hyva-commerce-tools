@@ -139,6 +139,37 @@ class ContentServiceTest extends TestCase
         $this->service->saveDraft('cms_page', 5, $document, null, 'what-i-read');
     }
 
+    public function testAssertDraftSavableRefusesAStaleBaseVersionWithoutWriting(): void
+    {
+        $this->storedDraft = (string) json_encode(['version' => ['uid' => 'saved-elsewhere'], 'content' => []]);
+        $document = $this->tree->insertNode($this->tree->newDocument('cms_page', 5), $this->tree->createNode('row'));
+        $this->provider->expects($this->never())->method('saveContent');
+        $this->provider->expects($this->never())->method('saveVersionHistoryItem');
+        $this->expectException(ConflictException::class);
+        $this->service->assertDraftSavable('cms_page', 5, $document, 'what-i-read');
+    }
+
+    public function testAssertDraftSavableRefusesInvalidContentWithoutWriting(): void
+    {
+        $document = $this->tree->insertNode(
+            $this->tree->newDocument('cms_page', 5),
+            ['uid' => 'u', 'component' => 'unknown', 'children' => []]
+        );
+        $this->provider->expects($this->never())->method('saveContent');
+        $this->expectException(LocalizedException::class);
+        $this->expectExceptionMessageMatches('/^The content was not saved: \[u\] /');
+        $this->service->assertDraftSavable('cms_page', 5, $document);
+    }
+
+    public function testAssertDraftSavableAcceptsAValidDocumentWithoutWriting(): void
+    {
+        $this->storedDraft = (string) json_encode(['version' => ['uid' => 'what-i-read'], 'content' => []]);
+        $document = $this->tree->insertNode($this->tree->newDocument('cms_page', 5), $this->tree->createNode('row'));
+        $this->provider->expects($this->never())->method('saveContent');
+        $this->provider->expects($this->never())->method('saveVersionHistoryItem');
+        $this->service->assertDraftSavable('cms_page', 5, $document, 'what-i-read');
+    }
+
     public function testStampTurnsNullTimestampsFromHyvaRestoresIntoStrings(): void
     {
         $restored = ['version' => ['uid' => 'r1', 'last_publish_timestamp' => null, 'last_save_timestamp' => null]];

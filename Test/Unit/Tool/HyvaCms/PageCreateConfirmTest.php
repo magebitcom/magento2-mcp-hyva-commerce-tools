@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\EntityWriter;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockCreate;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageCreate;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use PHPUnit\Framework\TestCase;
@@ -144,6 +145,42 @@ class PageCreateConfirmTest extends TestCase
         ]));
 
         $this->assertTrue($payload['created'] ?? null);
+    }
+
+    /**
+     * @param class-string<PageCreate|BlockCreate> $class
+     * @dataProvider createToolProvider
+     */
+    public function testTheSchemaNeedsAtLeastOneStoreView(string $class): void
+    {
+        // T-71: an empty list must not silently become all store views ([0]); omitting the field still means all.
+        $tool = new $class(
+            $this->createMock(EntityWriter::class),
+            $this->contentService(),
+            $this->createMock(ComponentTree::class),
+            $this->createMock(DraftEditor::class),
+            $this->createMock(ContentLocator::class),
+            $this->createMock(PreviewService::class),
+            new LiveSettings(),
+            $this->createMock(ContentAcl::class),
+            $this->storeScope(null)
+        );
+
+        $schema = $tool->getInputSchema();
+        $properties = $schema['properties'] ?? null;
+        $this->assertIsArray($properties);
+        $this->assertSame(1, $properties['store_ids']['minItems'] ?? null);
+        $required = $schema['required'] ?? [];
+        $this->assertIsArray($required);
+        $this->assertNotContains('store_ids', $required);
+    }
+
+    /**
+     * @return array<string, array{class-string<PageCreate|BlockCreate>}>
+     */
+    public static function createToolProvider(): array
+    {
+        return ['page' => [PageCreate::class], 'block' => [BlockCreate::class]];
     }
 
     /**

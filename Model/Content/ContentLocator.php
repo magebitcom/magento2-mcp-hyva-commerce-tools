@@ -111,6 +111,20 @@ class ContentLocator
     }
 
     /**
+     * Whether only the re-assignment allows this change (see StoreScopeGuard::changesOnlyAfterReassignment())
+     *
+     * @param array $entity Row from locateForWrite().
+     * @param array|null $newStoreIds Store views this call assigns, or null when it keeps them.
+     * @return bool
+     * @phpstan-param array{store_ids: list<int>} $entity
+     * @phpstan-param list<int>|null $newStoreIds
+     */
+    public function changesOnlyAfterReassignment(array $entity, ?array $newStoreIds): bool
+    {
+        return $this->storeScopeGuard->changesOnlyAfterReassignment($entity['store_ids'], $newStoreIds);
+    }
+
+    /**
      * Split entities into those the caller may change and those it may only see; the rest are dropped.
      *
      * Unrestricted callers get every target back as writable without any lookup; restricted callers cost one

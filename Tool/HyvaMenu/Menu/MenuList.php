@@ -58,7 +58,7 @@ class MenuList extends AbstractMenuTool
     {
         return 'List menus with store views, active flag, draft/published state and where each is assigned '
             . '(header/footer design config). Filter by store view, active state, assignment or search text. '
-            . sprintf(self::ADMIN_ONLY_DELETE_NOTE, 'menu');
+            . sprintf(self::DELETE_TOOL_NOTE, 'menu', 'hyva_menu_delete');
     }
 
     /**
