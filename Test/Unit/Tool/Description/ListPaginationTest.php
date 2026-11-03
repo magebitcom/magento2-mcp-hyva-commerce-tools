@@ -34,15 +34,15 @@ class ListPaginationTest extends TestCase
                 continue;
             }
             $checked[] = str_replace('.', '_', $tool->getName());
-            $pageSize = $properties['page_size'];
-            $page = $properties['page'] ?? [];
+            $pageSize = is_array($properties['page_size']) ? $properties['page_size'] : [];
+            $page = is_array($properties['page'] ?? null) ? $properties['page'] : [];
             $ok = isset($properties['page'])
                 && !isset($properties['limit'])
                 && str_contains($description, 'page_size (default 50, max 200)')
                 && ($pageSize['maximum'] ?? null) === 200
-                && str_contains((string) ($pageSize['description'] ?? ''), 'default 50')
-                && str_contains((string) ($pageSize['description'] ?? ''), 'max 200')
-                && str_contains((string) ($page['description'] ?? ''), 'default 1');
+                && str_contains($this->descriptionOf($pageSize), 'default 50')
+                && str_contains($this->descriptionOf($pageSize), 'max 200')
+                && str_contains($this->descriptionOf($page), 'default 1');
             if (!$ok) {
                 $problems[] = str_replace('.', '_', $tool->getName());
             }
@@ -101,5 +101,17 @@ class ListPaginationTest extends TestCase
             $tools[] = (new \ReflectionClass($class))->newInstanceWithoutConstructor();
         }
         return $tools;
+    }
+
+    /**
+     * The description of an input schema property, or '' when it has none.
+     *
+     * @param array<mixed> $property
+     * @return string
+     */
+    private function descriptionOf(array $property): string
+    {
+        $description = $property['description'] ?? '';
+        return is_string($description) ? $description : '';
     }
 }

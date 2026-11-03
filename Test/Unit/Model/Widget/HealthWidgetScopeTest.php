@@ -83,12 +83,12 @@ class HealthWidgetScopeTest extends TestCase
     {
         // T-36: media files have no store scope (as the core leaves unassigned data unscoped); usages are scoped.
         $data = $this->mediaHealth(false, 3)->getDisplayData($this->ctx(), $this->instance());
-        $notice = is_array($data) ? (string) ($data['notice'] ?? '') : '';
+        $notice = $this->notice($data);
         $this->assertStringContainsString('Media files are shared by all websites', $notice);
         $this->assertStringContainsString('3 usages elsewhere left out', $notice);
 
         $data = $this->mediaHealth(false)->getDisplayData($this->ctx(), $this->instance());
-        $notice = is_array($data) ? (string) ($data['notice'] ?? '') : '';
+        $notice = $this->notice($data);
         $this->assertStringNotContainsString('shared by all websites', $notice);
     }
 
@@ -352,5 +352,19 @@ class HealthWidgetScopeTest extends TestCase
         $this->assertIsArray($data);
         $this->assertIsArray($data[$key] ?? null);
         return array_values($data[$key]);
+    }
+
+    /**
+     * The notice from the display data, or '' when there is none.
+     *
+     * @param mixed $data
+     * @return string
+     */
+    private function notice(mixed $data): string
+    {
+        $this->assertIsArray($data);
+        $notice = $data['notice'] ?? '';
+        $this->assertIsString($notice);
+        return $notice;
     }
 }

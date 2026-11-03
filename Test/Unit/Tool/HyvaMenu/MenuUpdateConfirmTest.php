@@ -300,13 +300,20 @@ class MenuUpdateConfirmTest extends TestCase
         // The locator's write check, over the real guard.
         $menus->method('locateForWrite')->willReturnCallback(
             static function (array $arguments, ?array $newStoreIds = null) use ($guard, $menu): array {
-                $guard->assertChangeable('menu #3', $menu['store_ids'], $newStoreIds);
+                $guard->assertChangeable(
+                    'menu #3',
+                    $menu['store_ids'],
+                    $newStoreIds === null ? null : Cast::intList($newStoreIds)
+                );
                 return $menu;
             }
         );
         $menus->method('changesOnlyAfterReassignment')->willReturnCallback(
             static fn (array $row, ?array $newStoreIds): bool
-                => $guard->changesOnlyAfterReassignment($menu['store_ids'], $newStoreIds)
+                => $guard->changesOnlyAfterReassignment(
+                    $menu['store_ids'],
+                    $newStoreIds === null ? null : Cast::intList($newStoreIds)
+                )
         );
         return new MenuUpdate(
             $features,

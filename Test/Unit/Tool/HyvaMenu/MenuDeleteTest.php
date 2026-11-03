@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMenu;
 
 use Magebit\Mcp\Api\ToolResultInterface;
+use Magebit\Mcp\Model\Tool\WriteMode;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
@@ -41,11 +42,11 @@ class MenuDeleteTest extends TestCase
         $payload = $this->payload($this->tool($gateway, null, self::IN_USE)->execute(['id' => 3]));
 
         $this->assertSame('delete_menu', $payload['action']);
-        $this->assertSame([1], $this->at($payload, 'affected', 0, 'store_ids'));
-        $this->assertTrue($this->at($payload, 'affected', 0, 'in_use'));
-        $this->assertSame('header', $this->at($payload, 'details', 'usage', 'design_config', 0, 'location'));
+        $this->assertSame([1], $this->valueAt($payload, 'affected', 0, 'store_ids'));
+        $this->assertTrue($this->valueAt($payload, 'affected', 0, 'in_use'));
+        $this->assertSame('header', $this->valueAt($payload, 'details', 'usage', 'design_config', 0, 'location'));
         $this->assertStringContainsString('still in use', Cast::string($payload['hint']));
-        $this->assertTrue($this->at($payload, 'details', 'force_required'));
+        $this->assertTrue($this->valueAt($payload, 'details', 'force_required'));
     }
 
     public function testConfirmWithoutForceRefusesAMenuInUse(): void
@@ -115,7 +116,10 @@ class MenuDeleteTest extends TestCase
             $this->createMock(MenuGatewayInterface::class)
         )->getUnderlyingAclResource());
         $this->assertSame('Magebit_McpHyvaCommerceTools::tool_hyva_menu_delete', MenuDelete::ACL_RESOURCE);
-        $this->assertTrue(MenuDelete::IS_WRITE);
+        $this->assertSame(
+            WriteMode::WRITE,
+            $this->tool($this->createMock(MenuGatewayInterface::class))->getWriteMode()
+        );
     }
 
     public function testItIsHiddenWithoutMenuBuilder(): void
@@ -193,7 +197,7 @@ class MenuDeleteTest extends TestCase
      * @param int|string ...$keys
      * @return mixed
      */
-    private function at(mixed $value, int|string ...$keys): mixed
+    private function valueAt(mixed $value, int|string ...$keys): mixed
     {
         foreach ($keys as $key) {
             $value = is_array($value) ? ($value[$key] ?? null) : null;

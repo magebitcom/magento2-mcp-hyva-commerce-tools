@@ -157,7 +157,9 @@ class OptionalFeatureListingTest extends TestCase
             ]
         );
         $tool = (new \ReflectionClass($class))->newInstanceWithoutConstructor();
-        $declaring = new \ReflectionProperty($class, 'featureChecker');
+        // PHP 8.3 initialises a readonly property only from the class that declares it.
+        $declaring = (new \ReflectionProperty($class, 'featureChecker'))->getDeclaringClass()
+            ->getProperty('featureChecker');
         $declaring->setValue($tool, $features);
         $this->assertInstanceOf(UnderlyingAclAwareInterface::class, $tool);
         return $tool;

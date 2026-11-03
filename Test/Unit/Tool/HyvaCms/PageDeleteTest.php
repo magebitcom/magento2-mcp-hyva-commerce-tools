@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaCms;
 
 use Hyva\CmsLiveviewEditor\Model\Security\ContentTypeAuthorization;
 use Magebit\Mcp\Api\ToolResultInterface;
+use Magebit\Mcp\Model\Tool\WriteMode;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
@@ -55,9 +56,9 @@ class PageDeleteTest extends TestCase
         $this->assertSame(
             ['entity_type' => 'cms_page', 'id' => 7, 'identifier' => 'sale', 'title' => 'Sale', 'is_active' => true,
                 'store_ids' => [1], 'in_use' => false],
-            $this->at($payload, 'affected', 0)
+            $this->valueAt($payload, 'affected', 0)
         );
-        $this->assertFalse($this->at($payload, 'details', 'in_use'));
+        $this->assertFalse($this->valueAt($payload, 'details', 'in_use'));
         $this->assertStringContainsString('cannot be undone', Cast::string($payload['hint']));
     }
 
@@ -66,11 +67,11 @@ class PageDeleteTest extends TestCase
         $payload = $this->payload($this->tool($this->createMock(EntityWriter::class), self::BOTH, null, self::IN_USE)
             ->execute(['id' => 7]));
 
-        $this->assertTrue($this->at($payload, 'affected', 0, 'in_use'));
-        $this->assertTrue($this->at($payload, 'details', 'in_use'));
-        $this->assertSame('home page', $this->at($payload, 'details', 'usage', 'store_config', 0, 'location'));
+        $this->assertTrue($this->valueAt($payload, 'affected', 0, 'in_use'));
+        $this->assertTrue($this->valueAt($payload, 'details', 'in_use'));
+        $this->assertSame('home page', $this->valueAt($payload, 'details', 'usage', 'store_config', 0, 'location'));
         $this->assertStringContainsString('still in use', Cast::string($payload['hint']));
-        $this->assertTrue($this->at($payload, 'details', 'force_required'));
+        $this->assertTrue($this->valueAt($payload, 'details', 'force_required'));
         $this->assertStringContainsString('"force": true', Cast::string($payload['hint']));
     }
 
@@ -86,7 +87,7 @@ class PageDeleteTest extends TestCase
         $this->assertSame(409, $payload['status']);
         $this->assertTrue($payload['in_use']);
         $this->assertTrue($payload['force_required']);
-        $this->assertSame('home page', $this->at($payload, 'usage', 'store_config', 0, 'location'));
+        $this->assertSame('home page', $this->valueAt($payload, 'usage', 'store_config', 0, 'location'));
         $this->assertSame(
             'CMS page "sale" (#7) is still in use (store_config 1, links 1, details in usage). Nothing was deleted. '
                 . 'To delete it anyway, call again with "confirm": true and "force": true; those references break.',
@@ -149,15 +150,15 @@ class PageDeleteTest extends TestCase
             ->execute(['id' => 7, 'force' => true]));
 
         $this->assertTrue($payload['dry_run']);
-        $this->assertTrue($this->at($payload, 'details', 'force_required'));
+        $this->assertTrue($this->valueAt($payload, 'details', 'force_required'));
     }
 
     public function testTheSchemaOffersForceNextToConfirm(): void
     {
         $schema = $this->tool($this->createMock(EntityWriter::class), self::BOTH)->getInputSchema();
 
-        $this->assertSame('boolean', $this->at($schema, 'properties', 'force', 'type'));
-        $this->assertSame('boolean', $this->at($schema, 'properties', 'confirm', 'type'));
+        $this->assertSame('boolean', $this->valueAt($schema, 'properties', 'force', 'type'));
+        $this->assertSame('boolean', $this->valueAt($schema, 'properties', 'confirm', 'type'));
     }
 
     public function testConfirmDeletesThroughTheRepositoryWriter(): void
@@ -240,7 +241,10 @@ class PageDeleteTest extends TestCase
         $this->assertSame('Magento_Cms::block', BlockDelete::ADMIN_DELETE_RESOURCE);
         $this->assertSame('Hyva_Cms::block_delete', BlockDelete::HYVA_DELETE_RESOURCE);
         $this->assertSame('Magebit_McpHyvaCommerceTools::tool_hyva_cms_block_delete', BlockDelete::ACL_RESOURCE);
-        $this->assertTrue(BlockDelete::IS_WRITE);
+        $this->assertSame(
+            WriteMode::WRITE,
+            (new \ReflectionClass(BlockDelete::class))->newInstanceWithoutConstructor()->getWriteMode()
+        );
     }
 
     public function testThePermissionRefusalNamesTheBlockTypeInThePlural(): void
@@ -337,7 +341,7 @@ class PageDeleteTest extends TestCase
      * @param int|string ...$keys
      * @return mixed
      */
-    private function at(mixed $value, int|string ...$keys): mixed
+    private function valueAt(mixed $value, int|string ...$keys): mixed
     {
         foreach ($keys as $key) {
             $value = is_array($value) ? ($value[$key] ?? null) : null;

@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\EntityWriter;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockUpdate;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageUpdate;
@@ -410,13 +411,20 @@ class PageUpdateConfirmTest extends TestCase
         // The locator's write check, over the real guard.
         $locator->method('locateForWrite')->willReturnCallback(
             static function (string $type, array $arguments, ?array $newStoreIds = null) use ($guard, $page): array {
-                $guard->assertChangeable('CMS page #7', $page['store_ids'], $newStoreIds);
+                $guard->assertChangeable(
+                    'CMS page #7',
+                    $page['store_ids'],
+                    $newStoreIds === null ? null : Cast::intList($newStoreIds)
+                );
                 return $page;
             }
         );
         $locator->method('changesOnlyAfterReassignment')->willReturnCallback(
             static fn (array $entity, ?array $newStoreIds): bool
-                => $guard->changesOnlyAfterReassignment($page['store_ids'], $newStoreIds)
+                => $guard->changesOnlyAfterReassignment(
+                    $page['store_ids'],
+                    $newStoreIds === null ? null : Cast::intList($newStoreIds)
+                )
         );
         return new PageUpdate(
             $locator,

@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Acl;
 
 use Hyva\CmsLiveviewEditor\Model\Security\ContentTypeAuthorization;
 use Magebit\Mcp\Api\UnderlyingAclAwareInterface;
+use Magebit\Mcp\Model\Tool\WriteMode;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Content\Preview;
@@ -164,6 +165,9 @@ class ContentAclListingTest extends TestCase
             'Hyva_EmailTemplates::email_template_save',
             TemplateSendTest::UNDERLYING_ACL_RESOURCE
         );
-        $this->assertTrue(TemplateSendTest::IS_WRITE);
+        $this->assertSame(
+            WriteMode::WRITE,
+            (new \ReflectionClass(TemplateSendTest::class))->newInstanceWithoutConstructor()->getWriteMode()
+        );
     }
 }
