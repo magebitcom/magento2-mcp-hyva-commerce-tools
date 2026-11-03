@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Security;
 
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
 use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magento\Framework\Exception\AuthorizationException;
 use Magento\Store\Model\StoreManagerInterface;
@@ -214,7 +215,7 @@ class StoreScopeGuard
     public function assertReadable(string $label, array $storeIds): void
     {
         if (!$this->allowsRead($storeIds)) {
-            throw new AuthorizationException(__(
+            throw new OutOfScopeException(__(
                 '%1; %2 (%3) is outside it.',
                 self::RESTRICTED,
                 $label,
@@ -241,12 +242,12 @@ class StoreScopeGuard
         }
         if ($storeId === null) {
             if ($allowed === []) {
-                throw new AuthorizationException(__('Your admin role is restricted and has no readable store view.'));
+                throw new OutOfScopeException(__('Your admin role is restricted and has no readable store view.'));
             }
             return $allowed[0];
         }
         if ($storeId === 0) {
-            throw new AuthorizationException(__(
+            throw new OutOfScopeException(__(
                 '%1; store view 0 ("All Store Views") is outside it. Pass the store_id of one of your store views.',
                 self::RESTRICTED
             ));
@@ -269,7 +270,7 @@ class StoreScopeGuard
         $this->assertReadable($label, $storeIds);
         if (!$this->allowsWrite($storeIds)) {
             // storeViewList([0]) already names "All Store Views": say the rule once, after it.
-            throw new AuthorizationException(__(
+            throw new OutOfScopeException(__(
                 $storeIds === [0]
                     ? '%1 and may not change %2: it is assigned to %3, which needs every store view. Only content '
                         . 'assigned to your own store views can be changed.'
@@ -341,7 +342,7 @@ class StoreScopeGuard
     public function assertAssignable(string $label, array $currentStoreIds, array $newStoreIds): void
     {
         if (!$this->allowsAssignment($currentStoreIds, $newStoreIds)) {
-            throw new AuthorizationException(__(
+            throw new OutOfScopeException(__(
                 '%1 and may not assign %2 to %3: %4.',
                 self::RESTRICTED,
                 $label,
@@ -390,7 +391,7 @@ class StoreScopeGuard
     public function assertUnrestricted(string $what): void
     {
         if ($this->restrictedStoreIds() !== null) {
-            throw new AuthorizationException(__(
+            throw new OutOfScopeException(__(
                 '%1 and may not change %2: they apply to every store view.',
                 self::RESTRICTED,
                 $what

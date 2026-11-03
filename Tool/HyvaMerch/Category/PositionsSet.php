@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMerch\Category;
 
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\Mcp\Model\Tool\Schema\Builder\ArrayBuilder;
@@ -20,7 +21,6 @@ use Magebit\McpHyvaCommerceTools\Model\Security\AdminScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
-use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
 
 class PositionsSet extends AbstractTool
@@ -87,7 +87,7 @@ class PositionsSet extends AbstractTool
             );
         }
         if ($this->scopeGuard->allowedScopes($this->adminUserId())['restricted']) {
-            throw new AuthorizationException(__(
+            throw new OutOfScopeException(__(
                 '%1 and may not change %2: they apply to every store view.',
                 StoreScopeGuard::RESTRICTED,
                 'category positions'

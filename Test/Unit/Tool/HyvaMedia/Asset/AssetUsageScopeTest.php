@@ -66,7 +66,7 @@ class AssetUsageScopeTest extends TestCase
         $this->assertSame([], $this->payloadAt($result, 'affected.1.used_in.hyva_and_catalog'));
         $this->assertSame(1, $this->payloadAt($result, 'affected.1.usages_hidden_by_permissions'));
         // Asset 2 is used only in store view 2's page: still in use.
-        $this->assertSame(2, $this->payloadAt($result, 'details.in_use'));
+        $this->assertSame(2, $this->payloadAt($result, 'details.in_use_count'));
     }
 
     public function testAssetResolveLeavesOutProductsAndCategoriesOfOtherWebsites(): void
@@ -102,7 +102,8 @@ class AssetUsageScopeTest extends TestCase
             $this->assertCount(2, $this->arrayAt($result, 'affected.0.used_in.magento_tracked'));
             $this->assertCount(1, $this->arrayAt($result, 'affected.1.used_in.hyva_and_catalog'));
         }
-        $this->assertSame(2, $this->payloadAt($trash, 'details.in_use'));
+        $this->assertSame(2, $this->payloadAt($trash, 'details.in_use_count'));
+        $this->assertTrue($this->payloadAt($trash, 'details.in_use'));
     }
 
     /**

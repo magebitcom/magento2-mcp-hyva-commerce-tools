@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Menu;
 
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
 use Magebit\Mcp\Api\LoggerInterface;
 use FilesystemIterator;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
@@ -420,7 +421,7 @@ class MenuService
     {
         $path = $this->catalogScopeReader->categoryPaths([$rootCategoryId])[$rootCategoryId] ?? null;
         if ($path !== null && !$this->storeScopeGuard->allowsCategoryPath($path)) {
-            throw new AuthorizationException(__(
+            throw new OutOfScopeException(__(
                 '%1; category #%2 is outside it.',
                 StoreScopeGuard::RESTRICTED,
                 $rootCategoryId

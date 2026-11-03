@@ -16,6 +16,7 @@ use Magebit\Mcp\Api\UnderlyingAclAwareInterface;
 use Magebit\Mcp\Model\Tool\ToolResult;
 use Magebit\Mcp\Model\Tool\WriteMode;
 use Magebit\McpHyvaCommerceTools\Exception\FeatureUnavailableException;
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
 use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\SecurityViolationException;
@@ -97,6 +98,9 @@ abstract class AbstractTool implements ToolInterface, UnderlyingAclAwareInterfac
                     . 'to it, passing its version uid as base_version_uid. Do not resubmit the content you read '
                     . 'before.',
             ]);
+        } catch (OutOfScopeException $e) {
+            // Audited with its reason, as the in-use refusal is (T-90); the caller sees the same soft 403.
+            return $this->softError($e->getMessage(), ['status' => 403], 'out_of_scope');
         } catch (AuthorizationException $e) {
             return $this->softError($e->getMessage(), ['status' => 403]);
         } catch (SecurityViolationException $e) {

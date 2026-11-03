@@ -13,6 +13,7 @@ use Magebit\Mcp\Api\LoggerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magento\Backend\Model\UrlInterface as BackendUrl;
+use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -39,7 +40,8 @@ class PreviewServiceScopeTest extends TestCase
             $provider,
             $this->createMock(BackendUrl::class),
             $this->createMock(LoggerInterface::class),
-            $guard
+            $guard,
+            $this->createMock(StoreManagerInterface::class)
         );
     }
 

@@ -46,7 +46,8 @@ class ComponentList extends AbstractTool
     public function getDescription(): string
     {
         return 'List enabled Hyvä CMS components grouped by category, with label, description, providing module, '
-            . 'allowed children and whether the component must sit inside a parent.';
+            . 'allowed children and whether the component must sit inside a parent. Not paginated: returns every '
+            . 'matching component.';
     }
 
     /**

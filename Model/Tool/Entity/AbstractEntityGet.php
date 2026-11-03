@@ -25,6 +25,8 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
  */
 abstract class AbstractEntityGet extends AbstractTool implements ContextualAclAwareInterface
 {
+    use FlatFieldsTrait;
+
     public const ENTITY_TYPE = '';
     public const ENTITY_LABEL = '';
 
@@ -105,35 +107,15 @@ abstract class AbstractEntityGet extends AbstractTool implements ContextualAclAw
     protected function run(array $arguments): ToolResultInterface
     {
         $entity = $this->contentLocator->locate(static::ENTITY_TYPE, $arguments);
-        $groups = [];
-        foreach ($this->fieldResolvers as $resolver) {
-            $groups[] = $resolver->getKey();
-        }
-        $fields = $this->stringListArg($arguments, 'fields');
-        $flat = array_values(array_diff(array_intersect($fields, self::IDENTITY_FIELDS), $groups));
-        $unknown = array_values(array_diff($fields, $groups, self::IDENTITY_FIELDS));
-        if ($flat !== []) {
-            $arguments['fields'] = array_values(array_unique([...array_diff($fields, $flat), IdentityResolver::KEY]));
-        }
-        $response = [];
-        foreach ($this->pipeline->plan($this->fieldResolvers, $arguments) as $resolver) {
-            if ($resolver instanceof ContentFieldResolverInterface) {
-                $response[$resolver->getKey()] = $resolver->resolve($entity, $arguments);
-            }
-        }
-        if ($flat !== []) {
-            $identity = is_array($response[IdentityResolver::KEY] ?? null) ? $response[IdentityResolver::KEY] : [];
-            if (!in_array(IdentityResolver::KEY, $fields, true)) {
-                unset($response[IdentityResolver::KEY]);
-            }
-            foreach ($flat as $key) {
-                $response[$key] = $identity[$key] ?? null;
-            }
-        }
-        if ($unknown !== []) {
-            $response['unknown_fields'] = $unknown;
-            $response['available_fields'] = array_values(array_merge($groups, self::IDENTITY_FIELDS));
-        }
+        $response = $this->resolveFields(
+            $this->pipeline,
+            $this->fieldResolvers,
+            $entity,
+            $arguments,
+            $this->stringListArg($arguments, 'fields'),
+            IdentityResolver::KEY,
+            self::IDENTITY_FIELDS
+        );
         return $this->jsonResult($response, ['entity_type' => static::ENTITY_TYPE, 'id' => $entity['id']]);
     }
 }

@@ -10,6 +10,8 @@ namespace Magebit\McpHyvaCommerceTools\Model\Content;
 
 use Hyva\CmsLiveviewEditor\Model\Provider as ContentProvider;
 use Magento\Backend\Model\UrlInterface as BackendUrl;
+use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Store\Model\StoreManagerInterface;
 use Magebit\Mcp\Api\LoggerInterface;
 use Throwable;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
@@ -28,12 +30,14 @@ class PreviewService
      * @param BackendUrl $backendUrl
      * @param LoggerInterface $logger
      * @param StoreScopeGuard $storeScopeGuard
+     * @param StoreManagerInterface $storeManager
      */
     public function __construct(
         private readonly ContentProvider $contentProvider,
         private readonly BackendUrl $backendUrl,
         private readonly LoggerInterface $logger,
-        private readonly StoreScopeGuard $storeScopeGuard
+        private readonly StoreScopeGuard $storeScopeGuard,
+        private readonly StoreManagerInterface $storeManager
     ) {
     }
 
@@ -81,10 +85,10 @@ class PreviewService
             }
             $stores[] = [
                 'store_id' => Cast::int($store['store_id'] ?? 0),
-                'code' => $store['code'] ?? null,
+                'code' => $this->storeCode($store),
                 'is_assigned' => (bool) ($store['is_assigned'] ?? false),
                 'preview_url' => $store['preview_url'] ?? null,
-                'published_url' => $store['published_url'] ?? null,
+                'published_url' => $this->liveUrl($store),
             ];
         }
 
@@ -98,7 +102,7 @@ class PreviewService
             'note' => 'preview_url shows the current draft (or the given version) and needs no admin login. It is '
                 . 'an HMAC capability link: valid up to 7 days and only while the draft is unchanged; links issued '
                 . 'before Hyvä CMS 1.3 no longer work. published_url is the live address as Hyvä CMS reports it '
-                . '(null when the entity has no live URL in that store).',
+                . '(null when the entity has no live URL in that store: inactive, or not assigned to it).',
         ];
         if ($hidden > 0) {
             $preview['stores_hidden_by_permissions'] = $hidden;
@@ -108,6 +112,8 @@ class PreviewService
 
     /**
      * Live URL per store view, as Hyvä CMS reports it (store row published_url).
+     *
+     * None for an inactive entity or a store view it is not assigned to.
      *
      * @param string $type
      * @param int $id
@@ -133,14 +139,61 @@ class PreviewService
             ) {
                 continue;
             }
-            if (is_string($store['published_url'] ?? null) && $store['published_url'] !== '') {
+            $url = $this->liveUrl($store);
+            if ($url !== null) {
                 $urls[] = [
                     'store_id' => Cast::int($store['store_id'] ?? 0),
-                    'code' => is_string($store['code'] ?? null) ? $store['code'] : null,
-                    'published_url' => $store['published_url'],
+                    'code' => $this->storeCode($store),
+                    'published_url' => $url,
                 ];
             }
         }
         return $urls;
+    }
+
+    /**
+     * Store view code of a Hyvä store row; Hyvä's menu provider leaves it out of its rows (T-87).
+     *
+     * @param array $store
+     * @return string|null
+     * @phpstan-param array<mixed> $store
+     */
+    private function storeCode(array $store): ?string
+    {
+        if (is_string($store['code'] ?? null) && $store['code'] !== '') {
+            return $store['code'];
+        }
+        if (!isset($store['store_id'])) {
+            return null;
+        }
+        try {
+            return (string) $this->storeManager->getStore(Cast::int($store['store_id']))->getCode();
+        } catch (NoSuchEntityException) {
+            return null;
+        }
+    }
+
+    /**
+     * Live URL of a Hyvä store row, or null when the entity is inactive or not assigned to that store view.
+     *
+     * Hyvä's page provider reports the page's address for every store view, active or not (T-86); the block, form
+     * and menu providers already leave unassigned store views out.
+     *
+     * @param array $store
+     * @return string|null
+     * @phpstan-param array<mixed> $store
+     */
+    private function liveUrl(array $store): ?string
+    {
+        $url = $store['published_url'] ?? null;
+        if (!is_string($url) || $url === '') {
+            return null;
+        }
+        foreach (['is_active', 'is_assigned'] as $flag) {
+            if (array_key_exists($flag, $store) && !Cast::bool($store[$flag])) {
+                return null;
+            }
+        }
+        return $url;
     }
 }

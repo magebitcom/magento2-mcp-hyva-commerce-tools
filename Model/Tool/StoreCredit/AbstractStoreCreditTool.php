@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Tool\StoreCredit;
 
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
@@ -182,7 +183,7 @@ abstract class AbstractStoreCreditTool extends AbstractTool
             ? $this->scopeGuard->allowsWebsiteForWrite($adminUserId, $websiteId)
             : $this->scopeGuard->allowsWebsite($adminUserId, $websiteId);
         if (!$allowed) {
-            throw new AuthorizationException(__(
+            throw new OutOfScopeException(__(
                 '%1; website %2 is outside it.',
                 StoreScopeGuard::RESTRICTED,
                 $websiteId

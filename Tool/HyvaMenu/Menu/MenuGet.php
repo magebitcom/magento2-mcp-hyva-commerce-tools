@@ -18,7 +18,9 @@ use Magebit\McpHyvaCommerceTools\Api\ContentFieldResolverInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\VersionHistoryAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\FieldResolver\Menu\MenuSettingsResolver;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Entity\FlatFieldsTrait;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Menu\AbstractMenuTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
 
@@ -27,8 +29,16 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
  */
 class MenuGet extends AbstractMenuTool implements ContextualAclAwareInterface
 {
+    use FlatFieldsTrait;
+
     public const TOOL_NAME = 'hyva_menu.get';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_menu_get';
+
+    /**
+     * Keys of the settings group that fields also accepts on their own; they come back at the top level.
+     */
+    public const SETTINGS_FIELDS = ['id', 'identifier', 'title', 'is_active', 'store_ids', 'preview_url_key',
+        'has_draft', 'is_published', 'draft_differs', 'creation_time', 'update_time', 'published_urls'];
 
     /**
      * @param FeatureCheckerInterface $featureChecker
@@ -78,7 +88,9 @@ class MenuGet extends AbstractMenuTool implements ContextualAclAwareInterface
         }
         return 'Return a menu: settings and store views, header/footer placement, nested item structure (uids for '
             . 'hyva_menu_item_*), every link with its category/product/CMS page target and state, preview URLs, '
-            . 'versions and usage. Response keys: ' . implode(', ', $keys) . '. Use fields / exclude to narrow it.';
+            . 'versions and usage. Response keys (groups): ' . implode(', ', $keys) . '. Use fields / exclude to '
+            . 'narrow it: fields takes group names or the settings keys ' . implode(', ', self::SETTINGS_FIELDS)
+            . ', which come back at the top level (e.g. fields ["id", "title", "is_active"]).';
     }
 
     /**
@@ -91,7 +103,9 @@ class MenuGet extends AbstractMenuTool implements ContextualAclAwareInterface
             ->string('edition', fn (StringBuilder $s) => $s
                 ->enum(['draft', 'published'])
                 ->description('Structure/links of the draft (default) or the published menu.'))
-            ->array('fields', fn (ArrayBuilder $a) => $a->ofStrings())
+            ->array('fields', fn (ArrayBuilder $a) => $a->ofStrings()->description(
+                'Response keys to return: group names or settings keys (id, identifier, title, is_active, ...).'
+            ))
             ->array('exclude', fn (ArrayBuilder $a) => $a->ofStrings())
             ->toArray();
     }
@@ -102,12 +116,15 @@ class MenuGet extends AbstractMenuTool implements ContextualAclAwareInterface
     protected function executeMenu(array $arguments): ToolResultInterface
     {
         $entity = $this->contentLocator->locate(ContentLocator::TYPE_MENU, $arguments);
-        $response = [];
-        foreach ($this->pipeline->plan($this->fieldResolvers, $arguments) as $resolver) {
-            if ($resolver instanceof ContentFieldResolverInterface) {
-                $response[$resolver->getKey()] = $resolver->resolve($entity, $arguments);
-            }
-        }
+        $response = $this->resolveFields(
+            $this->pipeline,
+            $this->fieldResolvers,
+            $entity,
+            $arguments,
+            $this->stringListArg($arguments, 'fields'),
+            MenuSettingsResolver::KEY,
+            self::SETTINGS_FIELDS
+        );
         return $this->jsonResult($response, ['id' => $entity['id']]);
     }
 }

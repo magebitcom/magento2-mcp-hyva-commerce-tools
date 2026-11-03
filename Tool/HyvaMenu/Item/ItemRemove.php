@@ -75,10 +75,11 @@ class ItemRemove extends AbstractMenuEditTool
         }
         $described = $this->menuItemBuilder->describe($node);
         if (!empty($node['children']) && !$this->boolArg($arguments, 'confirm')) {
+            $removal = $this->menuItemBuilder->describeForRemoval($node);
             return $this->confirmationRequired(
                 'remove_menu_item_with_children',
-                [$this->menuItemBuilder->describeForRemoval($node)],
-                [],
+                [$removal],
+                ['menu_id' => $menuId, 'children_count' => $removal['children_count'], 'draft_only' => true],
                 null,
                 'Confirming removes the item and its children from the menu DRAFT only; publish with '
                     . 'hyva_menu_publish to change the storefront.'

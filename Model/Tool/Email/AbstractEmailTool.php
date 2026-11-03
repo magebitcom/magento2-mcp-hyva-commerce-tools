@@ -31,6 +31,11 @@ abstract class AbstractEmailTool extends AbstractTool
 {
     public const TEMPLATE_TYPE = EmailGatewayInterface::TYPE_EMAIL;
     public const LABEL = 'email template';
+
+    /**
+     * Plural of LABEL, e.g. "email templates", for messages about the type.
+     */
+    public const LABEL_PLURAL = 'email templates';
     public const UNDERLYING_ACL_RESOURCE = 'Hyva_EmailTemplates::email_template_view';
 
     /**
@@ -87,7 +92,7 @@ abstract class AbstractEmailTool extends AbstractTool
             );
         }
         if (static::IS_WRITE && static::CHANGES_TEMPLATES) {
-            $this->storeScopeGuard->assertUnrestricted(static::LABEL . 's');
+            $this->storeScopeGuard->assertUnrestricted(static::LABEL_PLURAL);
         }
         return $this->executeEmail($arguments);
     }
@@ -125,9 +130,10 @@ abstract class AbstractEmailTool extends AbstractTool
             ));
             if (count($matches) !== 1) {
                 throw new LocalizedException(__(
-                    $matches === [] ? '%1 "%2" does not exist.' : 'Several %1s are named "%2"; pass id.',
+                    $matches === [] ? '%1 "%2" does not exist.' : 'Several %3 are named "%2"; pass id.',
                     static::LABEL,
-                    $code
+                    $code,
+                    static::LABEL_PLURAL
                 ));
             }
             return $matches[0];

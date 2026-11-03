@@ -91,6 +91,33 @@ class ImageReplaceConfirmTest extends TestCase
         $this->assertSame(self::TARGETS, $this->payload($result)['skipped_out_of_scope'] ?? null);
     }
 
+    /**
+     * T-89: page 7 uses the image in its Hyvä content and its Magento CMS content; it is listed once, under affected.
+     */
+    public function testTheGlobalPreviewListsEachEntityOnce(): void
+    {
+        $magentoUsage = $this->usage('magento_cms', 'cms_page', 7, 'sale');
+        $productUsage = $this->usage('product', 'product', 12, 'MH01');
+        $this->editor = $this->createMock(ImageContentEditor::class);
+        $this->editor->method('normalize')->willReturnArgument(0);
+        $this->editor->method('findTargets')
+            ->willReturn(['editable' => self::TARGETS, 'not_editable' => [$magentoUsage, $productUsage]]);
+
+        $payload = $this->payload($this->tool()->execute([
+            'old_path' => 'wysiwyg/old.jpg',
+            'new_path' => 'wysiwyg/new.jpg',
+            'scope' => 'global',
+        ]));
+
+        $this->assertSame(
+            [self::TARGETS[0] + ['not_editable_usages' => [$magentoUsage]], self::TARGETS[1]],
+            $payload['affected'] ?? null
+        );
+        $this->assertSame(2, $payload['total'] ?? null);
+        $this->assertSame([$productUsage], Cast::array($payload['details'] ?? [])['not_editable_usages'] ?? null);
+        $this->assertStringContainsString('reported, not changed', Cast::string($payload['hint'] ?? ''));
+    }
+
     public function testTheGlobalPreviewListsTheOutOfScopeTargets(): void
     {
         $payload = $this->payload($this->tool(true)->execute([
@@ -127,6 +154,24 @@ class ImageReplaceConfirmTest extends TestCase
         );
         $scopeFilter->method('withHidden')->willReturnArgument(0);
         return new ImageReplace($this->editor, $files, $acl, $locator, $scopeFilter);
+    }
+
+    /**
+     * Image usage row as ImageUsageIndex returns it.
+     *
+     * @param string $source
+     * @param string $type
+     * @param int $id
+     * @param string $identifier
+     * @return array
+     * @phpstan-return array{source: string, entity_type: string, id: int, identifier: string, edition: string,
+     *     uid: string|null, component: string|null, field: string|null, alt: string|null, has_alt: bool}
+     */
+    private function usage(string $source, string $type, int $id, string $identifier): array
+    {
+        return ['source' => $source, 'entity_type' => $type, 'id' => $id, 'identifier' => $identifier,
+            'edition' => 'live', 'uid' => null, 'component' => null, 'field' => null, 'alt' => null,
+            'has_alt' => false];
     }
 
     /**

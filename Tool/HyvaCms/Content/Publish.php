@@ -96,17 +96,19 @@ class Publish extends AbstractContentTool
             $this->intArg($arguments, 'version_id')
         );
         $after = $this->contentService->getDocuments($entity['type'], $entity['id'])['published'];
+        // Hyvä Menu Builder activates a menu on publish (MenuProvider::saveContent()), so the flag is read again.
+        $isActive = $this->contentLocator->locate($entity['type'], ['id' => $entity['id']])['is_active'];
 
         return $this->jsonResult([
             'published' => true,
             'entity_type' => $entity['type'],
             'id' => $entity['id'],
             'identifier' => $entity['identifier'],
-            'is_active' => $entity['is_active'],
+            'is_active' => $isActive,
             'result' => $result,
             'components_before' => $before !== null ? $this->componentTree->countComponents($before) : [],
             'components_after' => $after !== null ? $this->componentTree->countComponents($after) : [],
-            'note' => $entity['is_active']
+            'note' => $isActive
                 ? null
                 : 'The Magento entity is inactive, so the content is not visible yet. Activate it with '
                     . (self::UPDATE_TOOLS[$entity['type']] ?? 'its update tool')

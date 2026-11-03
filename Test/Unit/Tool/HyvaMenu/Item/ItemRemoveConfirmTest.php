@@ -42,6 +42,10 @@ class ItemRemoveConfirmTest extends TestCase
         $this->assertSame('remove_menu_item_with_children', $this->payloadAt($result, 'action'));
         $this->assertSame('parent', $this->payloadAt($result, 'affected.0.uid'));
         $this->assertSame(1, $this->payloadAt($result, 'affected.0.children_count'));
+        $this->assertSame(
+            ['menu_id' => 3, 'children_count' => 1, 'draft_only' => true],
+            $this->payloadAt($result, 'details')
+        );
         $this->assertStringContainsString('hyva_menu_publish', Cast::string($this->payloadAt($result, 'hint')));
     }
 

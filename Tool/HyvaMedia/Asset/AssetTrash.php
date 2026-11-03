@@ -64,10 +64,10 @@ class AssetTrash extends AbstractMediaGalleryTool
     {
         return 'Move assets to Hyvä\'s Trash (restorable with hyva_media_trash_restore during the retention period, '
             . 'default 7 days; then purged by cron). Always needs "confirm": true: without it nothing changes and the '
-            . 'reply lists each asset with where it is used (affected), total and in_use; '
-            . 'pages, blocks, menus, products and categories outside your role\'s websites/store views are left out '
-            . '(usages_hidden_by_permissions) but still count in in_use. A restored asset may get a new id, so id '
-            . 'references to it stop resolving.'
+            . 'reply lists each asset with where it is used (affected), total, in_use (whether any is still used) and '
+            . 'in_use_count; pages, blocks, menus, products and categories outside your role\'s websites/store views '
+            . 'are left out (usages_hidden_by_permissions) but still count in in_use. A restored asset may get a new '
+            . 'id, so id references to it stop resolving.'
             . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
@@ -109,13 +109,18 @@ class AssetTrash extends AbstractMediaGalleryTool
                 $scoped['hidden'][$asset['id']]
             );
         }
+        // in_use is a boolean as in the delete tools (T-88); in_use_count counts the assets still in use.
         if (!$this->boolArg($arguments, 'confirm')) {
             return $this->confirmationRequired('trash_assets', $affected, array_filter([
-                'in_use' => $inUse,
+                'in_use' => $inUse > 0,
+                'in_use_count' => $inUse,
                 'note' => $inUse > 0 ? 'Assets still in use show as broken images until replaced or restored.' : null,
             ], static fn ($value): bool => $value !== null));
         }
         $trashed = $this->gallery->trash(array_column($assets, 'id'), $this->adminUserId());
-        return $this->jsonResult(['trashed' => $trashed, 'in_use' => $inUse], ['trashed' => $trashed]);
+        return $this->jsonResult(
+            ['trashed' => $trashed, 'in_use' => $inUse > 0, 'in_use_count' => $inUse],
+            ['trashed' => $trashed]
+        );
     }
 }

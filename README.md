@@ -91,15 +91,15 @@ bin/magento cache:flush
 | **Draft** | Unpublished Hyvä content. The storefront keeps showing the published version until a publish tool or a scheduled release makes the draft live. |
 | **Settings** | Magento fields of a page, block or menu (title, active flag, store views, meta), passed as `settings`. They are not drafted and apply immediately. |
 | **Content type** | The `entity_type` argument of the shared CMS tools: `cms_page`, `cms_block` or `menu`. |
-| **Hyvä verb** | A per-type permission from Hyvä's `ContentTypeAuthorization`: `view`, `save`, `publish`, `version_history`, `export`, `scheduling`, `schedule_save`, `schedule_cancel`. For example, `publish` on a page is `Hyva_Cms::page_publish`. |
+| **Hyvä verb** | A per-type permission from Hyvä's `ContentTypeAuthorization`: `view`, `save`, `publish`, `delete`, `version_history`, `export`, `scheduling`, `schedule_save`, `schedule_cancel`. For example, `publish` on a page is `Hyva_Cms::page_publish`. |
 | **Preview** | The dry-run reply of a call that needs `"confirm": true` and did not pass it. Nothing is written. |
 
 ## Safety model
 
 - **Write gate.** Write tools need the global write switch and a token with writes.
 - **Drafts first.** Content tools save drafts; only publish tools and scheduled releases make a draft live.
-- **Explicit confirm.** Calls that change the live storefront or are hard to undo return a preview until called with
-  `"confirm": true`.
+- **Explicit confirm.** The calls in the [confirm table](#confirm-and-previews) return a preview until called with
+  `"confirm": true`. Publish tools need no confirm: publishing is their purpose, and they go live on the first call.
 - **Three ACL checks.** The tool resource, the Hyvä resource and, for tools with `entity_type`, the Hyvä verb for that
   type. See [ACL](#acl).
 - **Store scope.** A role restricted by Hyvä Advanced Admin Permissions is held to its websites and store views. See
@@ -124,6 +124,10 @@ These tools save a draft (`saveContent(..., publish: false)`) and a version-hist
 - image replace and alt-text tools.
 
 The storefront changes only after `hyva_cms.publish` or a scheduled release.
+
+Publishing a menu also activates it: Hyvä Menu Builder sets `is_active` when it publishes
+(`MenuProvider::saveContent()`), and the publish reply reports the flag after publishing. Publishing a page or block
+leaves its active flag as it is; an inactive one stays hidden, and the reply's `note` names the update call.
 
 `settings` are different: they are Magento fields and apply at once. A `settings` change that affects the live
 storefront therefore needs `"confirm": true` (see the next section).
@@ -158,7 +162,7 @@ Every preview has the same keys:
 | `action` | The action the call would take, e.g. `delete_cms_page`. |
 | `affected` | Always a list: one entry per item that would change, or sample paths when clearing every optimized image. |
 | `total` | Every item that would change. |
-| `details` | Only when there is context that is not an item, e.g. `in_use` for trash, `target_folder` for move, `not_editable_usages` for a global image replace. |
+| `details` | Only when there is context that is not an item, e.g. `in_use` (always a boolean; trash adds `in_use_count`) for trash and the delete tools, `target_folder` for move, `menu_id` and `children_count` for a menu item removal, `not_editable_usages` for a global image replace (an affected entity's own usages sit on its `affected` entry, so each entity is listed once). |
 | `hint` | What confirming does, e.g. that a replaced image is a draft until `hyva_cms.publish`. |
 
 ### Refusals
@@ -169,7 +173,7 @@ Hyvä's save refusals come back as soft errors with a `status`:
 |---|---|---|
 | 422 | A provider refuses content, or Hyvä's content guard rejects it (3 MB, 5000 components, depth 50). `field_errors` lists the problems per component uid and field. | Fix the fields and call again. |
 | 409 | The draft changed since you read it. Pass `base_version_uid` to the update tools to get this check. | Reload and re-apply your change. Never resubmit old content. |
-| 403 | Hyvä refuses a permission. | Grant the permission (see [Role setup](#role-setup)). |
+| 403 | Hyvä refuses a permission, or the role's store scope excludes the entity (audit summary `{"error": "out_of_scope"}`; a missing permission is `status_403`). | Grant the permission (see [Role setup](#role-setup)), or work in the role's own store views (see [Store scope](#store-scope)). |
 
 ## ACL
 
@@ -251,7 +255,8 @@ Menus and forms are scoped by their store views although the Hyvä admin does no
 ### Store view 0 (All Store Views)
 
 - **Changing or creating needs every store view.** Store view 0 counts as all of them, as in the Hyvä admin. A
-  restricted role can read an "All Store Views" page, block or menu, but cannot change it or create one there.
+  restricted role can read an "All Store Views" page, block or menu, but can neither change it there nor create one
+  there.
 - **Re-assigning is judged by the store views it enters.** This covers `settings.store_ids` on `hyva_cms.page.update`,
   `hyva_cms.block.update` and `hyva_menu.update`, as Hyvä Advanced Admin Permissions judges the admin save:
   - moving the entity into the role's own store views is allowed (giving up store view 0 is not giving up a foreign
@@ -264,7 +269,7 @@ Menus and forms are scoped by their store views although the Hyvä admin does no
 |---|---|---|
 | `hyva_media.image.replace`, `hyva_media.image.update_alt` | Skip content outside the role. | — |
 | `hyva_cms.schedule.cancel`, `hyva_menu.schedule.cancel` | Refuse items of content outside the role. | — |
-| `hyva_cms.schedule.list`, `hyva_cms.schedule.detect_conflicts`, the conflicts `hyva_cms.schedule.create` returns | Hide items and conflicts of content outside the role, including content that no longer exists. | `items_hidden_by_permissions`, `conflicts_hidden_by_permissions` |
+| `hyva_cms.schedule.list`, `hyva_cms.schedule.detect_conflicts`, the conflicts `hyva_cms.schedule.create` and `hyva_menu.schedule.create` return | Hide items and conflicts of content outside the role, including content that no longer exists. | `items_hidden_by_permissions`, `conflicts_hidden_by_permissions` |
 | `hyva_form.delivery.audit` without a form | Audits only the role's forms. | `forms_hidden_by_permissions` |
 | `hyva_cms.migration.scan` | Lists only the role's pages and blocks. | — |
 | `hyva_menu.find_usage` | Leaves out the design configuration scopes the role may not open: Default, websites it does not fully hold, other store views. | `usages_hidden_by_permissions` |
@@ -682,6 +687,9 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
   over MCP can use classes that are not compiled yet for the theme.
 - **Admin area for saves.** Page and block saves run in an emulated `adminhtml` area. In the frontend area, where
   `/mcp` runs, Hyvä's `Plugin\Model\Page::afterGetContent` fails for a page without an id.
+- **Published URLs.** Hyvä's page provider reports a page's address as `published_url` in every store view, active
+  or not. `published_urls` leaves out, and preview store rows give `published_url: null` for, an inactive entity and a
+  store view it is not assigned to.
 - **Component links.** `hyva_cms.component.validate` warns (`invalid_link`) about link field values with neither `type`
   and `value` nor a non-empty `src`, such as `{"url": "..."}`. They render an empty href.
 - **Image ids.** Hyvä writers outside the editor must call `ImageIdBackfiller::backfill()` themselves

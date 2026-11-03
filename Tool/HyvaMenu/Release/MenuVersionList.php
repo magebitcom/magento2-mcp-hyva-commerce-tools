@@ -33,7 +33,8 @@ class MenuVersionList extends VersionList
      */
     public function getDescription(): string
     {
-        return 'Version history of a menu, newest first (same as hyva_cms_version_list with entity_type=menu).';
+        return 'Version history of a menu, newest first (same as hyva_cms_version_list with entity_type=menu). '
+            . self::PAGINATION_NOTE;
     }
 
     /**
