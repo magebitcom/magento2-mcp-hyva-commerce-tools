@@ -128,13 +128,15 @@ class ContentScanner
     /**
      * Nodes matching a predicate, with their location.
      *
+     * Only a node that names a menu (a menu widget) gets menu_identifier, so other usage rows do not carry it.
+     *
      * @param callable $predicate
      * @param array $types
      * @return array
      * @phpstan-param callable(array<string, mixed>): bool $predicate
      * @phpstan-param list<string> $types
      * @phpstan-return list<array{entity_type: string, id: int, identifier: string, title: string, edition: string,
-     *     uid: string|null, component: string|null}>
+     *     uid: string|null, component: string|null, menu_identifier?: string}>
      */
     public function findNodes(callable $predicate, array $types = ContentLocator::TYPES): array
     {
@@ -149,7 +151,7 @@ class ContentScanner
                 &$matches
             ): void {
                 if ($predicate($node)) {
-                    $matches[] = [
+                    $match = [
                         'entity_type' => $entry['entity_type'],
                         'id' => $entry['id'],
                         'identifier' => $entry['identifier'],
@@ -157,10 +159,11 @@ class ContentScanner
                         'edition' => $entry['edition'],
                         'uid' => is_string($node['uid'] ?? null) ? $node['uid'] : null,
                         'component' => is_string($node['component'] ?? null) ? $node['component'] : null,
-                        'menu_identifier' => is_string($node['menu_identifier'] ?? null)
-                            ? $node['menu_identifier']
-                            : null,
                     ];
+                    if (is_string($node['menu_identifier'] ?? null)) {
+                        $match['menu_identifier'] = $node['menu_identifier'];
+                    }
+                    $matches[] = $match;
                 }
             });
         }

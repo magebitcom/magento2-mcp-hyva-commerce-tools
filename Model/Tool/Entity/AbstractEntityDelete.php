@@ -9,20 +9,18 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Model\Tool\Entity;
 
 use Magebit\Mcp\Api\ToolResultInterface;
-use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
-use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\DeletionUsage;
 use Magebit\McpHyvaCommerceTools\Model\Content\EntityWriter;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
-use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
 use Magento\Framework\Exception\AuthorizationException;
 
 /**
  * hyva_cms.page.delete / hyva_cms.block.delete: confirm-gated delete of one CMS page or block.
  *
+ * A page or block still in use is deleted only with "force": true next to "confirm": true (InUseDeleteGate).
  * Three permissions: the tool's own resource ("Delete CMS pages via MCP", granted to no role by default), the
  * Magento admin delete permission (ADMIN_DELETE_RESOURCE) and Hyvä's delete verb for the type. The core checks the
  * tool resource and the listing resource (the first of the other two the role lacks), and run() checks both again.
@@ -30,9 +28,16 @@ use Magento\Framework\Exception\AuthorizationException;
  */
 abstract class AbstractEntityDelete extends AbstractTool
 {
+    use InUseDeleteGate;
+
     public const IS_WRITE = true;
     public const ENTITY_TYPE = '';
     public const ENTITY_LABEL = '';
+
+    /**
+     * Plural of ENTITY_LABEL, e.g. "Pages", for messages about the type.
+     */
+    public const ENTITY_LABEL_PLURAL = '';
 
     /**
      * Permission the Magento admin delete action needs (its ADMIN_RESOURCE).
@@ -43,6 +48,11 @@ abstract class AbstractEntityDelete extends AbstractTool
      * Hyvä CMS 1.4 delete verb of the type (ContentTypeAuthorization, e.g. Hyva_Cms::page_delete).
      */
     public const HYVA_DELETE_RESOURCE = '';
+
+    /**
+     * What deleting a page or block in use does to its usages.
+     */
+    private const IN_USE_CONSEQUENCE = 'those references break.';
 
     /**
      * @param ContentLocator $contentLocator
@@ -74,14 +84,19 @@ abstract class AbstractEntityDelete extends AbstractTool
     public function getDescription(): string
     {
         $what = 'CMS ' . strtolower(static::ENTITY_LABEL);
+        // The keys of details.usage (DeletionUsage), named so a client knows each type's report.
         $usage = static::ENTITY_TYPE === ContentLocator::TYPE_PAGE
-            ? 'home / 404 / cookies page configuration, links in Hyvä CMS content and menus'
-            : 'Hyvä CMS components, widget directives in Magento content, widget instances';
+            ? 'details.usage lists store_config = home / 404 / cookies page configuration, links = links in Hyvä '
+                . 'CMS content and menus'
+            : 'details.usage lists hyva_content = Hyvä CMS components, magento_content = widget directives in '
+                . 'Magento content, widget_instances = widget instances';
         return sprintf(
             'Delete a %1$s permanently, from every store view it is assigned to, with its Hyvä drafts, version '
                 . 'history and Tailwind CSS (scheduled releases that name it are not removed). Without "confirm": '
                 . 'true nothing is deleted and the reply previews the %1$s, its store views and where it is still '
-                . 'used (%2$s); a %1$s in use stays deletable, but say so to the user before confirming. Needs the '
+                . 'used (%2$s). A %1$s in use is deleted only with "force": true as well as "confirm": true (its '
+                . 'references break; the result then says "forced": true and repeats the usage); tell the user '
+                . 'where it is used before confirming. Needs the '
                 . 'MCP permission for this tool plus the admin delete permissions %3$s and %4$s. A role restricted '
                 . 'to some websites can delete only a %1$s whose store views are all its own. To hide it instead, '
                 . 'set settings.is_active=false with hyva_cms_%5$s_update.',
@@ -98,12 +113,7 @@ abstract class AbstractEntityDelete extends AbstractTool
      */
     public function getInputSchema(): array
     {
-        return Schema::object()
-            ->with(EntityTarget::fixed())
-            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description(
-                'Delete, after reviewing the preview. Without it nothing is deleted.'
-            ))
-            ->toArray();
+        return $this->deleteInputSchema();
     }
 
     /**
@@ -148,21 +158,30 @@ abstract class AbstractEntityDelete extends AbstractTool
             return $this->confirmationRequired(
                 'delete_' . static::ENTITY_TYPE,
                 [$summary],
-                ['in_use' => $inUse, 'usage' => $usage],
+                ['in_use' => $inUse, 'force_required' => $inUse, 'usage' => $usage],
                 null,
                 sprintf(
                     'Deleting removes the %1$s from every store view listed, with its Hyvä drafts and version '
                         . 'history; it cannot be undone (hyva_cms_export keeps a copy).',
                     strtolower(static::ENTITY_LABEL)
-                ) . ($inUse
-                    ? ' It is still in use (details.usage): those references break. Tell the user before confirming.'
-                    : '')
+                ) . ($inUse ? $this->inUseHint(self::IN_USE_CONSEQUENCE) : '')
+            );
+        }
+        if ($inUse && !$this->boolArg($arguments, 'force')) {
+            return $this->inUseRefusal(
+                sprintf('CMS %s "%s" (#%d)', strtolower(static::ENTITY_LABEL), $entity['identifier'], $entity['id']),
+                $usage,
+                self::IN_USE_CONSEQUENCE
             );
         }
         $this->entityWriter->delete($entity['type'], $entity['id']);
+        $audit = ['entity_type' => $entity['type'], 'id' => $entity['id'], 'deleted' => true, 'in_use' => $inUse];
+        if (!$inUse) {
+            return $this->jsonResult(['deleted' => true] + $summary, $audit);
+        }
         return $this->jsonResult(
-            ['deleted' => true] + $summary,
-            ['entity_type' => $entity['type'], 'id' => $entity['id'], 'deleted' => true, 'in_use' => $inUse]
+            ['deleted' => true] + $summary + $this->forcedDeleteDetails($usage),
+            $audit + ['forced' => true]
         );
     }
 
@@ -177,8 +196,8 @@ abstract class AbstractEntityDelete extends AbstractTool
         foreach ([static::ADMIN_DELETE_RESOURCE, static::HYVA_DELETE_RESOURCE] as $resource) {
             if ($this->callerContext->isAllowed($resource) === false) {
                 throw new AuthorizationException(__(
-                    'Your admin role may not delete %1s: it needs the %2 permission.',
-                    'CMS ' . strtolower(static::ENTITY_LABEL),
+                    'Your admin role may not delete %1: it needs the %2 permission.',
+                    'CMS ' . strtolower(static::ENTITY_LABEL_PLURAL),
                     $resource
                 ));
             }

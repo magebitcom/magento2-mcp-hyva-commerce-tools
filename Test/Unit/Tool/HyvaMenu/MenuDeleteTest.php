@@ -20,26 +20,70 @@ use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use PHPUnit\Framework\TestCase;
 
 /**
- * T-22: hyva_menu.delete is confirm-gated, says when the menu is still placed and keeps to the store scope.
+ * T-22: hyva_menu.delete is confirm-gated, says when the menu is still placed and keeps to the store scope. T-73: a
+ * menu in use needs "force": true as well.
  */
 class MenuDeleteTest extends TestCase
 {
     use StoreScopeStub;
 
+    /**
+     * DeletionUsage::forMenu() report of a header menu, also placed twice where the role cannot see.
+     */
+    private const IN_USE = ['identifier' => 'main', 'used' => true, 'total' => 1, 'design_config' => [[
+        'location' => 'header', 'path' => 'hyva_menu/header/identifier', 'scope' => 'stores', 'scope_id' => 1]],
+        'hyva_cms_content' => [], 'usages_hidden_by_permissions' => 2];
+
     public function testAMenuInUseIsPreviewedWithItsPlacementsAndNotDeleted(): void
     {
         $gateway = $this->createMock(MenuGatewayInterface::class);
         $gateway->expects($this->never())->method('delete');
-        $usage = ['identifier' => 'main', 'used' => true, 'total' => 1, 'design_config' => [['location' => 'header',
-            'path' => 'hyva_menu/header/identifier', 'scope' => 'stores', 'scope_id' => 1]]];
-
-        $payload = $this->payload($this->tool($gateway, null, $usage)->execute(['id' => 3]));
+        $payload = $this->payload($this->tool($gateway, null, self::IN_USE)->execute(['id' => 3]));
 
         $this->assertSame('delete_menu', $payload['action']);
         $this->assertSame([1], $this->at($payload, 'affected', 0, 'store_ids'));
         $this->assertTrue($this->at($payload, 'affected', 0, 'in_use'));
         $this->assertSame('header', $this->at($payload, 'details', 'usage', 'design_config', 0, 'location'));
         $this->assertStringContainsString('still in use', Cast::string($payload['hint']));
+        $this->assertTrue($this->at($payload, 'details', 'force_required'));
+    }
+
+    public function testConfirmWithoutForceRefusesAMenuInUse(): void
+    {
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->expects($this->never())->method('delete');
+
+        $result = $this->tool($gateway, null, self::IN_USE)->execute(['id' => 3, 'confirm' => true]);
+        $payload = $this->payload($result);
+
+        $this->assertTrue($result->isError());
+        $this->assertSame(409, $payload['status']);
+        $this->assertTrue($payload['force_required']);
+        $this->assertSame(
+            'Menu "main" (#3) is still in use (design_config 1, 2 outside your role, details in usage). Nothing was '
+                . 'deleted. To delete it anyway, call again with "confirm": true and "force": true; a placement that '
+                . 'names a deleted menu renders nothing.',
+            $payload['error']
+        );
+    }
+
+    public function testConfirmWithForceDeletesAMenuInUse(): void
+    {
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->expects($this->once())->method('delete')->with(3);
+
+        $payload = $this->payload($this->tool($gateway, null, self::IN_USE)
+            ->execute(['id' => 3, 'confirm' => true, 'force' => true]));
+
+        $this->assertTrue($payload['deleted']);
+        $this->assertTrue($payload['in_use']);
+        // T-79: the result says force was used and which placements broke (the preview's usage report).
+        $this->assertTrue($payload['forced']);
+        $this->assertSame(self::IN_USE, $payload['usage']);
+        $this->assertStringContainsString(
+            '(design_config 1, 2 outside your role, details in usage). Those references are now broken',
+            Cast::string($payload['hint'])
+        );
     }
 
     public function testConfirmDeletesTheMenu(): void
@@ -51,6 +95,7 @@ class MenuDeleteTest extends TestCase
 
         $this->assertTrue($payload['deleted']);
         $this->assertFalse($payload['in_use']);
+        $this->assertArrayNotHasKey('forced', $payload);
     }
 
     public function testARestrictedRoleMayNotDeleteAMenuOfAllStoreViews(): void

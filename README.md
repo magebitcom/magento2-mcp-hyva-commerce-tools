@@ -174,9 +174,23 @@ Scheduled releases that name it are not removed, as in the admin.
   403.
 - **Confirm.** Without `"confirm": true` nothing is deleted; the reply is the standard preview (`action`
   `delete_cms_page` / `delete_cms_block` / `delete_menu`, `affected` = the entity with its store views and `in_use`,
-  `details.usage` = where it is still used: home / 404 / cookies page configuration and links in content and menus for
-  a page; Hyvä CMS components, widget directives and widget instances for a block; header/footer design configuration,
-  content, widget instances, layout and templates for a menu). An entity in use can still be deleted; the hint says so.
+  `details.usage` = where it is still used, see **Usage keys**).
+- **Usage keys.** `details.usage` has `used`, `total` and one list per place; the list keys differ per type (they are
+  the keys the find-usage tools already return, so they are not unified):
+
+  | Tool | List keys in `details.usage` |
+  |---|---|
+  | `hyva_cms.page.delete` | `store_config` (home / 404 / cookies page configuration), `links` (links in Hyvä CMS content and menu items) |
+  | `hyva_cms.block.delete` | `hyva_content` (Hyvä CMS components), `magento_content` (widget directives in Magento content), `widget_instances` |
+  | `hyva_menu.delete` | `design_config` (header/footer design configuration), `hyva_cms_content` and `magento_cms_content` (menu widgets in content), `widget_instances`, `layout_and_templates`; also `identifier`, as `hyva_menu.find_usage` |
+
+  For a role restricted to some websites, `usages_hidden_by_permissions` counts the usages it may not see.
+- **In use.** An entity in use (`in_use: true`) is deleted only when the call passes `"force": true` as well as
+  `"confirm": true`; the preview says so (`details.force_required`, hint). With `"confirm": true` alone the call is
+  refused with a soft error (`status` 409) that names the usages and returns them in `usage`. A forced delete answers
+  `deleted: true` with `forced: true`, the usages that broke in `usage` (the preview's report) and a hint that those
+  references are now broken; the audit summary records `forced` too. An entity not in use needs only
+  `"confirm": true`; `"force"` without `"confirm"` still only previews.
 - **Store scope.** As for any change: every store view the entity is assigned to must be the role's (store view 0
   needs all of them).
 - **Writes switch.** They are write tools, so `allow_writes` and the token's write flag apply.

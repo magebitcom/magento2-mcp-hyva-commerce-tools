@@ -268,9 +268,13 @@ class StoreScopeGuard
     {
         $this->assertReadable($label, $storeIds);
         if (!$this->allowsWrite($storeIds)) {
+            // storeViewList([0]) already names "All Store Views": say the rule once, after it.
             throw new AuthorizationException(__(
-                '%1 and may not change %2: it is assigned to %3. Only content assigned to your own store views can '
-                . 'be changed (store view 0, "All Store Views", needs every store view).',
+                $storeIds === [0]
+                    ? '%1 and may not change %2: it is assigned to %3, which needs every store view. Only content '
+                        . 'assigned to your own store views can be changed.'
+                    : '%1 and may not change %2: it is assigned to %3. Only content assigned to your own store views '
+                        . 'can be changed (store view 0, "All Store Views", needs every store view).',
                 self::RESTRICTED,
                 $label,
                 $this->storeViewList($storeIds)
@@ -338,13 +342,42 @@ class StoreScopeGuard
     {
         if (!$this->allowsAssignment($currentStoreIds, $newStoreIds)) {
             throw new AuthorizationException(__(
-                '%1 and may not assign %2 to %3 (store view 0, "All Store Views", needs every store view; removing '
-                . 'a store view outside your role is not allowed either).',
+                '%1 and may not assign %2 to %3: %4.',
                 self::RESTRICTED,
                 $label,
-                $this->storeViewList($newStoreIds)
+                $this->storeViewList($newStoreIds),
+                $this->assignmentRefusalReason($currentStoreIds, $newStoreIds)
             ));
         }
+    }
+
+    /**
+     * Why allowsAssignment() refused a move, naming only the rule it broke
+     *
+     * The new assignment is checked first (store view 0 needs every store view; others must be the role's), then
+     * the store views the move would remove (store view 0 is never counted as removed).
+     *
+     * @param array $currentStoreIds
+     * @param array $newStoreIds
+     * @return string
+     * @phpstan-param list<int> $currentStoreIds
+     * @phpstan-param list<int> $newStoreIds
+     */
+    private function assignmentRefusalReason(array $currentStoreIds, array $newStoreIds): string
+    {
+        $allowed = $this->restrictedStoreIds() ?? [];
+        if (in_array(0, $newStoreIds, true) && !$this->allowsWrite([0])) {
+            return $newStoreIds === [0]
+                ? 'it needs every store view'
+                : 'store view 0 ("All Store Views") needs every store view';
+        }
+        $foreign = array_values(array_diff($newStoreIds, $allowed, [0]));
+        if ($foreign !== []) {
+            return $this->storeViewList($foreign) . (count($foreign) === 1 ? ' is' : ' are') . ' outside your role';
+        }
+        $removed = array_values(array_diff($currentStoreIds, $newStoreIds, $allowed, [0]));
+        return 'that removes it from ' . $this->storeViewList($removed) . ', '
+            . (count($removed) === 1 ? 'which is' : 'which are') . ' outside your role';
     }
 
     /**

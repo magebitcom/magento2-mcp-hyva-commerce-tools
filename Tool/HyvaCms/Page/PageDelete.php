@@ -19,6 +19,7 @@ class PageDelete extends AbstractEntityDelete
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_cms_page_delete';
     public const ENTITY_TYPE = 'cms_page';
     public const ENTITY_LABEL = 'Page';
+    public const ENTITY_LABEL_PLURAL = 'Pages';
     /** Magento\Cms\Controller\Adminhtml\Page\Delete::ADMIN_RESOURCE */
     public const ADMIN_DELETE_RESOURCE = 'Magento_Cms::page_delete';
     public const HYVA_DELETE_RESOURCE = 'Hyva_Cms::page_delete';

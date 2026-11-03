@@ -110,7 +110,7 @@ class UsageFinder
         }
         $hyva = array_values(array_filter(
             $this->menuWidgetNodes,
-            static fn (array $match): bool => $match['menu_identifier'] === $identifier
+            static fn (array $match): bool => ($match['menu_identifier'] ?? null) === $identifier
         ));
         return [
             'hyva_content' => $hyva,
