@@ -50,7 +50,7 @@ class WidgetList extends AbstractTool
     {
         return 'List the Hyvä Admin Dashboard widget types your role may add (title, category, ACL), and with view_id '
             . 'the widgets placed on that view (only views you can see; widgets your role may not use are left out). '
-            . 'Read only.';
+            . 'Read only. Not paginated: returns every widget type and placed widget.';
     }
 
     /**

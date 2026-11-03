@@ -13,6 +13,7 @@ use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\AiWorkerGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
+use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magento\Framework\AuthorizationInterface;
 use Magento\Framework\Exception\LocalizedException;
 
@@ -26,6 +27,12 @@ abstract class AbstractAiWorkerTool extends AbstractTool
 {
     public const UNDERLYING_ACL_RESOURCE = 'Hyva_AiWorker::jobs';
     public const ALL_JOBS_RESOURCE = 'Hyva_AiWorker::jobs';
+
+    /**
+     * Resource the tool is listed with while the feature is missing or disabled: none, so tools/list hides it.
+     * A feature's status tool overrides it with a resource that exists without the feature, so it stays listed.
+     */
+    protected const FEATURE_MISSING_ACL_RESOURCE = ContentAcl::UNAVAILABLE_RESOURCE;
 
     /**
      * @param FeatureCheckerInterface $featureChecker
@@ -42,7 +49,10 @@ abstract class AbstractAiWorkerTool extends AbstractTool
     }
 
     /**
-     * Hyvä resource the tool is listed with (system access while the module is disabled).
+     * Hyvä resource the tool is listed with.
+     *
+     * AI Worker's resources only exist while the module is enabled; without it the tool is hidden from tools/list
+     * (FEATURE_MISSING_ACL_RESOURCE) and a call answers that the feature is unavailable.
      *
      * @return string|null
      */
@@ -50,7 +60,7 @@ abstract class AbstractAiWorkerTool extends AbstractTool
     {
         return $this->featureChecker->getStatus(FeatureCheckerInterface::AI_WORKER)['enabled']
             ? static::UNDERLYING_ACL_RESOURCE
-            : 'Magento_Backend::system';
+            : static::FEATURE_MISSING_ACL_RESOURCE;
     }
 
     /**

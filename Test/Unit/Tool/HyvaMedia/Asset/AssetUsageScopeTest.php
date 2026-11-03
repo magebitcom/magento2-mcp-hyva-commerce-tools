@@ -39,15 +39,15 @@ class AssetUsageScopeTest extends TestCase
 
         $this->assertSame(
             [['cms_page', 1]],
-            $this->targets($this->arrayAt($result, 'affected.assets.0.used_in.hyva_and_catalog'), 'id')
+            $this->targets($this->arrayAt($result, 'affected.0.used_in.hyva_and_catalog'), 'id')
         );
         $this->assertSame(
             [['catalog_product', '2']],
-            $this->targets($this->arrayAt($result, 'affected.assets.0.used_in.magento_tracked'), 'entity_id')
+            $this->targets($this->arrayAt($result, 'affected.0.used_in.magento_tracked'), 'entity_id')
         );
-        $this->assertSame(2, $this->payloadAt($result, 'affected.assets.0.usages_hidden_by_permissions'));
-        $this->assertSame([], $this->payloadAt($result, 'affected.assets.1.used_in.hyva_and_catalog'));
-        $this->assertSame(1, $this->payloadAt($result, 'affected.assets.1.usages_hidden_by_permissions'));
+        $this->assertSame(2, $this->payloadAt($result, 'affected.0.usages_hidden_by_permissions'));
+        $this->assertSame([], $this->payloadAt($result, 'affected.1.used_in.hyva_and_catalog'));
+        $this->assertSame(1, $this->payloadAt($result, 'affected.1.usages_hidden_by_permissions'));
     }
 
     public function testTheTrashPreviewListsOnlyTheRolesUsagesButCountsEveryUseInInUse(): void
@@ -56,17 +56,17 @@ class AssetUsageScopeTest extends TestCase
 
         $this->assertSame(
             [['cms_page', 1]],
-            $this->targets($this->arrayAt($result, 'affected.assets.0.used_in.hyva_and_catalog'), 'id')
+            $this->targets($this->arrayAt($result, 'affected.0.used_in.hyva_and_catalog'), 'id')
         );
         $this->assertSame(
             [['catalog_product', '2']],
-            $this->targets($this->arrayAt($result, 'affected.assets.0.used_in.magento_tracked'), 'entity_id')
+            $this->targets($this->arrayAt($result, 'affected.0.used_in.magento_tracked'), 'entity_id')
         );
-        $this->assertSame(2, $this->payloadAt($result, 'affected.assets.0.usages_hidden_by_permissions'));
-        $this->assertSame([], $this->payloadAt($result, 'affected.assets.1.used_in.hyva_and_catalog'));
-        $this->assertSame(1, $this->payloadAt($result, 'affected.assets.1.usages_hidden_by_permissions'));
+        $this->assertSame(2, $this->payloadAt($result, 'affected.0.usages_hidden_by_permissions'));
+        $this->assertSame([], $this->payloadAt($result, 'affected.1.used_in.hyva_and_catalog'));
+        $this->assertSame(1, $this->payloadAt($result, 'affected.1.usages_hidden_by_permissions'));
         // Asset 2 is used only in store view 2's page: still in use.
-        $this->assertSame(2, $this->payloadAt($result, 'affected.in_use'));
+        $this->assertSame(2, $this->payloadAt($result, 'details.in_use_count'));
     }
 
     public function testAssetResolveLeavesOutProductsAndCategoriesOfOtherWebsites(): void
@@ -96,13 +96,14 @@ class AssetUsageScopeTest extends TestCase
         $trash = $this->trash($this->scope(null))->execute(['ids' => [1, 2]]);
 
         foreach ([$move, $trash] as $result) {
-            $asset = $this->arrayAt($result, 'affected.assets.0');
+            $asset = $this->arrayAt($result, 'affected.0');
             $this->assertArrayNotHasKey('usages_hidden_by_permissions', $asset);
-            $this->assertCount(2, $this->arrayAt($result, 'affected.assets.0.used_in.hyva_and_catalog'));
-            $this->assertCount(2, $this->arrayAt($result, 'affected.assets.0.used_in.magento_tracked'));
-            $this->assertCount(1, $this->arrayAt($result, 'affected.assets.1.used_in.hyva_and_catalog'));
+            $this->assertCount(2, $this->arrayAt($result, 'affected.0.used_in.hyva_and_catalog'));
+            $this->assertCount(2, $this->arrayAt($result, 'affected.0.used_in.magento_tracked'));
+            $this->assertCount(1, $this->arrayAt($result, 'affected.1.used_in.hyva_and_catalog'));
         }
-        $this->assertSame(2, $this->payloadAt($trash, 'affected.in_use'));
+        $this->assertSame(2, $this->payloadAt($trash, 'details.in_use_count'));
+        $this->assertTrue($this->payloadAt($trash, 'details.in_use'));
     }
 
     /**

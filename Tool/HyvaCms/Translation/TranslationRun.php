@@ -74,7 +74,7 @@ class TranslationRun extends AbstractTranslationTool
         return 'Translate the texts of a Hyvä CMS page, block or menu into each store view\'s language with the AI '
             . 'model configured in Hyvä AI Translations (same prompt and rules as the editor\'s Translate panel). '
             . 'Returns the proposals; with write_draft=true they are saved into the DRAFT (never published: review '
-            . 'with hyva_cms.preview, then hyva_cms.publish). Default: only texts without a translation. Calls a paid '
+            . 'with hyva_cms_preview, then hyva_cms_publish). Default: only texts without a translation. Calls a paid '
             . 'AI API.';
     }
 
@@ -207,7 +207,7 @@ class TranslationRun extends AbstractTranslationTool
                 $this->stringArg($arguments, 'base_version_uid') ?? $this->versionUid($document)
             );
             $payload['draft_saved'] = true;
-            $payload['next_step'] = 'Review with hyva_cms.preview, then publish with hyva_cms.publish.';
+            $payload['next_step'] = 'Review with hyva_cms_preview, then publish with hyva_cms_publish.';
         }
         return $this->jsonResult($payload, [
             'entity_type' => $entity['type'],

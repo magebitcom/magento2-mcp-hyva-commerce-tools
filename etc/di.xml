@@ -442,8 +442,10 @@
                 <item name="hyva_media.optimization.config_validate" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Optimization\OptimizationConfigValidate</item>
                 <item name="hyva_cms.page.create" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageCreate</item>
                 <item name="hyva_cms.page.update" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageUpdate</item>
+                <item name="hyva_cms.page.delete" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageDelete</item>
                 <item name="hyva_cms.block.create" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockCreate</item>
                 <item name="hyva_cms.block.update" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockUpdate</item>
+                <item name="hyva_cms.block.delete" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockDelete</item>
                 <item name="hyva_cms.draft.create" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Draft\DraftCreate</item>
                 <item name="hyva_cms.draft.update" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Draft\DraftUpdate</item>
                 <item name="hyva_cms.publish" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Content\Publish</item>
@@ -454,6 +456,7 @@
                 <item name="hyva_cms.import" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Transfer\TransferImport</item>
                 <item name="hyva_menu.create" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuCreate</item>
                 <item name="hyva_menu.update" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuUpdate</item>
+                <item name="hyva_menu.delete" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuDelete</item>
                 <item name="hyva_menu.item.add" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Item\ItemAdd</item>
                 <item name="hyva_menu.item.update" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Item\ItemUpdate</item>
                 <item name="hyva_menu.item.remove" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Item\ItemRemove</item>

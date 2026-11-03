@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Tool\StoreCredit;
 
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
@@ -16,7 +17,9 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\StoreCreditGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Security\AdminScopeGuard;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
+use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
@@ -35,6 +38,12 @@ abstract class AbstractStoreCreditTool extends AbstractTool
     public const UNDERLYING_ACL_RESOURCE = 'Hyva_StoreCredit::balance_view';
 
     /**
+     * Resource the tool is listed with while the feature is missing or disabled: none, so tools/list hides it.
+     * A feature's status tool overrides it with a resource that exists without the feature, so it stays listed.
+     */
+    protected const FEATURE_MISSING_ACL_RESOURCE = ContentAcl::UNAVAILABLE_RESOURCE;
+
+    /**
      * @param FeatureCheckerInterface $featureChecker
      * @param StoreCreditGatewayInterface $storeCredit
      * @param CustomerRepositoryInterface $customerRepository
@@ -51,7 +60,10 @@ abstract class AbstractStoreCreditTool extends AbstractTool
     }
 
     /**
-     * Hyvä resource the tool is listed with (customer access while the module is disabled).
+     * Hyvä resource the tool is listed with.
+     *
+     * Store Credit's resources only exist while the module is enabled; without it the tool is hidden from tools/list
+     * (FEATURE_MISSING_ACL_RESOURCE) and a call answers that the feature is unavailable.
      *
      * @return string|null
      */
@@ -59,7 +71,7 @@ abstract class AbstractStoreCreditTool extends AbstractTool
     {
         return $this->featureChecker->getStatus(FeatureCheckerInterface::STORE_CREDIT)['enabled']
             ? static::UNDERLYING_ACL_RESOURCE
-            : 'Magento_Customer::customer';
+            : static::FEATURE_MISSING_ACL_RESOURCE;
     }
 
     /**
@@ -171,8 +183,9 @@ abstract class AbstractStoreCreditTool extends AbstractTool
             ? $this->scopeGuard->allowsWebsiteForWrite($adminUserId, $websiteId)
             : $this->scopeGuard->allowsWebsite($adminUserId, $websiteId);
         if (!$allowed) {
-            throw new AuthorizationException(__(
-                'Your admin role is restricted to other websites; website %1 is not allowed.',
+            throw new OutOfScopeException(__(
+                '%1; website %2 is outside it.',
+                StoreScopeGuard::RESTRICTED,
                 $websiteId
             ));
         }

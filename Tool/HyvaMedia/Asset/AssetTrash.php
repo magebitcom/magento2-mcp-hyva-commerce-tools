@@ -18,6 +18,7 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\MediaGallery\AbstractMediaGalleryToo
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Media\SharedMedia;
 
 /**
  * `hyva_media.asset.trash`.
@@ -61,11 +62,13 @@ class AssetTrash extends AbstractMediaGalleryTool
      */
     public function getDescription(): string
     {
-        return 'Move assets to Hyvä\'s Trash (restorable with hyva_media.trash.restore during the retention period, '
-            . 'default 7 days; then purged by cron). Without confirm=true you get where each asset is used first; '
-            . 'pages, blocks, menus, products and categories outside your role\'s websites/store views are left out '
-            . '(usages_hidden_by_permissions) but still count in in_use. A restored asset may get a new id, so id '
-            . 'references to it stop resolving.';
+        return 'Move assets to Hyvä\'s Trash (restorable with hyva_media_trash_restore during the retention period, '
+            . 'default 7 days; then purged by cron). Always needs "confirm": true: without it nothing changes and the '
+            . 'reply lists each asset with where it is used (affected), total, in_use (whether any is still used) and '
+            . 'in_use_count; pages, blocks, menus, products and categories outside your role\'s websites/store views '
+            . 'are left out (usages_hidden_by_permissions) but still count in in_use. A restored asset may get a new '
+            . 'id, so id references to it stop resolving.'
+            . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
     /**
@@ -76,7 +79,8 @@ class AssetTrash extends AbstractMediaGalleryTool
         $schema = Schema::object()
             ->rawProperty('ids', ['type' => 'array', 'items' => ['type' => 'integer', 'minimum' => 1], 'minItems' => 1,
                 'maxItems' => 100])
-            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description('Trash after reviewing the preview.'))
+            ->boolean('confirm', fn (BooleanBuilder $b) => $b
+                ->description('Always required; call without it first to get the preview.'))
             ->toArray();
         $schema['required'] = ['ids'];
         return $schema;
@@ -105,14 +109,18 @@ class AssetTrash extends AbstractMediaGalleryTool
                 $scoped['hidden'][$asset['id']]
             );
         }
+        // in_use is a boolean as in the delete tools (T-88); in_use_count counts the assets still in use.
         if (!$this->boolArg($arguments, 'confirm')) {
-            return $this->confirmationRequired('trash_assets', [
-                'assets' => $affected,
-                'in_use' => $inUse,
+            return $this->confirmationRequired('trash_assets', $affected, array_filter([
+                'in_use' => $inUse > 0,
+                'in_use_count' => $inUse,
                 'note' => $inUse > 0 ? 'Assets still in use show as broken images until replaced or restored.' : null,
-            ]);
+            ], static fn ($value): bool => $value !== null));
         }
         $trashed = $this->gallery->trash(array_column($assets, 'id'), $this->adminUserId());
-        return $this->jsonResult(['trashed' => $trashed, 'in_use' => $inUse], ['trashed' => $trashed]);
+        return $this->jsonResult(
+            ['trashed' => $trashed, 'in_use' => $inUse > 0, 'in_use_count' => $inUse],
+            ['trashed' => $trashed]
+        );
     }
 }

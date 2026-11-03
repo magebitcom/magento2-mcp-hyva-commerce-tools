@@ -13,6 +13,7 @@ use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageContentEditor;
+use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Media\AbstractMediaTool;
 use Magebit\Mcp\Api\ToolResultInterface;
@@ -23,6 +24,8 @@ use Magebit\Mcp\Model\Tool\Schema\Schema;
 
 /**
  * `hyva_media.image.replace` MCP tool.
+ *
+ * @phpstan-import-type ImageUsage from ImageUsageIndex
  */
 class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterface
 {
@@ -61,9 +64,11 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
     public function getDescription(): string
     {
         return 'Replace an image path with another in Hyvä CMS pages, blocks and menus. Changes are saved as DRAFTS '
-            . '(component structure kept; optional new alt text) and go live only with hyva_cms.publish. Usages in '
-            . 'Magento CMS content or product/category descriptions are reported, not changed. scope=global (every '
-            . 'Hyvä entity) needs "confirm": true and otherwise returns the usages it would change.';
+            . '(component structure kept; optional new alt text) and go live only with hyva_cms_publish. Usages in '
+            . 'Magento CMS content or product/category descriptions are reported, not changed. "confirm": true is '
+            . 'needed only for scope=global (every Hyvä entity): without it nothing changes and the reply lists the '
+            . 'entities it would change. A scope naming one content type (cms_page, cms_block, menu) applies at '
+            . 'once. Either way the result is a draft: publish each entity with hyva_cms_publish.';
     }
 
     /**
@@ -84,7 +89,7 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
                 ->ofIntegers()
                 ->description('Limit to these ids of the scoped type.'))
             ->string('alt', fn (StringBuilder $s) => $s->description('Alt text for the replaced image fields.'))
-            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description('Required for scope=global.'))
+            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description('Required only for scope=global.'))
             ->toArray();
     }
 
@@ -118,10 +123,17 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
             $notEditable['hidden']
         );
         if ($scope === 'global' && !$this->boolArg($arguments, 'confirm')) {
-            return $this->confirmationRequired('replace_image_globally', [
-                'hyva_entities' => $targets['editable'],
-                'not_editable_usages' => $targets['not_editable'],
-            ] + $outOfScope);
+            $preview = $this->groupByEntity($targets['editable'], $targets['not_editable']);
+            return $this->confirmationRequired(
+                'replace_image_globally',
+                $preview['affected'],
+                ['not_editable_usages' => $preview['not_editable']] + $outOfScope,
+                null,
+                'Confirming saves the replacement as a DRAFT of each affected entity; nothing changes on the '
+                    . 'storefront until each one is published with hyva_cms_publish. Usages under '
+                    . 'not_editable_usages (also those of an affected entity, e.g. its Magento CMS content) are '
+                    . 'reported, not changed.'
+            );
         }
         if ($targets['editable'] === []) {
             return $this->softError(
@@ -144,8 +156,55 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
             'not_changed' => $targets['not_editable'],
             'skipped_types_no_permission' => array_values(array_diff($requested, $types)),
         ] + $outOfScope + [
-            'next_step' => 'Review the drafts and publish each entity with hyva_cms.publish.',
+            'next_step' => 'Review the drafts and publish each entity with hyva_cms_publish.',
         ], ['old_path' => $old, 'new_path' => $new, 'entities' => count($results)]);
+    }
+
+    /**
+     * Preview rows: each entity once (T-89).
+     *
+     * A usage that cannot be edited as a draft goes on the affected row of its entity when that entity is also
+     * edited (e.g. a page whose Hyvä content and Magento CMS content both use the image), else on its own.
+     *
+     * @param array $editable
+     * @param array $notEditable
+     * @return array
+     * @phpstan-param list<array{entity_type: string, id: int, identifier: string}> $editable
+     * @phpstan-param list<ImageUsage> $notEditable
+     * @phpstan-return array{affected: list<array<string, mixed>>, not_editable: list<ImageUsage>}
+     */
+    private function groupByEntity(array $editable, array $notEditable): array
+    {
+        $affected = [];
+        foreach ($editable as $target) {
+            $affected[$target['entity_type'] . ':' . $target['id']] = $target;
+        }
+        $rest = [];
+        foreach ($notEditable as $usage) {
+            $key = $usage['entity_type'] . ':' . $usage['id'];
+            if (isset($affected[$key])) {
+                $usages = $affected[$key]['not_editable_usages'] ?? [];
+                $affected[$key]['not_editable_usages'] = [...(is_array($usages) ? $usages : []), $usage];
+            } else {
+                $rest[] = $usage;
+            }
+        }
+        return ['affected' => array_values($affected), 'not_editable' => $rest];
+    }
+
+    /**
+     * Listed only for a role that may save drafts of at least one content type, besides Media Gallery view.
+     *
+     * @return string|null
+     */
+    public function getUnderlyingAclResource(): ?string
+    {
+        return $this->contentAcl->listingResource(
+            ContentLocator::TYPES,
+            [ContentAcl::VERB_SAVE],
+            [static::UNDERLYING_ACL_RESOURCE],
+            static::UNDERLYING_ACL_RESOURCE
+        );
     }
 
     /**

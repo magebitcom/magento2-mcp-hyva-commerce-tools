@@ -12,6 +12,7 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\MediaGallery\AbstractMediaGalleryToo
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Media\SharedMedia;
 
 /**
  * `hyva_media.folder.create`.
@@ -36,7 +37,8 @@ class FolderCreate extends AbstractMediaGalleryTool
      */
     public function getDescription(): string
     {
-        return 'Create a Media Gallery folder under wysiwyg/ (parents are created too).';
+        return 'Create a Media Gallery folder under wysiwyg/ (parents are created too).'
+            . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
     /**

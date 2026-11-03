@@ -114,7 +114,7 @@ class FieldValueFormat
         'category_importer' => [
             'format' => 'no value of its own',
             'example' => null,
-            'notes' => 'The editor uses it to create child items; add children (or use hyva_menu.category.import) '
+            'notes' => 'The editor uses it to create child items; add children (or use hyva_menu_category_import) '
                 . 'instead.',
         ],
     ];

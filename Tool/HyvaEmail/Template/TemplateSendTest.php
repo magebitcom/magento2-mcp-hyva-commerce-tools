@@ -21,7 +21,11 @@ class TemplateSendTest extends AbstractEmailTool
 {
     public const TOOL_NAME = 'hyva_email.template.send_test';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_email_template_send_test';
-    public const UNDERLYING_ACL_RESOURCE = 'Hyva_EmailTemplates::email_template_view';
+    /**
+     * Hyvä has no send-test resource and its admin button only needs email_template_view; a test send is an
+     * outbound write, so MCP asks for the template write verb (Save draft) instead.
+     */
+    public const UNDERLYING_ACL_RESOURCE = 'Hyva_EmailTemplates::email_template_save';
     public const IS_WRITE = true;
     public const CHANGES_TEMPLATES = false;
 

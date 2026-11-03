@@ -44,6 +44,18 @@ class MenuItemBuilderTest extends TestCase
         $this->builder = new MenuItemBuilder($tree, new DraftEditor($tree));
     }
 
+    public function testDescribeForRemovalCountsEveryDescendant(): void
+    {
+        $node = ['uid' => 'p', 'component' => 'menu_item', 'children' => [
+            ['uid' => 'c1', 'component' => 'menu_item', 'children' => [['uid' => 'g1', 'component' => 'menu_link']]],
+            ['uid' => 'c2', 'component' => 'menu_link'],
+        ]];
+        $described = $this->builder->describeForRemoval($node);
+        $this->assertSame(3, $described['children_count']);
+        $this->assertSame('p', $described['uid']);
+        $this->assertSame(0, $this->builder->describeForRemoval(['uid' => 'leaf'])['children_count']);
+    }
+
     public function testFooterLinkIsWrappedInAColumnInsteadOfDropped(): void
     {
         $spec = ['type' => 'category', 'value' => 99, 'label' => 'Ghost category'];

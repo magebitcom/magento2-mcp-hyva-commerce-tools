@@ -21,6 +21,7 @@ class NewsletterPreview extends AbstractTemplatePreview
     public const UNDERLYING_ACL_RESOURCE = 'Hyva_EmailTemplates::newsletter_template_view';
     public const TEMPLATE_TYPE = EmailGatewayInterface::TYPE_NEWSLETTER;
     public const LABEL = 'newsletter template';
+    public const LABEL_PLURAL = 'newsletter templates';
 
     /**
      * @inheritDoc

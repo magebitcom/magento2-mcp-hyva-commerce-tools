@@ -62,7 +62,7 @@ class MenuStatus extends AbstractTool
     {
         return 'Check whether Hyvä Menu Builder is installed, enabled and allowed for this token. Returns the '
             . 'version, menu components, rendering methods, header/footer menu assignment per store view and menu '
-            . 'counts. Call before any other hyva_menu.* tool.';
+            . 'counts. Call before any other hyva_menu_* tool.';
     }
 
     /**

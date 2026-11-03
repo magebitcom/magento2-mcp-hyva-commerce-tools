@@ -34,7 +34,9 @@ class ErrorList extends AbstractAiWorkerTool
     {
         return 'List recent Hyvä AI Worker failures: failed or stale jobs with their error, failed bulk chunks of '
             . 'running scheduler jobs (retryable or not), and the scheduler problems from the health check. Use it '
-            . 'to explain why AI generation or translation stopped working. Read only.';
+            . 'to explain why AI generation or translation stopped working. Read only.'
+            . ' Not paginated: limit (default 20, max 100) caps the failed jobs and the failed chunks returned, '
+            . 'newest first.';
     }
 
     /**

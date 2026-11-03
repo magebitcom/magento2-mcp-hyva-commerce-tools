@@ -20,6 +20,11 @@ class WorkerStatus extends AbstractAiWorkerTool
     public const UNDERLYING_ACL_RESOURCE = 'Hyva_AiWorker::config';
 
     /**
+     * Status tool: stays listed (under system access) while the module is missing and reports it unavailable.
+     */
+    protected const FEATURE_MISSING_ACL_RESOURCE = 'Magento_Backend::system';
+
+    /**
      * @inheritDoc
      */
     public function getTitle(): string

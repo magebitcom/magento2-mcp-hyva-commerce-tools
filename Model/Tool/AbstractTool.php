@@ -16,6 +16,7 @@ use Magebit\Mcp\Api\UnderlyingAclAwareInterface;
 use Magebit\Mcp\Model\Tool\ToolResult;
 use Magebit\Mcp\Model\Tool\WriteMode;
 use Magebit\McpHyvaCommerceTools\Exception\FeatureUnavailableException;
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
 use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\SecurityViolationException;
@@ -30,6 +31,13 @@ abstract class AbstractTool implements ToolInterface, UnderlyingAclAwareInterfac
     public const ACL_RESOURCE = '';
     public const UNDERLYING_ACL_RESOURCE = 'Hyva_Cms::cms';
     public const IS_WRITE = false;
+
+    /**
+     * Description note naming the delete tool (%1$s = what, e.g. "CMS page"; %2$s = tool); agents must not substitute.
+     */
+    public const DELETE_TOOL_NOTE = 'To delete a %1$s use %2$s (it previews first and deletes only with "confirm": '
+        . 'true; it needs its own MCP permission, without it tell the user deletion is not allowed). Do not '
+        . 'deactivate, empty or unassign it as a substitute.';
 
     /**
      * @inheritDoc
@@ -90,6 +98,9 @@ abstract class AbstractTool implements ToolInterface, UnderlyingAclAwareInterfac
                     . 'to it, passing its version uid as base_version_uid. Do not resubmit the content you read '
                     . 'before.',
             ]);
+        } catch (OutOfScopeException $e) {
+            // Audited with its reason, as the in-use refusal is (T-90); the caller sees the same soft 403.
+            return $this->softError($e->getMessage(), ['status' => 403], 'out_of_scope');
         } catch (AuthorizationException $e) {
             return $this->softError($e->getMessage(), ['status' => 403]);
         } catch (SecurityViolationException $e) {
@@ -160,6 +171,28 @@ abstract class AbstractTool implements ToolInterface, UnderlyingAclAwareInterfac
     }
 
     /**
+     * Soft error for a draft refused after the call's settings were applied (a re-assigning call moves first)
+     *
+     * @param LocalizedException|ConflictException $exception
+     * @param array $result What the call wrote so far.
+     * @return ToolResultInterface
+     * @throws LocalizedException
+     * @phpstan-param array<string, mixed> $result
+     */
+    protected function draftRefusedAfterSettings(
+        LocalizedException|ConflictException $exception,
+        array $result
+    ): ToolResultInterface {
+        return $this->softError(
+            'The settings were applied but the draft was not saved: ' . $exception->getMessage()
+                . ' Save the draft again in a separate call.',
+            ['settings_applied' => true, 'draft_saved' => false]
+                + ($exception instanceof ConflictException ? ['status' => 409] : [])
+                + $result
+        );
+    }
+
+    /**
      * Soft error returned when an optional Hyvä feature is missing or disabled.
      *
      * @param array $unavailable Output of FeatureCheckerInterface::getUnavailableResponse()
@@ -179,24 +212,40 @@ abstract class AbstractTool implements ToolInterface, UnderlyingAclAwareInterfac
     /**
      * Preview returned by destructive tools when `confirm: true` is missing.
      *
+     * Same envelope for every tool: `affected` is always a list (one entry per item that would change, or a sample
+     * of them), `total` counts every item that would change (more than `affected` holds when it is a sample),
+     * `details` holds context that is not an affected item (only when there is any), and `hint` says what
+     * confirming does.
+     *
      * @param string $action
      * @param array $affected
+     * @param array $details
+     * @param int|null $total Default: count($affected)
+     * @param string $hint Added to the standard hint, e.g. what still needs to happen after confirming
      * @return ToolResultInterface
      * @throws LocalizedException
-     * @phpstan-param array<mixed> $affected
+     * @phpstan-param list<mixed> $affected
+     * @phpstan-param array<string, mixed> $details
      */
-    protected function confirmationRequired(string $action, array $affected): ToolResultInterface
-    {
-        return $this->jsonResult(
-            [
-                'dry_run' => true,
-                'confirmation_required' => true,
-                'action' => $action,
-                'affected' => $affected,
-                'hint' => 'Nothing was changed. Call again with "confirm": true to apply.',
-            ],
-            ['dry_run' => true, 'action' => $action]
-        );
+    protected function confirmationRequired(
+        string $action,
+        array $affected,
+        array $details = [],
+        ?int $total = null,
+        string $hint = ''
+    ): ToolResultInterface {
+        $payload = [
+            'dry_run' => true,
+            'confirmation_required' => true,
+            'action' => $action,
+            'affected' => $affected,
+            'total' => $total ?? count($affected),
+        ];
+        if ($details !== []) {
+            $payload['details'] = $details;
+        }
+        $payload['hint'] = trim('Nothing was changed. Call again with "confirm": true to apply. ' . $hint);
+        return $this->jsonResult($payload, ['dry_run' => true, 'action' => $action]);
     }
 
     /**

@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Model\Auth;
 
 use Magebit\Mcp\Model\Acl\AclChecker;
+use Magebit\Mcp\Model\Auth\AuthenticatedContext;
 use Magebit\Mcp\Model\Auth\AuthenticatedContextProvider;
 use Magento\Framework\Exception\LocalizedException;
 
@@ -29,6 +30,20 @@ class CallerContext
         private readonly AuthenticatedContextProvider $contextProvider,
         private readonly AclChecker $aclChecker
     ) {
+    }
+
+    /**
+     * Make the authenticated MCP caller known before the core runs tools/list or a tool call's ACL gate.
+     *
+     * The core sets its context provider only when it dispatches a tool, after the ACL gate and never for
+     * tools/list, so the listing resources of this module's tools would otherwise be resolved without a caller.
+     *
+     * @param AuthenticatedContext $context
+     * @return void
+     */
+    public function bind(AuthenticatedContext $context): void
+    {
+        $this->contextProvider->set($context);
     }
 
     /**

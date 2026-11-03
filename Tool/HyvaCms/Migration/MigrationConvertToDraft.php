@@ -30,6 +30,7 @@ class MigrationConvertToDraft extends AbstractContentTool
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_cms_migration_convert_to_draft';
     public const IS_WRITE = true;
     public const CONTENT_VERBS = [ContentAcl::VERB_SAVE];
+    public const LISTING_CONTENT_TYPES = [ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK];
 
     /**
      * @param ContentLocator $contentLocator
@@ -65,7 +66,7 @@ class MigrationConvertToDraft extends AbstractContentTool
         return 'Convert a Page Builder/WYSIWYG page or block into a Hyvä CMS DRAFT with Hyvä\'s own migrator '
             . '(mode=full maps rows/columns/headings/text/images to components, everything else becomes HTML '
             . 'components; mode=partial keeps every top-level element as HTML). The original Magento content is not '
-            . 'changed and the storefront keeps showing it until hyva_cms.publish. Replacing an existing Hyvä draft '
+            . 'changed and the storefront keeps showing it until hyva_cms_publish. Replacing an existing Hyvä draft '
             . 'needs "confirm": true.';
     }
 

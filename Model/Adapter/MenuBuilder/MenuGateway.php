@@ -202,6 +202,18 @@ class MenuGateway implements MenuGatewayInterface
     /**
      * @inheritDoc
      */
+    public function delete(int $menuId): void
+    {
+        try {
+            $this->menuRepository()->deleteById($menuId);
+        } catch (NoSuchEntityException) {
+            throw new LocalizedException(__('Menu #%1 does not exist.', $menuId));
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function findIdByIdentifier(string $identifier, ?int $storeId = null): ?int
     {
         if ($storeId !== null) {

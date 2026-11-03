@@ -12,6 +12,7 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuItemBuilder;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\ToolPayloadTrait;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Item\ItemRemove;
@@ -40,6 +41,12 @@ class ItemRemoveConfirmTest extends TestCase
         $this->assertTrue($this->payloadAt($result, 'confirmation_required'));
         $this->assertSame('remove_menu_item_with_children', $this->payloadAt($result, 'action'));
         $this->assertSame('parent', $this->payloadAt($result, 'affected.0.uid'));
+        $this->assertSame(1, $this->payloadAt($result, 'affected.0.children_count'));
+        $this->assertSame(
+            ['menu_id' => 3, 'children_count' => 1, 'draft_only' => true],
+            $this->payloadAt($result, 'details')
+        );
+        $this->assertStringContainsString('hyva_menu_publish', Cast::string($this->payloadAt($result, 'hint')));
     }
 
     public function testConfirmRemovesTheItemWithChildren(): void
@@ -114,6 +121,9 @@ class ItemRemoveConfirmTest extends TestCase
         $builder = $this->createMock(MenuItemBuilder::class);
         $builder->method('describe')->willReturnCallback(
             static fn (array $node): array => ['uid' => $node['uid'] ?? null]
+        );
+        $builder->method('describeForRemoval')->willReturnCallback(
+            static fn (array $node): array => ['uid' => $node['uid'] ?? null, 'children_count' => 1]
         );
         return new ItemRemove($features, $menus, $contentService, $tree, $builder);
     }

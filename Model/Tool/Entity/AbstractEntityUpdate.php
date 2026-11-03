@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Tool\Entity;
 
+use Hyva\CmsConnect\Exception\ConflictException;
 use Magento\Framework\Exception\LocalizedException;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
@@ -23,7 +24,6 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ContentSchema;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
-use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 /**
@@ -44,7 +44,6 @@ abstract class AbstractEntityUpdate extends AbstractTool
      * @param DraftEditor $draftEditor
      * @param EntityWriter $entityWriter
      * @param LiveSettings $liveSettings
-     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         private readonly ContentLocator $contentLocator,
@@ -52,8 +51,7 @@ abstract class AbstractEntityUpdate extends AbstractTool
         private readonly ComponentTree $componentTree,
         private readonly DraftEditor $draftEditor,
         private readonly EntityWriter $entityWriter,
-        private readonly LiveSettings $liveSettings,
-        private readonly StoreScopeGuard $storeScopeGuard
+        private readonly LiveSettings $liveSettings
     ) {
     }
 
@@ -72,11 +70,12 @@ abstract class AbstractEntityUpdate extends AbstractTool
     {
         return sprintf(
             'Update a CMS %1$s. Content changes (components = replace all root components, operations = targeted '
-                . 'edits) are saved as a DRAFT and the live version is unchanged until hyva_cms.publish. "settings" '
+                . 'edits) are saved as a DRAFT and the live version is unchanged until hyva_cms_publish. "settings" '
                 . 'changes '
                 . 'Magento fields (title, active flag, store views, meta) and applies IMMEDIATELY: a setting that '
                 . 'changes the live storefront (active flag, store views, URL key; any field of an active %1$s) needs '
-                . '"confirm": true. Without it nothing is written and the reply lists what would change.',
+                . '"confirm": true. Without it nothing is written and the reply lists what would change. '
+                . sprintf(self::DELETE_TOOL_NOTE, 'CMS %1$s', 'hyva_cms_%1$s_delete'),
             strtolower(static::ENTITY_LABEL)
         );
     }
@@ -96,7 +95,9 @@ abstract class AbstractEntityUpdate extends AbstractTool
             ->object('settings', function (ObjectBuilder $o) use ($allowed): void {
                 foreach ($allowed as $field) {
                     if ($field === 'store_ids') {
-                        $o->rawProperty('store_ids', ['type' => 'array', 'items' => ['type' => 'integer']]);
+                        // As in the admin form a store view is required: an empty list takes the entity offline.
+                        $o->rawProperty('store_ids', ['type' => 'array', 'items' => ['type' => 'integer'],
+                            'minItems' => 1]);
                     } elseif ($field === 'is_active') {
                         $o->rawProperty('is_active', ['type' => 'boolean']);
                     } else {
@@ -123,21 +124,18 @@ abstract class AbstractEntityUpdate extends AbstractTool
      */
     protected function run(array $arguments): ToolResultInterface
     {
-        $entity = $this->contentLocator->locateForWrite(static::ENTITY_TYPE, $arguments);
         $components = $this->arrayArg($arguments, 'components');
         $operations = $this->arrayArg($arguments, 'operations');
         $settings = $this->arrayArg($arguments, 'settings');
-        if ($components === [] && $operations === [] && $settings === []) {
-            return $this->softError('Nothing to update: pass components, operations and/or settings.');
-        }
-
+        $newStoreIds = null;
         if (array_key_exists('store_ids', $settings) && $settings['store_ids'] !== null) {
             $storeIds = $settings['store_ids'];
-            $this->storeScopeGuard->assertAssignable(
-                $this->contentLocator->label($entity),
-                $entity['store_ids'],
-                Cast::intList(is_array($storeIds) ? $storeIds : [$storeIds])
-            );
+            $newStoreIds = Cast::intList(is_array($storeIds) ? $storeIds : [$storeIds]);
+        }
+        // A re-assigning call is judged by the store views it enters (Hyvä admin rule, see StoreScopeGuard).
+        $entity = $this->contentLocator->locateForWrite(static::ENTITY_TYPE, $arguments, $newStoreIds);
+        if ($components === [] && $operations === [] && $settings === []) {
+            return $this->softError('Nothing to update: pass components, operations and/or settings.');
         }
 
         // Layout, heading and meta are not part of the located row: load them so an unchanged value is no change.
@@ -153,6 +151,7 @@ abstract class AbstractEntityUpdate extends AbstractTool
         }
 
         $result = ['entity_type' => static::ENTITY_TYPE, 'id' => $entity['id']];
+        $applied = null;
         if ($components !== [] || $operations !== []) {
             $document = $this->contentService->getWorkingDocument($entity['type'], $entity['id']);
             if ($components !== []) {
@@ -162,38 +161,55 @@ abstract class AbstractEntityUpdate extends AbstractTool
                 }
             }
             $applied = $this->draftEditor->apply($document, $operations);
-            $result['draft'] = $this->contentService->saveDraft(
-                $entity['type'],
-                $entity['id'],
-                $applied['document'],
-                $this->stringArg($arguments, 'version_name'),
-                $this->stringArg($arguments, 'base_version_uid')
-            );
-            $result['applied_operations'] = $applied['applied'];
-            $result['published'] = false;
         }
-        if ($settings !== []) {
-            $stringKeyed = [];
-            foreach ($settings as $key => $value) {
-                $stringKeyed[(string) $key] = $value;
-            }
-            // The draft goes first: it is not live and stays in version history, whereas settings change the live
-            // entity, so a refused draft (stale base_version_uid, bad operations) must not leave settings applied.
-            try {
-                $result['settings_changed'] = $this->entityWriter->update(
+        $stringKeyed = [];
+        foreach ($settings as $key => $value) {
+            $stringKeyed[(string) $key] = $value;
+        }
+
+        if ($this->contentLocator->changesOnlyAfterReassignment($entity, $newStoreIds)) {
+            // Allowed only because it moves the entity into the caller's store views: move it first, so a refused
+            // move writes nothing and the draft never lands on an entity the caller may not change where it is.
+            // A draft refusal that is known before the move (stale base_version_uid, invalid content) writes nothing.
+            if ($applied !== null) {
+                $this->contentService->assertDraftSavable(
                     $entity['type'],
                     $entity['id'],
-                    $stringKeyed
+                    $applied['document'],
+                    $this->stringArg($arguments, 'base_version_uid')
                 );
-            } catch (LocalizedException $exception) {
-                if (!isset($result['draft'])) {
-                    throw $exception;
+            }
+            $result['settings_changed'] = $this->entityWriter->update($entity['type'], $entity['id'], $stringKeyed);
+            if ($applied !== null) {
+                try {
+                    $result += $this->saveDraft($entity, $applied, $arguments);
+                } catch (LocalizedException|ConflictException $exception) {
+                    return $this->draftRefusedAfterSettings($exception, $result);
                 }
-                // The draft is already saved: report it with the error instead of hiding a partial write.
-                return $this->softError(
-                    'The draft was saved but the settings were not applied: ' . $exception->getMessage(),
-                    ['draft_saved' => true, 'settings_applied' => false] + $result
-                );
+            }
+        } else {
+            // The draft goes first: it is not live and stays in version history, whereas settings change the live
+            // entity, so a refused draft (stale base_version_uid, bad operations) must not leave settings applied.
+            if ($applied !== null) {
+                $result += $this->saveDraft($entity, $applied, $arguments);
+            }
+            if ($stringKeyed !== []) {
+                try {
+                    $result['settings_changed'] = $this->entityWriter->update(
+                        $entity['type'],
+                        $entity['id'],
+                        $stringKeyed
+                    );
+                } catch (LocalizedException $exception) {
+                    if (!isset($result['draft'])) {
+                        throw $exception;
+                    }
+                    // The draft is already saved: report it with the error instead of hiding a partial write.
+                    return $this->softError(
+                        'The draft was saved but the settings were not applied: ' . $exception->getMessage(),
+                        ['draft_saved' => true, 'settings_applied' => false] + $result
+                    );
+                }
             }
         }
 
@@ -203,5 +219,35 @@ abstract class AbstractEntityUpdate extends AbstractTool
             'operations' => count($operations),
             'settings' => array_keys($settings),
         ]);
+    }
+
+    /**
+     * Save the edited document as the entity's draft
+     *
+     * @param array $entity
+     * @param array $applied Output of DraftEditor::apply().
+     * @param array $arguments
+     * @return array
+     * @throws LocalizedException
+     * @throws ConflictException When the draft changed since base_version_uid.
+     * @phpstan-param array{type: string, id: int} $entity
+     * @phpstan-param array{document: array<string, mixed>, applied: list<array<string, mixed>>} $applied
+     * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-return array{draft: array{version_id: int|null, version_uid: string,
+     *     warnings: list<array<string, mixed>>}, applied_operations: list<array<string, mixed>>, published: false}
+     */
+    private function saveDraft(array $entity, array $applied, array $arguments): array
+    {
+        return [
+            'draft' => $this->contentService->saveDraft(
+                $entity['type'],
+                $entity['id'],
+                $applied['document'],
+                $this->stringArg($arguments, 'version_name'),
+                $this->stringArg($arguments, 'base_version_uid')
+            ),
+            'applied_operations' => $applied['applied'],
+            'published' => false,
+        ];
     }
 }

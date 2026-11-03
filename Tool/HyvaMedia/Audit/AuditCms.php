@@ -45,7 +45,9 @@ class AuditCms extends AbstractMediaTool
     {
         return 'Audit only images used in Hyvä CMS pages and blocks (draft and published): missing alt text, large '
             . 'hero images, unoptimized campaign images, broken references. Pages and blocks outside your role\'s '
-            . 'websites/store views are not checked (usages_hidden_by_permissions).';
+            . 'websites/store views are not checked (usages_hidden_by_permissions).'
+            . ' Not paginated: limit (default 100, max 1000) caps the images listed, errors first; '
+            . 'images_checked and counts cover every image.';
     }
 
     /**

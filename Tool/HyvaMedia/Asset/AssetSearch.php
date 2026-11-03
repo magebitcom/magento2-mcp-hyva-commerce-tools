@@ -14,6 +14,8 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ListPagination;
+use Magebit\McpHyvaCommerceTools\Model\Media\SharedMedia;
 
 /**
  * `hyva_media.asset.search`.
@@ -39,7 +41,9 @@ class AssetSearch extends AbstractMediaGalleryTool
         return 'Search the Hyvä Media Gallery (media_gallery_asset): by folder, text, type, size and dimensions, or '
             . 'only '
             . 'likely duplicates (same file size and dimensions). Returns asset ids, paths, sizes and URLs; Hyvä CMS '
-            . 'image fields reference assets by these ids.';
+            . 'image fields reference assets by these ids. '
+            . ListPagination::DESCRIPTION_NOTE
+            . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
     /**
@@ -58,8 +62,7 @@ class AssetSearch extends AbstractMediaGalleryTool
             ->boolean('duplicates_only', fn (BooleanBuilder $b) => $b->description('Only assets that share size '
                 . 'and dimensions with another (Hyvä\'s duplicate heuristic).'))
             ->string('sort', fn (StringBuilder $s) => $s->enum(['updated_at', 'created_at', 'title', 'size']))
-            ->integer('page', fn (IntegerBuilder $i) => $i->minimum(1))
-            ->integer('page_size', fn (IntegerBuilder $i) => $i->minimum(1)->maximum(200))
+            ->with(new ListPagination())
             ->toArray();
     }
 

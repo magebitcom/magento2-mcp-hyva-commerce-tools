@@ -89,20 +89,39 @@ class ContentLocator
     /**
      * Entity the caller may change: every store view it is assigned to is within the caller's restriction.
      *
+     * A call that also re-assigns the entity passes the new store views: the change is then judged by the
+     * assignment it enters (StoreScopeGuard::assertChangeable()), as the Hyvä admin does.
+     *
      * @param string $type cms_page|cms_block|menu
      * @param array $arguments
+     * @param array|null $newStoreIds Store views this call assigns, or null when it keeps them.
      * @return array
      * @throws LocalizedException
      * @throws AuthorizationException When the caller's website/store view restriction excludes the entity.
      * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-param list<int>|null $newStoreIds
      * @phpstan-return array{type: string, id: int, identifier: string, title: string, is_active: bool,
      *     store_ids: list<int>}
      */
-    public function locateForWrite(string $type, array $arguments): array
+    public function locateForWrite(string $type, array $arguments, ?array $newStoreIds = null): array
     {
         $entity = $this->find($type, $arguments);
-        $this->storeScopeGuard->assertWritable($this->label($entity), $entity['store_ids']);
+        $this->storeScopeGuard->assertChangeable($this->label($entity), $entity['store_ids'], $newStoreIds);
         return $entity;
+    }
+
+    /**
+     * Whether only the re-assignment allows this change (see StoreScopeGuard::changesOnlyAfterReassignment())
+     *
+     * @param array $entity Row from locateForWrite().
+     * @param array|null $newStoreIds Store views this call assigns, or null when it keeps them.
+     * @return bool
+     * @phpstan-param array{store_ids: list<int>} $entity
+     * @phpstan-param list<int>|null $newStoreIds
+     */
+    public function changesOnlyAfterReassignment(array $entity, ?array $newStoreIds): bool
+    {
+        return $this->storeScopeGuard->changesOnlyAfterReassignment($entity['store_ids'], $newStoreIds);
     }
 
     /**

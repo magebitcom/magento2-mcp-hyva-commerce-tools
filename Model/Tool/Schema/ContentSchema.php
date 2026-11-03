@@ -19,7 +19,7 @@ class ContentSchema
         'type' => 'array',
         'description' => 'Root components, in order. Each item is {"component": "<name>", "fields": {...}, '
             . '"children": [...]} or a raw node with field values on the node. Missing fields get the component '
-            . 'defaults; uids are generated. Use hyva_cms.component.list / hyva_cms.component.schema for names and '
+            . 'defaults; uids are generated. Use hyva_cms_component_list / hyva_cms_component_schema for names and '
             . 'fields.',
         'items' => [
             'type' => 'object',

@@ -12,6 +12,7 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\MediaGallery\AbstractMediaGalleryToo
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Media\SharedMedia;
 
 /**
  * `hyva_media.trash.restore`.
@@ -39,7 +40,8 @@ class TrashRestore extends AbstractMediaGalleryTool
         return 'Restore trashed assets to their original paths (Hyvä uses the delete permission for this). Refuses '
             . 'items '
             . 'whose original path is taken. Restored assets are re-indexed and may get a new asset id, which is '
-            . 'reported.';
+            . 'reported.'
+            . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
     /**
@@ -49,7 +51,7 @@ class TrashRestore extends AbstractMediaGalleryTool
     {
         $schema = Schema::object()
             ->rawProperty('trash_ids', ['type' => 'array', 'items' => ['type' => 'integer', 'minimum' => 1],
-                'minItems' => 1, 'description' => 'Ids from hyva_media.trash.list.'])
+                'minItems' => 1, 'description' => 'Ids from hyva_media_trash_list.'])
             ->toArray();
         $schema['required'] = ['trash_ids'];
         return $schema;

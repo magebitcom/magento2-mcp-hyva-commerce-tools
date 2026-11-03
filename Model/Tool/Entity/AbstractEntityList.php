@@ -18,8 +18,8 @@ use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
-use Magebit\Mcp\Model\Tool\Schema\Preset\Pagination;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ListPagination;
 use Magento\Framework\Exception\LocalizedException;
 
 /**
@@ -78,7 +78,9 @@ abstract class AbstractEntityList extends AbstractTool
         return sprintf(
             'List CMS %ss with their Hyvä CMS state: liveview enabled, published, draft-only or published with '
                 . 'unpublished draft changes, pending schedules, and whether the Magento content still uses Page '
-                . 'Builder/WYSIWYG. Filter by store view, status, component usage or legacy (non-Hyvä) content.',
+                . 'Builder/WYSIWYG. Filter by store view, status, component usage or legacy (non-Hyvä) content. '
+                . sprintf(self::DELETE_TOOL_NOTE, 'CMS %1$s', 'hyva_cms_%1$s_delete') . ' '
+                . ListPagination::DESCRIPTION_NOTE,
             strtolower(static::ENTITY_LABEL)
         );
     }
@@ -115,7 +117,7 @@ abstract class AbstractEntityList extends AbstractTool
             ->string('search', fn (StringBuilder $s) => $s
                 ->minLength(1)
                 ->description('Substring of title or identifier.'))
-            ->with(Pagination::maxPageSize(200))
+            ->with(new ListPagination())
             ->toArray();
     }
 

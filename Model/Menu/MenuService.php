@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Menu;
 
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
 use Magebit\Mcp\Api\LoggerInterface;
 use FilesystemIterator;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
@@ -106,15 +107,34 @@ class MenuService
      * Menu the caller may change: every store view it is assigned to is within the caller's restriction.
      *
      * @param array $arguments id | identifier [+ store_id]
+     * @param array|null $newStoreIds Store views this call assigns, or null (see ContentLocator::locateForWrite()).
      * @return array Menu row from the gateway.
      * @throws LocalizedException
      * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-param list<int>|null $newStoreIds
      * @phpstan-return array<string, mixed>
      */
-    public function locateForWrite(array $arguments): array
+    public function locateForWrite(array $arguments, ?array $newStoreIds = null): array
     {
-        $entity = $this->contentLocator->locateForWrite(ContentLocator::TYPE_MENU, $arguments);
+        $entity = $this->contentLocator->locateForWrite(ContentLocator::TYPE_MENU, $arguments, $newStoreIds);
         return $this->menuGateway->get($entity['id']);
+    }
+
+    /**
+     * Whether only the re-assignment allows this change (see StoreScopeGuard::changesOnlyAfterReassignment())
+     *
+     * @param array $menu Row from locateForWrite().
+     * @param array|null $newStoreIds Store views this call assigns, or null when it keeps them.
+     * @return bool
+     * @phpstan-param array<string, mixed> $menu
+     * @phpstan-param list<int>|null $newStoreIds
+     */
+    public function changesOnlyAfterReassignment(array $menu, ?array $newStoreIds): bool
+    {
+        return $this->storeScopeGuard->changesOnlyAfterReassignment(
+            Cast::intList($menu['store_ids'] ?? []),
+            $newStoreIds
+        );
     }
 
     /**
@@ -401,8 +421,9 @@ class MenuService
     {
         $path = $this->catalogScopeReader->categoryPaths([$rootCategoryId])[$rootCategoryId] ?? null;
         if ($path !== null && !$this->storeScopeGuard->allowsCategoryPath($path)) {
-            throw new AuthorizationException(__(
-                'Your admin role is restricted to other websites or store views; category #%1 is outside it.',
+            throw new OutOfScopeException(__(
+                '%1; category #%2 is outside it.',
+                StoreScopeGuard::RESTRICTED,
                 $rootCategoryId
             ));
         }

@@ -54,6 +54,15 @@ class ViewerWidgetCacheKeyPluginTest extends TestCase
         );
     }
 
+    public function testTheActivityWidgetOfARestrictedAdminIsCachedPerAdmin(): void
+    {
+        $this->assertSame(
+            self::KEY . ':stores-2:admin-7',
+            $this->key([2], true, 'magebit_mcp_activity_widget', true, ['cms_page', 'cms_block', 'menu'], 7)
+        );
+        $this->assertSame(self::KEY, $this->key(null, true, 'magebit_mcp_activity_widget'));
+    }
+
     public function testOtherWidgetTypesKeepHyvasKey(): void
     {
         $this->assertSame(self::KEY, $this->key([1], false, 'hyva_sales_widget'));
@@ -67,6 +76,7 @@ class ViewerWidgetCacheKeyPluginTest extends TestCase
      * @param string $widgetType
      * @param bool $menuAllowed
      * @param array $schedulable Content types the viewer may schedule.
+     * @param int|null $ownCallsOf Admin the activity widget is limited to.
      * @return string
      * @phpstan-param list<int>|null $allowedStoreIds
      * @phpstan-param list<string> $schedulable
@@ -76,7 +86,8 @@ class ViewerWidgetCacheKeyPluginTest extends TestCase
         bool $auditAllowed,
         string $widgetType,
         bool $menuAllowed = true,
-        array $schedulable = ['cms_page', 'cms_block', 'menu']
+        array $schedulable = ['cms_page', 'cms_block', 'menu'],
+        ?int $ownCallsOf = null
     ): string {
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->with(FeatureCheckerInterface::MENU_BUILDER)->willReturn($menuAllowed);
@@ -86,6 +97,7 @@ class ViewerWidgetCacheKeyPluginTest extends TestCase
         );
         $reader = $this->createMock(McpActivityReader::class);
         $reader->method('isAllowed')->willReturn($auditAllowed);
+        $reader->method('viewerAdminUserId')->willReturn($ownCallsOf);
         $instance = $this->createMock(WidgetInstanceInterface::class);
         $instance->method('getWidgetTypeId')->willReturn($widgetType);
         return (new ViewerWidgetCacheKeyPlugin($this->storeScope($allowedStoreIds), $reader, $features, $acl))

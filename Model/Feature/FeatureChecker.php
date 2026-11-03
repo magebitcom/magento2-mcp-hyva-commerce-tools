@@ -68,7 +68,9 @@ class FeatureChecker implements FeatureCheckerInterface
             $enabled = $enabled && $moduleEnabled;
         }
 
-        $aclAllowed = $aclResource !== null ? $this->isAclAllowed($aclResource) : null;
+        // A missing or disabled feature gets no ACL verdict (null): its resource may not exist, or may belong to
+        // another module that is still installed, so true or false would both mislead.
+        $aclAllowed = $aclResource !== null && $installed && $enabled ? $this->isAclAllowed($aclResource) : null;
 
         return [
             'feature' => $feature,

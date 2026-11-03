@@ -14,6 +14,7 @@ use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ListPagination;
 
 /**
  * `hyva_form.form.list`.
@@ -39,7 +40,8 @@ class FormList extends AbstractFormTool
     public function getDescription(): string
     {
         return 'List Hyvä Form Builder forms (newest first) with identifier, title, enabled flag, store views, '
-            . 'whether they have a draft and a published version, and where submissions go (recipients, webhook).';
+            . 'whether they have a draft and a published version, and where submissions go (recipients, webhook). '
+            . ListPagination::DESCRIPTION_NOTE;
     }
 
     /**
@@ -50,8 +52,7 @@ class FormList extends AbstractFormTool
         return Schema::object()
             ->string('search', fn (StringBuilder $s) => $s->description('Title contains.'))
             ->integer('store_id', fn (IntegerBuilder $i) => $i->minimum(0))
-            ->integer('page', fn (IntegerBuilder $i) => $i->minimum(1))
-            ->integer('page_size', fn (IntegerBuilder $i) => $i->minimum(1)->maximum(200))
+            ->with(new ListPagination())
             ->toArray();
     }
 

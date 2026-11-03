@@ -20,6 +20,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Media\SharedMedia;
 
 /**
  * `hyva_media.image.list` MCP tool.
@@ -60,7 +61,10 @@ class ImageList extends AbstractMediaTool
             . 'whether and where they are used (Hyvä CMS, menus, Magento CMS, product/category descriptions) and '
             . 'missing alt text. Filter by folder, type, size (KB), dimensions, used/unused, usage source. Usages in '
             . 'pages, blocks, menus, products and categories outside your role\'s websites/store views are only '
-            . 'counted (usages_hidden_by_permissions); an image used there still counts as used.';
+            . 'counted (usages_hidden_by_permissions); an image used there still counts as used.'
+            . ' Not paginated: limit (default 100, max 1000) caps the images returned after filtering and '
+            . 'sorting; total counts every match.'
+            . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
     /**

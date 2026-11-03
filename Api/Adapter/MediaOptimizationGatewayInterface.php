@@ -52,12 +52,14 @@ interface MediaOptimizationGatewayInterface
     public function clearAll(string $mode = 'all'): int;
 
     /**
-     * Count all generated.
+     * Count all generated images, with up to $sampleSize paths of each kind.
      *
+     * @param int $sampleSize
      * @return array
-     * @phpstan-return array{resized: int, converted: int}
+     * @phpstan-return array{resized: int, converted: int,
+     *     sample: array{resized: list<string>, converted: list<string>}}
      */
-    public function countAllGenerated(): array;
+    public function countAllGenerated(int $sampleSize = 0): array;
 
     /**
      * Responsive <picture> markup built only from variants that already exist (never generates files)

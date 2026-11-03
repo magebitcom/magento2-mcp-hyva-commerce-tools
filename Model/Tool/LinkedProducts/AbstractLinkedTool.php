@@ -18,6 +18,7 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
+use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magento\Framework\Exception\LocalizedException;
 
 /**
@@ -33,6 +34,12 @@ abstract class AbstractLinkedTool extends AbstractTool
     public const UNDERLYING_ACL_RESOURCE = 'Hyva_LinkedProducts::group_view';
 
     /**
+     * Resource the tool is listed with while the feature is missing or disabled: none, so tools/list hides it.
+     * A feature's status tool overrides it with a resource that exists without the feature, so it stays listed.
+     */
+    protected const FEATURE_MISSING_ACL_RESOURCE = ContentAcl::UNAVAILABLE_RESOURCE;
+
+    /**
      * @param FeatureCheckerInterface $featureChecker
      * @param LinkedProductsGatewayInterface $linkedGroups
      * @param StoreScopeGuard $storeScopeGuard
@@ -45,7 +52,10 @@ abstract class AbstractLinkedTool extends AbstractTool
     }
 
     /**
-     * Hyvä resource the tool is listed with (catalog product access while the module is disabled).
+     * Hyvä resource the tool is listed with.
+     *
+     * Linked Products's resources only exist while the module is enabled; without it the tool is hidden from tools/list
+     * (FEATURE_MISSING_ACL_RESOURCE) and a call answers that the feature is unavailable.
      *
      * @return string|null
      */
@@ -53,7 +63,7 @@ abstract class AbstractLinkedTool extends AbstractTool
     {
         return $this->featureChecker->getStatus(FeatureCheckerInterface::LINKED_PRODUCTS)['enabled']
             ? static::UNDERLYING_ACL_RESOURCE
-            : 'Magento_Catalog::products';
+            : static::FEATURE_MISSING_ACL_RESOURCE;
     }
 
     /**
@@ -68,7 +78,7 @@ abstract class AbstractLinkedTool extends AbstractTool
         }
         if (static::IS_WRITE) {
             // Groups have no website or store view assignment: a restricted role may not change them.
-            $this->storeScopeGuard->assertUnrestricted('Linked product groups');
+            $this->storeScopeGuard->assertUnrestricted('linked product groups');
         }
         return $this->executeLinked($arguments);
     }
@@ -100,7 +110,7 @@ abstract class AbstractLinkedTool extends AbstractTool
                 ->description('Group name (unique). Required for a new group.'))
             ->array('attribute_codes', fn (ArrayBuilder $a) => $a->ofStrings()->maxItems(10)
                 ->description('Link attributes the switcher shows (user-defined dropdowns such as color, size; '
-                    . 'listed in linkable_attributes of hyva_linked.group.list). Default: unchanged.'))
+                    . 'listed in linkable_attributes of hyva_linked_group_list). Default: unchanged.'))
             ->array('skus', $skuList('Complete member list. Default: the current members.'))
             ->array('add_skus', $skuList('Members to add to the current ones.'))
             ->array('remove_skus', $skuList('Members to remove from the current ones.'));

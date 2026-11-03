@@ -75,6 +75,15 @@ interface MenuGatewayInterface
     public function update(int $menuId, array $data): array;
 
     /**
+     * Delete a menu through Hyvä's menu repository, as the Menu Builder admin delete action does.
+     *
+     * @param int $menuId
+     * @return void
+     * @throws LocalizedException
+     */
+    public function delete(int $menuId): void;
+
+    /**
      * Render the published menu on the storefront of a store view, the way Hyvä does.
      *
      * @param string $identifier

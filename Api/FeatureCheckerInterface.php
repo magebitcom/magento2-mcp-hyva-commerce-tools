@@ -41,6 +41,9 @@ interface FeatureCheckerInterface
     /**
      * Get status.
      *
+     * The acl_allowed key is null when the feature has no ACL resource, is not installed or disabled, or no admin
+     * context exists; otherwise whether the caller's role holds acl_resource.
+     *
      * @param string $feature
      * @return array
      * @phpstan-return array{ feature: string, label: string, available: bool, installed: bool, enabled: bool,

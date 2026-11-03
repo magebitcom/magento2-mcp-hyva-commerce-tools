@@ -16,6 +16,7 @@ use Magebit\Mcp\Model\Util\ResolverPipeline;
 use Magebit\McpHyvaCommerceTools\Api\ImageFieldResolverInterface;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageContentEditor;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Media\AbstractMediaTool;
+use Magebit\McpHyvaCommerceTools\Model\Media\SharedMedia;
 
 /**
  * `hyva_media.image.get`: image details composed by field resolvers.
@@ -56,7 +57,8 @@ class ImageGet extends AbstractMediaTool
         }
         return 'Details of one image: file size, dimensions, type and dates, Media Gallery title, every usage with '
             . 'alt-text state, optimized variants with WebP/AVIF status, and Image Editor backup. Response keys: '
-            . implode(', ', $keys) . '.';
+            . implode(', ', $keys) . '.'
+            . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
     /**

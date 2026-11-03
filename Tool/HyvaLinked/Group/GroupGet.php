@@ -63,7 +63,7 @@ class GroupGet extends AbstractLinkedTool
             $id = $this->linkedGroups->getList(null, $sku, 1, 1)['items'][0]['id'] ?? null;
         }
         if ($id === null) {
-            return $this->softError('No such group. Pass id, name or a member sku (hyva_linked.group.list).');
+            return $this->softError('No such group. Pass id, name or a member sku (hyva_linked_group_list).');
         }
         $group = $this->linkedGroups->get($id);
         $codes = array_column($group['attributes'], 'code');

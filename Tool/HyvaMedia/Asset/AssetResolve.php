@@ -19,6 +19,7 @@ use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Media\SharedMedia;
 
 /**
  * `hyva_media.asset.resolve`.
@@ -64,7 +65,8 @@ class AssetResolve extends AbstractMediaGalleryTool
             . 'where '
             . 'it is used (Hyvä CMS pages, blocks and menus by path or asset id, catalog, and Magento-tracked CMS '
             . 'content). Use it before moving or trashing an asset. Pages, blocks, menus, products and categories '
-            . 'outside your role\'s websites/store views are left out and counted in usages_hidden_by_permissions.';
+            . 'outside your role\'s websites/store views are left out and counted in usages_hidden_by_permissions.'
+            . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
     /**
@@ -91,7 +93,7 @@ class AssetResolve extends AbstractMediaGalleryTool
             $asset = $path !== null ? $this->gallery->getByPath($path) : null;
         }
         if ($asset === null) {
-            return $this->softError('No Media Gallery asset matches. Run hyva_media.sync.status if the file exists '
+            return $this->softError('No Media Gallery asset matches. Run hyva_media_sync_status if the file exists '
                 . 'but is not in the gallery yet.');
         }
         $scoped = $this->scopeFilter->filterAssetUsages([$asset['id'] => $this->usage($asset)]);

@@ -48,7 +48,9 @@ class AuditAll extends AbstractMediaTool
             . 'formats, large PNGs, heavy hero/banner images, missing optimized variants, plus Media Optimization '
             . 'settings (disabled optimization, automatic replacement off). Usages in pages, blocks, menus, products '
             . 'and categories outside your role\'s websites/store views are not checked '
-            . '(usages_hidden_by_permissions).';
+            . '(usages_hidden_by_permissions).'
+            . ' Not paginated: limit (default 100, max 1000) caps the images listed, errors first; '
+            . 'images_checked and counts cover every image.';
     }
 
     /**

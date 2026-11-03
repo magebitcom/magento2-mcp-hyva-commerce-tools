@@ -136,8 +136,29 @@ class MediaHealth extends AbstractHealthWidget
                 ),
             ],
             'sections' => $sections,
-            'notice' => (string) __('%1 referenced images checked.', $report['images_checked']),
+            'notice' => $this->notice($report),
             'links' => $links,
         ];
+    }
+
+    /**
+     * Notice under the stats; a website-restricted admin is told the files are shared and which usages were checked
+     *
+     * @param array $report MediaAuditor::audit() report
+     * @return string
+     * @phpstan-param array{images_checked: int, usages_hidden_by_permissions?: int} $report
+     */
+    private function notice(array $report): string
+    {
+        $notice = (string) __('%1 referenced images checked.', $report['images_checked']);
+        if (!array_key_exists('usages_hidden_by_permissions', $report)) {
+            return $notice;
+        }
+        return $notice . ' ' . (string) __(
+            'Media files are shared by all websites (the Hyvä Media Gallery has no website or store view scope), '
+            . 'so the files are the same for every admin; only their usages in your websites and store views are '
+            . 'checked (%1 usages elsewhere left out).',
+            $report['usages_hidden_by_permissions']
+        );
     }
 }

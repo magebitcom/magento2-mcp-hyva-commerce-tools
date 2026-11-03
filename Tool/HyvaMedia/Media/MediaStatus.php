@@ -55,7 +55,7 @@ class MediaStatus extends AbstractTool
     {
         return 'Check whether Hyvä Media Optimization and Image Editor are installed and enabled, the new Media '
             . 'Gallery state, GD/Imagick availability with supported formats, WebP/AVIF output, automatic image '
-            . 'replacement, debug logging and ACL status. Call before other hyva_media.* tools.';
+            . 'replacement, debug logging and ACL status. Call before other hyva_media_* tools.';
     }
 
     /**

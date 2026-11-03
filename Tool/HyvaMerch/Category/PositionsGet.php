@@ -46,7 +46,9 @@ class PositionsGet extends AbstractTool
     {
         return 'Show the merchandised product order of a category (Hyvä Category Merchandiser: the stored category '
             . 'product positions), with SKU, name, enabled and visible flags, plus notes when something else '
-            . 'controls the storefront order (e.g. ElasticSuite) or the index updates by schedule.';
+            . 'controls the storefront order (e.g. ElasticSuite) or the index updates by schedule.'
+            . ' Not paginated: limit (default 100, max 500) caps the products returned, in position order; '
+            . 'category.product_count counts all of them.';
     }
 
     /**

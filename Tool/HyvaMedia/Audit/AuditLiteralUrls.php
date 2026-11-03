@@ -46,7 +46,9 @@ class AuditLiteralUrls extends AbstractMediaGalleryTool
             . 'id (they break when the file is moved or renamed): literal_fixable (re-saving the draft stores the id), '
             . 'literal_not_in_gallery (file not indexed), stale_asset_id (asset gone) and literal images inside rich '
             . 'text. id_backed counts the healthy ones. Content outside your role\'s websites/store views is not '
-            . 'scanned (documents_hidden_by_permissions).';
+            . 'scanned (documents_hidden_by_permissions).'
+            . ' Not paginated: limit (default 200, max 1000) caps the findings listed; documents_checked and '
+            . 'counts cover everything.';
     }
 
     /**

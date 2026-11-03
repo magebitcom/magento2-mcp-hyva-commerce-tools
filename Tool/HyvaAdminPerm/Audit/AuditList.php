@@ -13,6 +13,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\ArrayBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ListPagination;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\AdminPermissionsGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
@@ -63,7 +64,8 @@ class AuditList extends AbstractTool
     {
         return 'List the Hyvä Advanced Admin Permissions audit log, newest first: who granted or revoked which role '
             . 'for which admin user or integration, roles flagged as negative, and failed attempts. Filter by '
-            . 'target or acting admin, action and date. Read only.';
+            . 'target or acting admin, action and date. Read only. '
+            . ListPagination::DESCRIPTION_NOTE;
     }
 
     /**
@@ -78,8 +80,7 @@ class AuditList extends AbstractTool
                 ->maxItems(7))
             ->string('from', fn (StringBuilder $s) => $s->pattern(self::DATE_PATTERN))
             ->string('to', fn (StringBuilder $s) => $s->pattern(self::DATE_PATTERN))
-            ->integer('page', fn (IntegerBuilder $i) => $i->minimum(1))
-            ->integer('page_size', fn (IntegerBuilder $i) => $i->minimum(1)->maximum(200))
+            ->with(new ListPagination())
             ->toArray();
     }
 

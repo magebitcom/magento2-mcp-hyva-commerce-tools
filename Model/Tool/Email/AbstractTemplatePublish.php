@@ -61,7 +61,7 @@ abstract class AbstractTemplatePublish extends AbstractEmailTool
             'result' => $published,
             'assigned_to' => $template['assigned_to'],
             'note' => $template['assigned_to'] === [] && static::TEMPLATE_TYPE === 'email_template'
-                ? 'No store email sends this template yet (see hyva_email.audit.coverage); assign it under Stores > '
+                ? 'No store email sends this template yet (see hyva_email_audit_coverage); assign it under Stores > '
                     . 'Configuration > Sales Emails / Customer Configuration.'
                 : null,
         ], ['id' => $template['id']]);

@@ -78,7 +78,7 @@ abstract class AbstractMenuEditTool extends AbstractMenuTool
         }
         if ($parents === []) {
             throw new LocalizedException(
-                __('The menu has no "%1" root component. Add one (hyva_menu.update) or pass parent_uid.', $root)
+                __('The menu has no "%1" root component. Add one (hyva_menu_update) or pass parent_uid.', $root)
             );
         }
         return $parents;

@@ -47,7 +47,8 @@ class ViewList extends AbstractTool
     public function getDescription(): string
     {
         return 'List the Hyvä Admin Dashboard views (boards) you own or that are shared with you (with everyone or '
-            . 'your roles), their sharing, and which one opens by default for you. Read only.';
+            . 'your roles), their sharing, and which one opens by default for you. Read only. Not paginated: returns '
+            . 'every view you can see.';
     }
 
     /**

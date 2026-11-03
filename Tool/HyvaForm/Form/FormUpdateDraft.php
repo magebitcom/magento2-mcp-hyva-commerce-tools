@@ -63,11 +63,11 @@ class FormUpdateDraft extends AbstractFormTool
      */
     public function getDescription(): string
     {
-        return 'Edit a form: operations change the DRAFT content (same operations as hyva_cms.draft.update: add / '
+        return 'Edit a form: operations change the DRAFT content (same operations as hyva_cms_draft_update: add / '
             . 'remove / '
-            . 'move / set_field / set_fields / replace_node; uids from hyva_form.form.get with include_document). '
+            . 'move / set_field / set_fields / replace_node; uids from hyva_form_form_get with include_document). '
             . 'Settings (recipients, subject, webhook, title, store views, CAPTCHA) apply IMMEDIATELY. Publish with '
-            . 'hyva_form.form.publish. Problems Hyvä would refuse on publish come back in form_issues.';
+            . 'hyva_form_form_publish. Problems Hyvä would refuse on publish come back in form_issues.';
     }
 
     /**
@@ -82,7 +82,7 @@ class FormUpdateDraft extends AbstractFormTool
                 'description' => 'Draft operations: ' . implode(', ', array_keys(ContentSchema::OPERATIONS)) . '.'])
             ->string('version_name', fn (StringBuilder $s) => $s->maxLength(100))
             ->string('base_version_uid', fn (StringBuilder $s) => $s->description('Optional: draft version uid you '
-                . 'read (draft_version_uid of hyva_form.form.get); refused with status 409 when it changed since.'))
+                . 'read (draft_version_uid of hyva_form_form_get); refused with status 409 when it changed since.'))
             ->toArray();
         return $schema;
     }

@@ -142,12 +142,16 @@ class MediaOptimizationGateway implements MediaOptimizationGatewayInterface
     /**
      * @inheritDoc
      */
-    public function countAllGenerated(): array
+    public function countAllGenerated(int $sampleSize = 0): array
     {
         $media = $this->media();
+        $resized = $this->filesUnder($media, ImagePathResolver::RESIZED_DIR);
+        $converted = $this->filesUnder($media, ImagePathResolver::CONVERTED_DIR);
+        $sample = static fn (array $files): array => array_slice(array_column($files, 'path'), 0, max(0, $sampleSize));
         return [
-            'resized' => count($this->filesUnder($media, ImagePathResolver::RESIZED_DIR)),
-            'converted' => count($this->filesUnder($media, ImagePathResolver::CONVERTED_DIR)),
+            'resized' => count($resized),
+            'converted' => count($converted),
+            'sample' => ['resized' => $sample($resized), 'converted' => $sample($converted)],
         ];
     }
 

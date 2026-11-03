@@ -14,6 +14,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageContentEditor;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageReplace;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -52,6 +53,11 @@ class ImageReplaceConfirmTest extends TestCase
         ]));
 
         $this->assertTrue($payload['confirmation_required'] ?? null);
+        $this->assertSame(self::TARGETS, $payload['affected'] ?? null);
+        $this->assertSame(count(self::TARGETS), $payload['total'] ?? null);
+        $this->assertSame([], Cast::array($payload['details'] ?? [])['not_editable_usages'] ?? null);
+        $this->assertStringContainsString('DRAFT', Cast::string($payload['hint'] ?? ''));
+        $this->assertStringContainsString('hyva_cms_publish', Cast::string($payload['hint'] ?? ''));
     }
 
     public function testConfirmRewritesEveryDraft(): void
@@ -83,6 +89,33 @@ class ImageReplaceConfirmTest extends TestCase
 
         $this->assertTrue($result->isError());
         $this->assertSame(self::TARGETS, $this->payload($result)['skipped_out_of_scope'] ?? null);
+    }
+
+    /**
+     * T-89: page 7 uses the image in its Hyvä content and its Magento CMS content; it is listed once, under affected.
+     */
+    public function testTheGlobalPreviewListsEachEntityOnce(): void
+    {
+        $magentoUsage = $this->usage('magento_cms', 'cms_page', 7, 'sale');
+        $productUsage = $this->usage('product', 'product', 12, 'MH01');
+        $this->editor = $this->createMock(ImageContentEditor::class);
+        $this->editor->method('normalize')->willReturnArgument(0);
+        $this->editor->method('findTargets')
+            ->willReturn(['editable' => self::TARGETS, 'not_editable' => [$magentoUsage, $productUsage]]);
+
+        $payload = $this->payload($this->tool()->execute([
+            'old_path' => 'wysiwyg/old.jpg',
+            'new_path' => 'wysiwyg/new.jpg',
+            'scope' => 'global',
+        ]));
+
+        $this->assertSame(
+            [self::TARGETS[0] + ['not_editable_usages' => [$magentoUsage]], self::TARGETS[1]],
+            $payload['affected'] ?? null
+        );
+        $this->assertSame(2, $payload['total'] ?? null);
+        $this->assertSame([$productUsage], Cast::array($payload['details'] ?? [])['not_editable_usages'] ?? null);
+        $this->assertStringContainsString('reported, not changed', Cast::string($payload['hint'] ?? ''));
     }
 
     public function testTheGlobalPreviewListsTheOutOfScopeTargets(): void
@@ -121,6 +154,24 @@ class ImageReplaceConfirmTest extends TestCase
         );
         $scopeFilter->method('withHidden')->willReturnArgument(0);
         return new ImageReplace($this->editor, $files, $acl, $locator, $scopeFilter);
+    }
+
+    /**
+     * Image usage row as ImageUsageIndex returns it.
+     *
+     * @param string $source
+     * @param string $type
+     * @param int $id
+     * @param string $identifier
+     * @return array
+     * @phpstan-return array{source: string, entity_type: string, id: int, identifier: string, edition: string,
+     *     uid: string|null, component: string|null, field: string|null, alt: string|null, has_alt: bool}
+     */
+    private function usage(string $source, string $type, int $id, string $identifier): array
+    {
+        return ['source' => $source, 'entity_type' => $type, 'id' => $id, 'identifier' => $identifier,
+            'edition' => 'live', 'uid' => null, 'component' => null, 'field' => null, 'alt' => null,
+            'has_alt' => false];
     }
 
     /**

@@ -65,7 +65,7 @@ class ScheduleCancel extends AbstractContentTool
             ->array('item_ids', fn (ArrayBuilder $a) => $a
                 ->ofIntegers()
                 ->maxItems(100)
-                ->description('Scheduled item ids (from hyva_cms.schedule.list), at most 100 per call.'))
+                ->description('Scheduled item ids (from hyva_cms_schedule_list), at most 100 per call.'))
             ->integer('release_id', fn (IntegerBuilder $i) => $i->minimum(1))
             ->toArray();
     }

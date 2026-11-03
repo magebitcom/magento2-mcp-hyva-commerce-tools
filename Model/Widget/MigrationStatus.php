@@ -90,10 +90,18 @@ class MigrationStatus extends AbstractHealthWidget
                     $hyva . ($total > 0 ? ' (' . (int) round($hyva * 100 / $total) . '%)' : ''),
                     $hyva === $total ? 'success' : null
                 ),
-                $this->stat('Page Builder', $kinds['page_builder'] ?? 0, $this->level($kinds['page_builder'] ?? 0)),
-                $this->stat('WYSIWYG', $kinds['wysiwyg'] ?? 0, $this->level($kinds['wysiwyg'] ?? 0)),
                 $this->stat(
-                    'Complexity L / M / H',
+                    'Page Builder pages + blocks',
+                    $kinds['page_builder'] ?? 0,
+                    $this->level($kinds['page_builder'] ?? 0)
+                ),
+                $this->stat(
+                    'WYSIWYG pages + blocks',
+                    $kinds['wysiwyg'] ?? 0,
+                    $this->level($kinds['wysiwyg'] ?? 0)
+                ),
+                $this->stat(
+                    'Complexity L / M / H (pages + blocks)',
                     $complexity['low'] . ' / ' . $complexity['medium'] . ' / ' . $complexity['high']
                 ),
                 $this->stat('Converted drafts waiting', $waiting, $waiting > 0 ? 'warning' : 'success'),
@@ -106,7 +114,8 @@ class MigrationStatus extends AbstractHealthWidget
                 ]
             ],
             'notice' => (string) __(
-                'Counts include pages and blocks. Convert with hyva_cms.migration.convert_to_draft.'
+                'CMS pages and Hyvä CMS pages count pages only; the legacy content counts and list include pages and '
+                    . 'blocks. Convert with hyva_cms_migration_convert_to_draft.'
             ),
             'links' => [],
         ];

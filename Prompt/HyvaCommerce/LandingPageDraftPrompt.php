@@ -83,13 +83,13 @@ class LandingPageDraftPrompt implements PromptInterface
 
                 Build it as a Hyvä CMS DRAFT. Never publish and never schedule it in this conversation.
 
-                1. Call hyva_cms.component.list once to see which building blocks exist, and hyva_cms.component.schema
+                1. Call hyva_cms_component_list once to see which building blocks exist, and hyva_cms_component_schema
                    for each component you plan to use (row, heading, text, image, button, banner are typical) so every
                    field value is valid.
                 2. Write short, concrete copy: one headline, one or two sentences of supporting text, one
                    call-to-action button. Do not invent prices, dates or discounts the owner did not give you.
-                3. Call hyva_cms.page.create with the title, URL key and the components. Leave is_active false.
-                4. Call hyva_cms.component.validate on the new page; fix anything it reports with hyva_cms.draft.update.
+                3. Call hyva_cms_page_create with the title, URL key and the components. Leave is_active false.
+                4. Call hyva_cms_component_validate on the new page; fix anything it reports with hyva_cms_draft_update.
                 5. Reply in plain language: what is on the page, the preview link from the result (it works without
                    logging in), and that it stays invisible to shoppers until they ask you to publish it.
 

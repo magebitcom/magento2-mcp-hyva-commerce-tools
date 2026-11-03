@@ -70,8 +70,8 @@ class FormCreate extends AbstractFormTool
     {
         return 'Create a Form Builder form as a DRAFT: settings plus fields, built as Hyvä expects (one hyva_form '
             . 'root, '
-            . 'form_step children, form_field_* components; see hyva_cms.component.schema for each field). The form '
-            . 'stays disabled and unpublished until hyva_form.form.publish. Without recipient_to or webhook_url '
+            . 'form_step children, form_field_* components; see hyva_cms_component_schema for each field). The form '
+            . 'stays disabled and unpublished until hyva_form_form_publish. Without recipient_to or webhook_url '
             . 'submissions go nowhere, so set one. identifier defaults to one derived from the title.';
     }
 
@@ -143,7 +143,7 @@ class FormCreate extends AbstractFormTool
             'form_issues' => $formIssues,
             'delivery_issues' => $form !== null ? $this->formRules->deliveryIssues($form, $document) : [],
             'preview' => $this->previewService->getPreview(self::CONTENT_TYPE, $id),
-            'next_step' => 'Review the preview, then call hyva_form.form.publish (which also enables the form).',
+            'next_step' => 'Review the preview, then call hyva_form_form_publish (which also enables the form).',
         ], ['id' => $id, 'identifier' => $identifier]);
     }
 

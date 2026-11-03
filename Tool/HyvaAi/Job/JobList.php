@@ -13,6 +13,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\ArrayBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ListPagination;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AiWorker\AbstractAiWorkerTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
@@ -41,7 +42,8 @@ class JobList extends AbstractAiWorkerTool
     {
         return 'List Hyvä AI Worker jobs (AI content generation, translations, bulk runs), newest first, with status, '
             . 'progress (items complete/failed), who started them, provider/model and the last error. Roles with '
-            . 'Hyva_AiWorker::jobs see every job; others only their own. Read only.';
+            . 'Hyva_AiWorker::jobs see every job; others only their own. Read only. '
+            . ListPagination::DESCRIPTION_NOTE;
     }
 
     /**
@@ -61,8 +63,7 @@ class JobList extends AbstractAiWorkerTool
             ->integer('store_id', fn (IntegerBuilder $i) => $i->minimum(0))
             ->string('from', fn (StringBuilder $s) => $s->pattern(self::DATE_PATTERN))
             ->string('to', fn (StringBuilder $s) => $s->pattern(self::DATE_PATTERN))
-            ->integer('page', fn (IntegerBuilder $i) => $i->minimum(1))
-            ->integer('page_size', fn (IntegerBuilder $i) => $i->minimum(1)->maximum(200))
+            ->with(new ListPagination())
             ->toArray();
     }
 

@@ -127,6 +127,21 @@ class ImageUpdateAlt extends AbstractMediaTool implements ContextualAclAwareInte
     }
 
     /**
+     * Listed only for a role that may save drafts of at least one content type, besides Media Gallery view.
+     *
+     * @return string|null
+     */
+    public function getUnderlyingAclResource(): ?string
+    {
+        return $this->contentAcl->listingResource(
+            ContentLocator::TYPES,
+            [ContentAcl::VERB_SAVE],
+            [static::UNDERLYING_ACL_RESOURCE],
+            static::UNDERLYING_ACL_RESOURCE
+        );
+    }
+
+    /**
      * Save permission on the content type when scope names one; "global"/"all" is filtered per type in run().
      *
      * @param array $arguments

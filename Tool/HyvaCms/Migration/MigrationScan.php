@@ -27,6 +27,7 @@ class MigrationScan extends AbstractContentTool
     public const TOOL_NAME = 'hyva_cms.migration.scan';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_cms_migration_scan';
     public const CONTENT_VERBS = [ContentAcl::VERB_VIEW];
+    public const LISTING_CONTENT_TYPES = [ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK];
 
     /**
      * @param MigrationService $migrationService
@@ -55,7 +56,9 @@ class MigrationScan extends AbstractContentTool
     {
         return 'Find CMS pages and blocks still rendered from Magento content (Page Builder or WYSIWYG) instead of '
             . 'Hyvä CMS, ranked by migration complexity (elements, HTML fallbacks, images). Also flags converted '
-            . 'drafts that are waiting for review/publish.';
+            . 'drafts that are waiting for review/publish.'
+            . ' Not paginated: limit (default 50, max 500) caps the items returned, most complex first; total '
+            . 'and summary count every legacy row.';
     }
 
     /**

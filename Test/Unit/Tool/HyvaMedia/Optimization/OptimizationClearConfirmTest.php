@@ -38,7 +38,11 @@ class OptimizationClearConfirmTest extends TestCase
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn(true);
         $this->gateway = $this->createMock(MediaOptimizationGatewayInterface::class);
-        $this->gateway->method('countAllGenerated')->willReturn(['resized' => 40, 'converted' => 2]);
+        $this->gateway->method('countAllGenerated')->willReturn([
+            'resized' => 40,
+            'converted' => 2,
+            'sample' => ['resized' => ['catalog/resized/a.jpg'], 'converted' => ['catalog/converted/a.webp']],
+        ]);
         $editor = $this->createMock(ImageContentEditor::class);
         $editor->method('normalize')->willReturnArgument(0);
         $this->tool = new OptimizationClear($features, $this->gateway, $editor);
@@ -54,7 +58,23 @@ class OptimizationClearConfirmTest extends TestCase
         $this->assertFalse($result->isError());
         $this->assertTrue($this->payloadAt($result, 'confirmation_required'));
         $this->assertSame('clear_all_optimized_images', $this->payloadAt($result, 'action'));
-        $this->assertSame(['resized' => 40, 'converted' => 2, 'mode' => 'resized'], $this->payloadAt($result, 'affected.0'));
+        $this->assertSame(['catalog/resized/a.jpg'], $this->payloadAt($result, 'affected'));
+        $this->assertSame(40, $this->payloadAt($result, 'total'));
+        $this->assertSame(
+            ['mode' => 'resized', 'resized' => 40, 'converted' => 2],
+            $this->payloadAt($result, 'details')
+        );
+    }
+
+    public function testAllModesPreviewCountsEveryGeneratedFile(): void
+    {
+        $result = $this->tool->execute(['all_images' => true]);
+
+        $this->assertSame(42, $this->payloadAt($result, 'total'));
+        $this->assertSame(
+            ['catalog/resized/a.jpg', 'catalog/converted/a.webp'],
+            $this->payloadAt($result, 'affected')
+        );
     }
 
     public function testConfirmClearsAllImages(): void

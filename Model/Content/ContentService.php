@@ -147,13 +147,7 @@ class ContentService
         ?string $baseVersionUid = null
     ): array {
         $this->assertBaseVersion($type, $id, $baseVersionUid);
-        // Provider::saveContent() does not resolve Media Gallery asset ids (only the editor does), so do it here.
-        $document = $this->imageIdBackfiller->backfill($this->componentTree->markImageFields($document));
-        $document = $this->componentTree->normalizeDocument($document, $type, $id);
-        $validation = $this->validate($document);
-        if (!$validation['valid']) {
-            throw new LocalizedException(__('The content was not saved: %1', $this->describeErrors($validation)));
-        }
+        ['document' => $document, 'validation' => $validation] = $this->prepareDraft($type, $id, $document);
 
         $this->snapshotUnversionedDraft($type, $id);
 
@@ -174,6 +168,50 @@ class ContentService
             'version_uid' => is_string($versionData['uid'] ?? null) ? $versionData['uid'] : '',
             'warnings' => $warnings,
         ];
+    }
+
+    /**
+     * Run the checks saveDraft() runs before it writes (stale base_version_uid, content validation), writing nothing.
+     *
+     * Lets a caller that must write something else first (a store view move) refuse the whole call up front.
+     *
+     * @param string $type
+     * @param int $id
+     * @param array $document
+     * @param string|null $baseVersionUid
+     * @return void
+     * @throws LocalizedException When the document is invalid.
+     * @throws ConflictException When the stored draft is no longer $baseVersionUid.
+     * @phpstan-param array<string, mixed> $document
+     */
+    public function assertDraftSavable(string $type, int $id, array $document, ?string $baseVersionUid = null): void
+    {
+        $this->assertBaseVersion($type, $id, $baseVersionUid);
+        $this->prepareDraft($type, $id, $document);
+    }
+
+    /**
+     * Resolve image ids, normalize and validate a draft document; refuse it when invalid.
+     *
+     * @param string $type
+     * @param int $id
+     * @param array $document
+     * @return array
+     * @throws LocalizedException When the document is invalid.
+     * @phpstan-param array<string, mixed> $document
+     * @phpstan-return array{document: array<string, mixed>,
+     *     validation: array{valid: bool, schema_error: string|null, issues: list<array<string, mixed>>}}
+     */
+    private function prepareDraft(string $type, int $id, array $document): array
+    {
+        // Provider::saveContent() does not resolve Media Gallery asset ids (only the editor does), so do it here.
+        $document = $this->imageIdBackfiller->backfill($this->componentTree->markImageFields($document));
+        $document = $this->componentTree->normalizeDocument($document, $type, $id);
+        $validation = $this->validate($document);
+        if (!$validation['valid']) {
+            throw new LocalizedException(__('The content was not saved: %1', $this->describeErrors($validation)));
+        }
+        return ['document' => $document, 'validation' => $validation];
     }
 
     /**

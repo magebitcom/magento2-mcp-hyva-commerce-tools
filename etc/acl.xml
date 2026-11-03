@@ -215,10 +215,15 @@
                                           title="Tool: Create Hyvä CMS Page" sortOrder="219"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_page_update"
                                           title="Tool: Update Hyvä CMS Page" sortOrder="220"/>
+                                <!-- Delete tools: granted to no role by default (see README "Delete tools") -->
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_page_delete"
+                                          title="Tool: Delete CMS Pages via MCP" sortOrder="250"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_block_create"
                                           title="Tool: Create Hyvä CMS Block" sortOrder="221"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_block_update"
                                           title="Tool: Update Hyvä CMS Block" sortOrder="222"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_block_delete"
+                                          title="Tool: Delete CMS Blocks via MCP" sortOrder="251"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_draft_create"
                                           title="Tool: Create Hyvä CMS Draft" sortOrder="223"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_cms_draft_update"
@@ -239,6 +244,8 @@
                                           title="Tool: Create Hyvä Menu" sortOrder="231"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_update"
                                           title="Tool: Update Hyvä Menu" sortOrder="232"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_delete"
+                                          title="Tool: Delete Hyvä Menus via MCP" sortOrder="252"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_item_add"
                                           title="Tool: Add Hyvä Menu Item" sortOrder="233"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_item_update"

@@ -90,7 +90,7 @@ class AuditCoverage extends AbstractEmailTool
                 'hyva_template_id' => $available > 0 ? $available : null,
                 'next_step' => $available > 0
                     ? null
-                    : 'Create it with hyva_email.template.create_draft (orig_code ' . $usage['orig_code'] . ').',
+                    : 'Create it with hyva_email_template_create_draft (orig_code ' . $usage['orig_code'] . ').',
             ];
         }
         return $this->jsonResult([

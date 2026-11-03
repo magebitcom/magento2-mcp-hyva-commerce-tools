@@ -34,7 +34,8 @@ class VersionList extends AbstractFormTool
      */
     public function getDescription(): string
     {
-        return 'Version history of a form, newest first: version_id, name, author, time, whether it was published.';
+        return 'Version history of a form, newest first: version_id, name, author, time, whether it was published. '
+            . 'Not paginated: returns every version; total counts them.';
     }
 
     /**

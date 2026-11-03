@@ -38,8 +38,10 @@ class ItemRemove extends AbstractMenuEditTool
      */
     public function getDescription(): string
     {
-        return 'Remove one item (and its children) from the menu DRAFT. Items with children need "confirm": true; '
-            . 'without it the affected children are listed and nothing changes. Never publishes.';
+        return 'Remove one item (and its children) from the menu DRAFT. "confirm": true is needed only when the item '
+            . 'has children: without it nothing changes and the reply lists the item with its children and '
+            . 'children_count. An item without children is removed at once. Never publishes (hyva_menu_publish '
+            . 'does). Removes one uid only: the desktop and mobile copies of an item have separate uids.';
     }
 
     /**
@@ -50,7 +52,7 @@ class ItemRemove extends AbstractMenuEditTool
         return Schema::object()
             ->with(EntityTarget::fixed())
             ->string('uid', fn (StringBuilder $s) => $s->minLength(1)->required())
-            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description('Required when the item has children.'))
+            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description('Required only when the item has children.'))
             ->string('base_version_uid', fn (StringBuilder $s) => $s->description(
                 'Optional: draft version uid you read (draft.version.uid, or version_uid of your last write). The '
                 . 'save is refused (status 409) when the draft changed since you read it.'
@@ -73,7 +75,15 @@ class ItemRemove extends AbstractMenuEditTool
         }
         $described = $this->menuItemBuilder->describe($node);
         if (!empty($node['children']) && !$this->boolArg($arguments, 'confirm')) {
-            return $this->confirmationRequired('remove_menu_item_with_children', [$described]);
+            $removal = $this->menuItemBuilder->describeForRemoval($node);
+            return $this->confirmationRequired(
+                'remove_menu_item_with_children',
+                [$removal],
+                ['menu_id' => $menuId, 'children_count' => $removal['children_count'], 'draft_only' => true],
+                null,
+                'Confirming removes the item and its children from the menu DRAFT only; publish with '
+                    . 'hyva_menu_publish to change the storefront.'
+            );
         }
         $result = $this->componentTree->removeNode($document, $uid);
         $saved = $this->saveMenuDraft(

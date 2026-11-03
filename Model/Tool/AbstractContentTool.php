@@ -17,7 +17,8 @@ use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 /**
  * Tool whose Hyvä permission depends on the entity_type argument (Hyvä Commerce 1.4 per-type verbs).
  *
- * tools/list shows it to any role with Hyvä CMS access (Hyva_Cms::cms); before the call the core checks every
+ * tools/list shows it to a role that holds its verbs on at least one content type (ContentAcl::listingResource();
+ * the caller is bound for it by Plugin\JsonRpc\BindCallerContextPlugin); before the call the core checks every
  * resource from getContextualAclResources(), e.g. Hyva_Cms::page_publish for publish on a cms_page.
  */
 abstract class AbstractContentTool extends AbstractTool implements ContextualAclAwareInterface
@@ -35,6 +36,11 @@ abstract class AbstractContentTool extends AbstractTool implements ContextualAcl
     public const EXTRA_ACL_RESOURCES = [];
 
     /**
+     * Content types a generic tool can work on; tools/list counts only these (e.g. migration: pages and blocks).
+     */
+    public const LISTING_CONTENT_TYPES = ContentLocator::TYPES;
+
+    /**
      * Content type a variant of a generic tool is bound to (e.g. "menu" for hyva_menu.publish); '' = from args.
      */
     public const FIXED_CONTENT_TYPE = '';
@@ -49,16 +55,25 @@ abstract class AbstractContentTool extends AbstractTool implements ContextualAcl
     /**
      * Hyvä resource the tool is listed with.
      *
+     * A generic tool is listed with a resource the caller holds when its CONTENT_VERBS (and extra resources) are
+     * allowed on at least one content type, so a read-only role does not see a write tool it cannot use on any type.
      * A fixed-type variant uses that type's first verb resource from Hyvä (e.g. Hyva_MenuBuilder::menu_publish);
-     * when the type's module is off Hyvä answers with its fallback resource, so the tool stays listed and reports
-     * the feature as unavailable.
+     * while the type's module is off Hyvä has no mapping for it and the variant is hidden from tools/list.
      *
      * @return string|null
      */
     public function getUnderlyingAclResource(): ?string
     {
         if (static::FIXED_CONTENT_TYPE === '') {
-            return parent::getUnderlyingAclResource();
+            return $this->contentAcl()->listingResource(
+                static::LISTING_CONTENT_TYPES,
+                $this->contentVerbs([]),
+                $this->extraAclResources(),
+                static::UNDERLYING_ACL_RESOURCE
+            );
+        }
+        if (!$this->contentAcl()->isMapped(static::FIXED_CONTENT_TYPE)) {
+            return ContentAcl::UNAVAILABLE_RESOURCE;
         }
         return $this->contentAcl()->resources([static::FIXED_CONTENT_TYPE], [static::CONTENT_VERBS[0]])[0] ?? null;
     }

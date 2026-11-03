@@ -11,6 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Model\Tool\Media;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MediaOptimizationGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 
 /**
  * Base for hyva_media.optimization.* tools: soft "feature not available" result without Hyvä Media Optimization.
@@ -25,6 +26,20 @@ abstract class AbstractOptimizationTool extends AbstractMediaTool
         protected readonly FeatureCheckerInterface $featureChecker,
         protected readonly MediaOptimizationGatewayInterface $gateway
     ) {
+    }
+
+    /**
+     * Hyvä resource the tool is listed with; hidden from tools/list while Media Optimization is missing or disabled
+     *
+     * The hyva_media.status tool still reports the feature with available:false.
+     *
+     * @return string|null
+     */
+    public function getUnderlyingAclResource(): ?string
+    {
+        return $this->featureChecker->getStatus(FeatureCheckerInterface::MEDIA_OPTIMIZATION)['enabled']
+            ? parent::getUnderlyingAclResource()
+            : ContentAcl::UNAVAILABLE_RESOURCE;
     }
 
     /**

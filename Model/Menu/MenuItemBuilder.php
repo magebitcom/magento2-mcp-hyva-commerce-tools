@@ -217,6 +217,37 @@ class MenuItemBuilder
     }
 
     /**
+     * Item as describe() returns it, plus children_count: how many items below it (at any depth) go with it.
+     *
+     * @param array $node
+     * @return array
+     * @phpstan-param array<string, mixed> $node
+     * @phpstan-return array<string, mixed>
+     */
+    public function describeForRemoval(array $node): array
+    {
+        $item = $this->describe($node);
+        $item['children_count'] = $this->countDescendants($item);
+        return $item;
+    }
+
+    /**
+     * Count descendants of a described item.
+     *
+     * @param array $item
+     * @return int
+     * @phpstan-param array<string, mixed> $item
+     */
+    private function countDescendants(array $item): int
+    {
+        $count = 0;
+        foreach (is_array($item['children'] ?? null) ? $item['children'] : [] as $child) {
+            $count += 1 + $this->countDescendants(Cast::stringKeyed($child));
+        }
+        return $count;
+    }
+
+    /**
      * Readable view of a menu node and its descendants.
      *
      * @param array $node
