@@ -15,6 +15,7 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
+use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magento\Framework\Exception\LocalizedException;
 
 /**
@@ -26,6 +27,12 @@ use Magento\Framework\Exception\LocalizedException;
 abstract class AbstractMediaGalleryTool extends AbstractTool
 {
     public const UNDERLYING_ACL_RESOURCE = 'Hyva_MediaGallery::asset_view';
+
+    /**
+     * Resource the tool is listed with while the feature is missing or disabled: none, so tools/list hides it.
+     * A feature's status tool overrides it with a resource that exists without the feature, so it stays listed.
+     */
+    protected const FEATURE_MISSING_ACL_RESOURCE = ContentAcl::UNAVAILABLE_RESOURCE;
 
     /**
      * @param FeatureCheckerInterface $featureChecker
@@ -46,8 +53,8 @@ abstract class AbstractMediaGalleryTool extends AbstractTool
     /**
      * Hyvä resource the tool is listed with.
      *
-     * Media Gallery's resources only exist while the module is enabled; without it the tool stays listed under
-     * Hyvä CMS access and answers that the feature is unavailable.
+     * Media Gallery's resources only exist while the module is enabled; without it the tool is hidden from tools/list
+     * (FEATURE_MISSING_ACL_RESOURCE) and a call answers that the feature is unavailable.
      *
      * @return string|null
      */
@@ -55,7 +62,7 @@ abstract class AbstractMediaGalleryTool extends AbstractTool
     {
         return $this->featureChecker->getStatus(FeatureCheckerInterface::MEDIA_GALLERY)['enabled']
             ? static::UNDERLYING_ACL_RESOURCE
-            : 'Hyva_Cms::cms';
+            : static::FEATURE_MISSING_ACL_RESOURCE;
     }
 
     /**

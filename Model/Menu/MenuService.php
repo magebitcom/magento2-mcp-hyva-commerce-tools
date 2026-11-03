@@ -106,14 +106,16 @@ class MenuService
      * Menu the caller may change: every store view it is assigned to is within the caller's restriction.
      *
      * @param array $arguments id | identifier [+ store_id]
+     * @param array|null $newStoreIds Store views this call assigns, or null (see ContentLocator::locateForWrite()).
      * @return array Menu row from the gateway.
      * @throws LocalizedException
      * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-param list<int>|null $newStoreIds
      * @phpstan-return array<string, mixed>
      */
-    public function locateForWrite(array $arguments): array
+    public function locateForWrite(array $arguments, ?array $newStoreIds = null): array
     {
-        $entity = $this->contentLocator->locateForWrite(ContentLocator::TYPE_MENU, $arguments);
+        $entity = $this->contentLocator->locateForWrite(ContentLocator::TYPE_MENU, $arguments, $newStoreIds);
         return $this->menuGateway->get($entity['id']);
     }
 
@@ -402,7 +404,8 @@ class MenuService
         $path = $this->catalogScopeReader->categoryPaths([$rootCategoryId])[$rootCategoryId] ?? null;
         if ($path !== null && !$this->storeScopeGuard->allowsCategoryPath($path)) {
             throw new AuthorizationException(__(
-                'Your admin role is restricted to other websites or store views; category #%1 is outside it.',
+                '%1; category #%2 is outside it.',
+                StoreScopeGuard::RESTRICTED,
                 $rootCategoryId
             ));
         }

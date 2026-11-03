@@ -15,6 +15,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ListPagination;
+use Magebit\McpHyvaCommerceTools\Model\Media\SharedMedia;
 
 /**
  * `hyva_media.asset.search`.
@@ -41,7 +42,8 @@ class AssetSearch extends AbstractMediaGalleryTool
             . 'only '
             . 'likely duplicates (same file size and dimensions). Returns asset ids, paths, sizes and URLs; Hyvä CMS '
             . 'image fields reference assets by these ids. '
-            . ListPagination::DESCRIPTION_NOTE;
+            . ListPagination::DESCRIPTION_NOTE
+            . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
     /**

@@ -25,6 +25,7 @@ class MigrationAnalyze extends AbstractContentTool
     public const TOOL_NAME = 'hyva_cms.migration.analyze';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_cms_migration_analyze';
     public const CONTENT_VERBS = [ContentAcl::VERB_VIEW];
+    public const LISTING_CONTENT_TYPES = [ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK];
 
     /**
      * @param ContentLocator $contentLocator

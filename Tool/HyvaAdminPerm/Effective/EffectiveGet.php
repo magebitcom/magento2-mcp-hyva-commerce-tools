@@ -62,7 +62,9 @@ class EffectiveGet extends AbstractTool
         return 'Explain what an admin user can actually do (Hyvä Advanced Admin Permissions): all their roles, roles '
             . 'whose grant has lapsed, negative (deny-wins) roles, each ACL resource allowed or denied with the roles '
             . 'that grant or deny it, and the websites/store views they are restricted to. Read only. Filter the '
-            . 'resource list with resource_prefix (e.g. Hyva_Cms::) and allowed.';
+            . 'resource list with resource_prefix (e.g. Hyva_Cms::) and allowed.'
+            . ' Not paginated: limit (default 300, max 2000) caps the resources listed; resources_total counts '
+            . 'all of them.';
     }
 
     /**

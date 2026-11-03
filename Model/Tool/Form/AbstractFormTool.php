@@ -19,6 +19,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Form\FormRules;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
+use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
 
@@ -34,6 +35,12 @@ abstract class AbstractFormTool extends AbstractTool
 {
     public const CONTENT_TYPE = 'form';
     public const UNDERLYING_ACL_RESOURCE = 'Hyva_FormBuilder::form_view';
+
+    /**
+     * Resource the tool is listed with while the feature is missing or disabled: none, so tools/list hides it.
+     * A feature's status tool overrides it with a resource that exists without the feature, so it stays listed.
+     */
+    protected const FEATURE_MISSING_ACL_RESOURCE = ContentAcl::UNAVAILABLE_RESOURCE;
 
     /**
      * @param FeatureCheckerInterface $featureChecker
@@ -54,8 +61,8 @@ abstract class AbstractFormTool extends AbstractTool
     /**
      * Hyvä resource the tool is listed with.
      *
-     * Form Builder's resources only exist while the module is enabled; without it the tool stays listed under
-     * Hyvä CMS access and answers that the feature is unavailable.
+     * Form Builder's resources only exist while the module is enabled; without it the tool is hidden from tools/list
+     * (FEATURE_MISSING_ACL_RESOURCE) and a call answers that the feature is unavailable.
      *
      * @return string|null
      */
@@ -63,7 +70,7 @@ abstract class AbstractFormTool extends AbstractTool
     {
         return $this->featureChecker->getStatus(FeatureCheckerInterface::FORM_BUILDER)['enabled']
             ? static::UNDERLYING_ACL_RESOURCE
-            : 'Hyva_Cms::cms';
+            : static::FEATURE_MISSING_ACL_RESOURCE;
     }
 
     /**

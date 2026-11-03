@@ -75,6 +75,30 @@ class ContentLocatorScopeTest extends TestCase
         $locator->locateForWrite(ContentLocator::TYPE_PAGE, ['id' => 3]);
     }
 
+    public function testARestrictedCallerMayMoveAllStoreViewsContentIntoItsStoreViews(): void
+    {
+        // T-32, as Hyvä Advanced Admin Permissions: the re-assignment is judged by the store views it enters.
+        $locator = $this->locator([1], []);
+        $this->assertSame(3, $locator->locateForWrite(ContentLocator::TYPE_PAGE, ['id' => 3], [1])['id']);
+        foreach ([[0], [1, 2], [2]] as $newStoreIds) {
+            try {
+                $locator->locateForWrite(ContentLocator::TYPE_PAGE, ['id' => 3], $newStoreIds);
+                $this->fail('Moving page 3 to store views ' . implode(',', $newStoreIds) . ' must be refused.');
+            } catch (AuthorizationException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+        // Dropping a foreign store view, or moving foreign content, stays refused.
+        foreach ([4, 2] as $id) {
+            try {
+                $locator->locateForWrite(ContentLocator::TYPE_PAGE, ['id' => $id], [1]);
+                $this->fail('Page ' . $id . ' must not be moved.');
+            } catch (AuthorizationException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
     public function testARestrictedCallerCannotChangeAPageSharedWithAForeignStoreView(): void
     {
         $this->expectException(AuthorizationException::class);

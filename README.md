@@ -24,10 +24,13 @@ Content writes go through the same Hyvä services the Liveview editor uses
   - `hyva-themes/commerce-module-form-builder`, `commerce-module-email-templates`, `commerce-module-store-credit`,
     `commerce-module-linked-products`, `commerce-module-category-merchandiser`, `commerce-module-cms-ai-translations`,
     `commerce-module-ai-worker`, `commerce-module-advanced-admin-permissions`
-  - Without Menu Builder or Media Optimization (missing or disabled) their tools are hidden from `tools/list`;
-    `hyva_menu.status` and `hyva_media.status` stay and report the feature with `available: false` and
-    `acl_allowed: null` (no ACL verdict for a feature that is not there). A call to a hidden tool is refused by the
-    core (`-32004`). The other optional modules keep their tools listed and answer "not installed" per call.
+  - Without Menu Builder, Media Optimization, Media Gallery, Form Builder, Email Templates, Store Credit, Linked
+    Products or AI Worker (missing or disabled) their tools are hidden from `tools/list`. The status tools stay:
+    `hyva_menu.status` and `hyva_media.status` report the feature with `available: false` and `acl_allowed: null`
+    (no ACL verdict for a feature that is not there), `hyva_store_credit.status` and `hyva_ai.worker.status` answer
+    that it is not installed, and `hyva_commerce.audit.overview` lists every module. A call to a hidden tool is
+    refused by the core (`-32004`). Category Merchandiser, CMS AI Translations, Advanced Admin Permissions, the AI
+    providers and the Tailwind compiler keep their tools listed and answer "not installed" per call.
   - Removing Menu Builder also removes Hyvä's own CMS dashboard widgets:
     `hyva-themes/commerce-module-admin-dashboard-cms-widgets` requires `commerce-module-menu-builder` in composer and
     in a constructor (`RecentlyEditedHyvaCmsMenus`), so `setup:di:compile` fails until that package goes too. This
@@ -85,7 +88,12 @@ bin/magento cache:flush
   `/mcp` route, so the module applies the MCP admin's website / store view restriction itself. CMS pages, blocks,
   menus and forms outside the role's store views are hidden from the lists, and every tool that reads or changes
   one refuses them (status 403). Changing one, or assigning store views, needs every store view it is assigned to;
-  store view 0 ("All Store Views") needs all of them, as in the Hyvä admin. Menus and forms are scoped by their store
+  store view 0 ("All Store Views") needs all of them, as in the Hyvä admin. A restricted role can therefore read an
+  "All Store Views" page, block or menu but neither change it there nor create one there. An update that re-assigns
+  it (`settings.store_ids` on `hyva_cms.page.update`, `hyva_cms.block.update`, `hyva_menu.update`) is judged by the
+  store views it enters, as Hyvä Advanced Admin Permissions judges the admin save: moving it into the role's own
+  store views is allowed (giving up store view 0 is not giving up a foreign store view), dropping a store view
+  outside the role is not. Menus and forms are scoped by their store
   views although the Hyvä admin does not scope them. Email and newsletter templates, linked product groups and
   category positions belong to no store view: a restricted role can read them but not change them.
   `image.replace` and `image.update_alt` skip content outside the role, `schedule.cancel` refuses items of content
@@ -107,7 +115,9 @@ bin/magento cache:flush
   image or menu used only there still counts as used. A product assigned to no website
   stays listed, as in the Hyvä admin. The dashboard widgets apply the logged-in admin's restriction, with a separate
   widget cache entry per restriction. Not filtered by scope: Media Gallery files, folders, trash and sync status (the
-  Hyvä Media Gallery has no scope), configuration values (menu placements, email assignments in
+  Hyvä Media Gallery has no scope, and the core MCP module leaves data without a store assignment unscoped too; the
+  media tool descriptions and, for a restricted admin, the Media Health notice say that media files are shared by all
+  websites), configuration values (menu placements, email assignments in
   `hyva_email.audit.coverage`, store credit websites in `audit.overview`) and email and newsletter templates. The MCP
   audit log has no store scope either, so the MCP Activity widget (which needs `Magebit_Mcp::mcp_audit`) shows a
   restricted admin only their own MCP calls and an unrestricted admin every admin's calls. Menu Health and Media Health
@@ -149,7 +159,8 @@ check scope).
 ## Optional features
 
 Tools for an optional Hyvä module stay registered when that module is missing, disabled or not allowed for the token's
-admin role. They answer with a soft error (`isError: true`) instead of failing:
+admin role (most of them are hidden from `tools/list` while the module is missing, see Requirements). A call answers
+with a soft error (`isError: true`) instead of failing:
 
 ```json
 {"available": false, "feature": "menu_builder", "reason": "Hyvä Menu Builder is installed but disabled (Hyva_MenuBuilder).", "hint": "Run bin/magento module:enable Hyva_MenuBuilder and setup:upgrade."}
@@ -214,9 +225,9 @@ are removed with `hyva_menu.item.remove`; media files go to the Media Gallery tr
 | `hyva_cms.draft.update` | write | the verb on any type | entity_type → save | Update Hyvä CMS Draft |
 | `hyva_cms.export` | read | the verb on any type | entity_type → export (+ version_history with include_versions) + `Hyva_Cms::transfer` | Export Hyvä CMS Content |
 | `hyva_cms.import` | write | the verb on any type | entity_type → save + `Hyva_Cms::transfer` | Import Hyvä CMS Content |
-| `hyva_cms.migration.analyze` | read | the verb on any type | entity_type → view | Analyze Legacy CMS Content |
-| `hyva_cms.migration.convert_to_draft` | write | the verb on any type | entity_type → save | Convert Legacy CMS Content to Draft |
-| `hyva_cms.migration.scan` | read | the verb on any type | entity_type → view | Scan Legacy CMS Content (at most `limit` items, default 50, max 500; summary.total counts all) |
+| `hyva_cms.migration.analyze` | read | the verb on pages or blocks | entity_type → view | Analyze Legacy CMS Content |
+| `hyva_cms.migration.convert_to_draft` | write | the verb on pages or blocks | entity_type → save | Convert Legacy CMS Content to Draft |
+| `hyva_cms.migration.scan` | read | the verb on pages or blocks | entity_type → view | Scan Legacy CMS Content (at most `limit` items, default 50, max 500; summary.total counts all) |
 | `hyva_cms.page.create` | write | `Hyva_Cms::page_save` | copy_from.entity_type → view | Create Hyvä CMS Page |
 | `hyva_cms.page.get` | read | `Hyva_Cms::page_view` | fields with versions → version_history | Get Hyvä CMS Page |
 | `hyva_cms.page.list` | read | `Hyva_Cms::page_view` |  | List Hyvä CMS Pages |
@@ -318,7 +329,7 @@ are removed with `hyva_menu.item.remove`; media files go to the Media Gallery tr
 | `hyva_email.template.list` | read | `Hyva_EmailTemplates::email_template_view` | List Hyvä Email Templates |
 | `hyva_email.template.preview` | read | `Hyva_EmailTemplates::email_template_view` | Preview Hyvä Email Template |
 | `hyva_email.template.publish` | write | `Hyva_EmailTemplates::email_template_publish` | Publish Hyvä Email Template |
-| `hyva_email.template.send_test` | write | `Hyva_EmailTemplates::email_template_view` | Send Hyvä Email Template Test |
+| `hyva_email.template.send_test` | write | `Hyva_EmailTemplates::email_template_save` | Send Hyvä Email Template Test (an outbound write: needs Save draft, although the Hyvä admin button needs only View) |
 | `hyva_email.template.update_draft` | write | `Hyva_EmailTemplates::email_template_save` | Update Hyvä Email Template Draft |
 
 ### Hyvä Store Credit

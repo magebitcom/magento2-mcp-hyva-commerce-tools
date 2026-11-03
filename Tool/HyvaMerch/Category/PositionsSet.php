@@ -17,6 +17,7 @@ use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Merchandising\CategoryPositions;
 use Magebit\McpHyvaCommerceTools\Model\Security\AdminScopeGuard;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Framework\Exception\AuthorizationException;
@@ -86,8 +87,11 @@ class PositionsSet extends AbstractTool
             );
         }
         if ($this->scopeGuard->allowedScopes($this->adminUserId())['restricted']) {
-            throw new AuthorizationException(__('Category positions apply to every store view; a role restricted to '
-                . 'some websites or store views may not change them.'));
+            throw new AuthorizationException(__(
+                '%1 and may not change %2: they apply to every store view.',
+                StoreScopeGuard::RESTRICTED,
+                'category positions'
+            ));
         }
         $categoryId = $this->intArg($arguments, 'category_id') ?? 0;
         $skus = array_values(array_filter(

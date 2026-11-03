@@ -152,9 +152,17 @@ class MenuUpdateConfirmTest extends TestCase
         );
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn(true);
+        $menu = ['id' => 3, 'identifier' => 'main', 'title' => 'Main menu', 'is_active' => true, 'store_ids' => [0],
+            'preview_url_key' => null];
+        $guard = $this->storeScope($allowedStoreIds);
         $menus = $this->createMock(MenuService::class);
-        $menus->method('locateForWrite')->willReturn(['id' => 3, 'identifier' => 'main', 'title' => 'Main menu',
-            'is_active' => true, 'store_ids' => [0], 'preview_url_key' => null]);
+        // The locator's write check, over the real guard.
+        $menus->method('locateForWrite')->willReturnCallback(
+            static function (array $arguments, ?array $newStoreIds = null) use ($guard, $menu): array {
+                $guard->assertChangeable('menu #3', $menu['store_ids'], $newStoreIds);
+                return $menu;
+            }
+        );
         return new MenuUpdate(
             $features,
             $menus,
@@ -162,7 +170,6 @@ class MenuUpdateConfirmTest extends TestCase
             $contentService,
             $editor,
             new LiveSettings(),
-            $this->storeScope($allowedStoreIds),
             $builder
         );
     }

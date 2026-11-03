@@ -79,6 +79,19 @@ class HealthWidgetScopeTest extends TestCase
         }
     }
 
+    public function testMediaHealthTellsARestrictedAdminThatMediaFilesAreShared(): void
+    {
+        // T-36: media files have no store scope (as the core leaves unassigned data unscoped); usages are scoped.
+        $data = $this->mediaHealth(false, 3)->getDisplayData($this->ctx(), $this->instance());
+        $notice = is_array($data) ? (string) ($data['notice'] ?? '') : '';
+        $this->assertStringContainsString('Media files are shared by all websites', $notice);
+        $this->assertStringContainsString('3 usages elsewhere left out', $notice);
+
+        $data = $this->mediaHealth(false)->getDisplayData($this->ctx(), $this->instance());
+        $notice = is_array($data) ? (string) ($data['notice'] ?? '') : '';
+        $this->assertStringNotContainsString('shared by all websites', $notice);
+    }
+
     public function testMigrationStatusCountsOnlyTheAdminsPages(): void
     {
         $include = 'not called';
@@ -172,13 +185,17 @@ class HealthWidgetScopeTest extends TestCase
      * Media Health without problems.
      *
      * @param bool $auditAllowed
+     * @param int|null $hiddenUsages Usages left out for a restricted admin; null = unrestricted.
      * @return MediaHealth
      */
-    private function mediaHealth(bool $auditAllowed): MediaHealth
+    private function mediaHealth(bool $auditAllowed, ?int $hiddenUsages = null): MediaHealth
     {
+        $report = ['scope' => 'all', 'images_checked' => 0, 'counts' => [], 'config_issues' => [], 'images' => []];
+        if ($hiddenUsages !== null) {
+            $report['usages_hidden_by_permissions'] = $hiddenUsages;
+        }
         $auditor = $this->createMock(MediaAuditor::class);
-        $auditor->method('audit')->willReturn(['scope' => 'all', 'images_checked' => 0, 'counts' => [],
-            'config_issues' => [], 'images' => []]);
+        $auditor->method('audit')->willReturn($report);
         $engines = $this->createMock(ImageEngineInfo::class);
         $engines->method('getEngines')->willReturn(
             ['gd' => ['available' => true], 'imagick' => ['available' => false]]

@@ -76,7 +76,9 @@ class AuditMenu extends AbstractTool
         return 'Menu health: broken menu links, inactive categories, disabled products, empty menus, menus not '
             . 'assigned to store views or placements, plus menu image problems. Reports available=false without Hyvä '
             . 'Menu Builder. Menus outside your role\'s websites/store views are left out and counted in '
-            . 'menus_hidden_by_permissions.';
+            . 'menus_hidden_by_permissions.'
+            . ' Not paginated: limit (default 20, max 1000) caps the images listed under media; every menu is '
+            . 'listed and counted.';
     }
 
     /**

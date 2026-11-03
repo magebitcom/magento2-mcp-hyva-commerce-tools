@@ -18,6 +18,7 @@ use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Media\SharedMedia;
 
 /**
  * `hyva_media.sync.status`.
@@ -43,7 +44,8 @@ class SyncStatus extends AbstractMediaGalleryTool
         return 'Is the Media Gallery index in step with the files? Compares the gallery folders on disk with '
             . 'media_gallery_asset (files not indexed, assets whose file is gone), shows the synchronization queue and '
             . 'whether Magento\'s enhanced gallery is on (with the old gallery on, new uploads are not indexed). Fix: '
-            . 'bin/magento media-gallery:sync.';
+            . 'bin/magento media-gallery:sync.'
+            . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
     /**

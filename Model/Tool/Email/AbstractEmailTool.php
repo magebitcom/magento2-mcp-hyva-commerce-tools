@@ -18,6 +18,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
+use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magento\Framework\Exception\LocalizedException;
 
 /**
@@ -39,6 +40,12 @@ abstract class AbstractEmailTool extends AbstractTool
     public const CHANGES_TEMPLATES = true;
 
     /**
+     * Resource the tool is listed with while the feature is missing or disabled: none, so tools/list hides it.
+     * A feature's status tool overrides it with a resource that exists without the feature, so it stays listed.
+     */
+    protected const FEATURE_MISSING_ACL_RESOURCE = ContentAcl::UNAVAILABLE_RESOURCE;
+
+    /**
      * @param FeatureCheckerInterface $featureChecker
      * @param EmailGatewayInterface $emailGateway
      * @param ContentService $contentService
@@ -57,8 +64,8 @@ abstract class AbstractEmailTool extends AbstractTool
     /**
      * Hyvä resource the tool is listed with.
      *
-     * The module's resources only exist while it is enabled; without it the tool stays listed under Hyvä CMS
-     * access and answers that the feature is unavailable.
+     * Email Templates's resources only exist while the module is enabled; without it the tool is hidden from tools/list
+     * (FEATURE_MISSING_ACL_RESOURCE) and a call answers that the feature is unavailable.
      *
      * @return string|null
      */
@@ -66,7 +73,7 @@ abstract class AbstractEmailTool extends AbstractTool
     {
         return $this->featureChecker->getStatus(FeatureCheckerInterface::EMAIL_TEMPLATES)['enabled']
             ? static::UNDERLYING_ACL_RESOURCE
-            : 'Hyva_Cms::cms';
+            : static::FEATURE_MISSING_ACL_RESOURCE;
     }
 
     /**
@@ -80,7 +87,7 @@ abstract class AbstractEmailTool extends AbstractTool
             );
         }
         if (static::IS_WRITE && static::CHANGES_TEMPLATES) {
-            $this->storeScopeGuard->assertUnrestricted(ucfirst(static::LABEL) . 's');
+            $this->storeScopeGuard->assertUnrestricted(static::LABEL . 's');
         }
         return $this->executeEmail($arguments);
     }

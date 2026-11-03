@@ -15,7 +15,10 @@ use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Content\Preview;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Content\Publish;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Draft\DraftCreate;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Migration\MigrationConvertToDraft;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Migration\MigrationScan;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Version\VersionRestore;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateSendTest;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageReplace;
 use PHPUnit\Framework\TestCase;
 
@@ -137,5 +140,30 @@ class ContentAclListingTest extends TestCase
         $acl = $this->acl(array_merge(self::VIEWER, ['Hyva::cms_block_save']));
         $tool = $this->tool(ImageReplace::class, ImageReplace::class, $acl);
         $this->assertSame('Hyva::cms_block_save', $tool->getUnderlyingAclResource());
+    }
+
+    public function testMigrationToolsCountOnlyPagesAndBlocks(): void
+    {
+        // T-58: a role that may save only menus must not see the page/block migration write tool.
+        $acl = $this->acl(array_merge(self::VIEWER, ['Hyva::menu_save']));
+        $tool = $this->tool(MigrationConvertToDraft::class, MigrationConvertToDraft::class, $acl);
+        $this->assertSame('Hyva::cms_page_save', $tool->getUnderlyingAclResource());
+
+        $acl = $this->acl(array_merge(self::VIEWER, ['Hyva::cms_block_save']));
+        $tool = $this->tool(MigrationConvertToDraft::class, MigrationConvertToDraft::class, $acl);
+        $this->assertSame('Hyva::cms_block_save', $tool->getUnderlyingAclResource());
+
+        $acl = $this->acl(['Hyva_Cms::cms', 'Hyva::menu_view']);
+        $tool = $this->tool(MigrationScan::class, MigrationScan::class, $acl);
+        $this->assertSame('Hyva::cms_page_view', $tool->getUnderlyingAclResource());
+    }
+
+    public function testEmailSendTestIsListedWithTheTemplateWriteVerb(): void
+    {
+        $this->assertSame(
+            'Hyva_EmailTemplates::email_template_save',
+            TemplateSendTest::UNDERLYING_ACL_RESOURCE
+        );
+        $this->assertTrue(TemplateSendTest::IS_WRITE);
     }
 }

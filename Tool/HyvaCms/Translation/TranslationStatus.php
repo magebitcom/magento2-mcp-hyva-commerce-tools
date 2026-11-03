@@ -40,7 +40,9 @@ class TranslationStatus extends AbstractTranslationTool
         return 'Show how much of a Hyvä CMS page, block or menu is translated for each store view with its own '
             . 'language (Hyvä AI Translations settings), and which texts still miss a translation. Reads the working '
             . 'copy (draft if there is one). Translations are stored inside the content; '
-            . 'hyva_cms_translation_run fills the gaps.';
+            . 'hyva_cms_translation_run fills the gaps.'
+            . ' Not paginated: limit (default 50, max 200, 0 = none) caps the missing texts listed; texts_total '
+            . 'counts all texts.';
     }
 
     /**

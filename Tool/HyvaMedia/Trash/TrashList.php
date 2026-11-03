@@ -13,6 +13,7 @@ use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ListPagination;
+use Magebit\McpHyvaCommerceTools\Model\Media\SharedMedia;
 
 /**
  * `hyva_media.trash.list`.
@@ -38,7 +39,8 @@ class TrashList extends AbstractMediaGalleryTool
         return 'Assets in Hyvä\'s Media Gallery Trash: trash id, original path, size, who trashed it and when, plus '
             . 'the '
             . 'retention period after which cron deletes them for good. '
-            . ListPagination::DESCRIPTION_NOTE;
+            . ListPagination::DESCRIPTION_NOTE
+            . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
     /**

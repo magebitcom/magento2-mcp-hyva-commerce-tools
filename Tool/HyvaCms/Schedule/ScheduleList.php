@@ -60,7 +60,8 @@ class ScheduleList extends AbstractContentTool
             . 'store time. Filter by entity, status and date range (from/to in store time, YYYY-MM-DD[ HH:MM]). '
             . 'Statuses other than pending list the newest releases first and read at most the newest '
             . self::HISTORY_ROW_CAP . ' items (truncated: true when cut, the release cut by the cap is left out; '
-            . 'total_releases counts only the items read).';
+            . 'total_releases counts only the items read).'
+            . ' Not paginated: limit (default 100, max 500) caps the releases returned.';
     }
 
     /**

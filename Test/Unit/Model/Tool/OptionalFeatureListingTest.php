@@ -11,8 +11,14 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool;
 use Magebit\Mcp\Api\UnderlyingAclAwareInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaAi\Job\JobList;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaAi\Worker\WorkerStatus;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Content\Publish;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCommerce\Audit\AuditMenu;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateList;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormList;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupList;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset\AssetSearch;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Media\MediaStatus;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Optimization\OptimizationClear;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Optimization\OptimizationConfigGet;
@@ -20,10 +26,12 @@ use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Item\ItemUpdate;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuList;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuStatus;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuPublish;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaStoreCredit\Balance\BalanceGet;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaStoreCredit\Status as StoreCreditStatus;
 use PHPUnit\Framework\TestCase;
 
 /**
- * T-42: tools of a missing optional feature are hidden from tools/list; the status tools stay.
+ * T-42, T-56: tools of a missing optional feature are hidden from tools/list; the status tools stay.
  */
 class OptionalFeatureListingTest extends TestCase
 {
@@ -50,6 +58,28 @@ class OptionalFeatureListingTest extends TestCase
                 FeatureCheckerInterface::MEDIA_OPTIMIZATION,
                 'Magento_Cms::config_cms',
             ],
+            'form list' => [FormList::class, FeatureCheckerInterface::FORM_BUILDER, 'Hyva_FormBuilder::form_view'],
+            'email template list' => [
+                TemplateList::class,
+                FeatureCheckerInterface::EMAIL_TEMPLATES,
+                'Hyva_EmailTemplates::email_template_view',
+            ],
+            'store credit balance' => [
+                BalanceGet::class,
+                FeatureCheckerInterface::STORE_CREDIT,
+                'Hyva_StoreCredit::balance_view',
+            ],
+            'linked group list' => [
+                GroupList::class,
+                FeatureCheckerInterface::LINKED_PRODUCTS,
+                'Hyva_LinkedProducts::group_view',
+            ],
+            'ai job list' => [JobList::class, FeatureCheckerInterface::AI_WORKER, 'Hyva_AiWorker::manage'],
+            'media asset search' => [
+                AssetSearch::class,
+                FeatureCheckerInterface::MEDIA_GALLERY,
+                'Hyva_MediaGallery::asset_view',
+            ],
         ];
     }
 
@@ -74,6 +104,21 @@ class OptionalFeatureListingTest extends TestCase
             ->newInstanceWithoutConstructor()->getUnderlyingAclResource());
         $this->assertSame('Hyva_MediaGallery::asset_view', (new \ReflectionClass(MediaStatus::class))
             ->newInstanceWithoutConstructor()->getUnderlyingAclResource());
+        $this->assertSame('Magento_Customer::customer', $this->tool(
+            StoreCreditStatus::class,
+            FeatureCheckerInterface::STORE_CREDIT,
+            false
+        )->getUnderlyingAclResource());
+        $this->assertSame('Magento_Backend::system', $this->tool(
+            WorkerStatus::class,
+            FeatureCheckerInterface::AI_WORKER,
+            false
+        )->getUnderlyingAclResource());
+        $this->assertSame('Hyva_AiWorker::config', $this->tool(
+            WorkerStatus::class,
+            FeatureCheckerInterface::AI_WORKER,
+            true
+        )->getUnderlyingAclResource());
     }
 
     public function testAFixedTypeVariantIsHiddenWhileHyvaHasNoMappingForTheType(): void

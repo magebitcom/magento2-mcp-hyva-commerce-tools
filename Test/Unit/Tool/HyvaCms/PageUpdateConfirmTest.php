@@ -134,6 +134,30 @@ class PageUpdateConfirmTest extends TestCase
         $this->assertSame(['title'], $payload['settings_changed'] ?? null);
     }
 
+    public function testARestrictedRoleMayMoveAnAllStoreViewsPageIntoItsStoreViews(): void
+    {
+        // T-32: Hyvä Advanced Admin Permissions judges a re-assignment by the store views it enters.
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->expects($this->once())->method('update')->willReturn(['store_ids']);
+
+        $payload = $this->payload($this->tool($this->createMock(ContentService::class), $writer, [1], false, [0])
+            ->execute(['identifier' => 'sale', 'settings' => ['store_ids' => [1]], 'confirm' => true]));
+
+        $this->assertSame(['store_ids'], $payload['settings_changed'] ?? null);
+    }
+
+    public function testARestrictedRoleMayNotChangeAnAllStoreViewsPageWhereItIs(): void
+    {
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->expects($this->never())->method('update');
+
+        $result = $this->tool($this->createMock(ContentService::class), $writer, [1], false, [0])
+            ->execute(['identifier' => 'sale', 'settings' => ['title' => 'Summer sale']]);
+
+        $this->assertTrue($result->isError());
+        $this->assertStringContainsString('store view 0', json_encode($result->getContent()) ?: '');
+    }
+
     public function testAFailingSettingsSaveReportsTheAlreadySavedDraft(): void
     {
         $contentService = $this->createMock(ContentService::class);
@@ -151,8 +175,7 @@ class PageUpdateConfirmTest extends TestCase
             $this->createMock(ComponentTree::class),
             $editor,
             $writer,
-            new LiveSettings(),
-            $this->storeScope(null)
+            new LiveSettings()
         );
 
         $result = $tool->execute([
@@ -175,25 +198,35 @@ class PageUpdateConfirmTest extends TestCase
      * @param EntityWriter $writer
      * @param array|null $allowedStoreIds Store views of a restricted caller; null = unrestricted.
      * @param bool $active Whether the page is active.
+     * @param array $storeIds Store views the page is assigned to.
      * @return PageUpdate
      * @phpstan-param list<int>|null $allowedStoreIds
+     * @phpstan-param list<int> $storeIds
      */
     private function tool(
         ContentService $contentService,
         EntityWriter $writer,
         ?array $allowedStoreIds = null,
-        bool $active = false
+        bool $active = false,
+        array $storeIds = [1]
     ): PageUpdate {
+        $page = ['is_active' => $active, 'store_ids' => $storeIds] + self::PAGE;
+        $guard = $this->storeScope($allowedStoreIds);
         $locator = $this->createMock(ContentLocator::class);
-        $locator->method('locateForWrite')->willReturn(['is_active' => $active] + self::PAGE);
+        // The locator's write check, over the real guard.
+        $locator->method('locateForWrite')->willReturnCallback(
+            static function (string $type, array $arguments, ?array $newStoreIds = null) use ($guard, $page): array {
+                $guard->assertChangeable('CMS page #7', $page['store_ids'], $newStoreIds);
+                return $page;
+            }
+        );
         return new PageUpdate(
             $locator,
             $contentService,
             $this->createMock(ComponentTree::class),
             $this->createMock(DraftEditor::class),
             $writer,
-            new LiveSettings(),
-            $this->storeScope($allowedStoreIds)
+            new LiveSettings()
         );
     }
 

@@ -18,6 +18,7 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\MediaGallery\AbstractMediaGalleryToo
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Media\SharedMedia;
 
 /**
  * `hyva_media.asset.trash`.
@@ -66,7 +67,8 @@ class AssetTrash extends AbstractMediaGalleryTool
             . 'reply lists each asset with where it is used (affected), total and in_use; '
             . 'pages, blocks, menus, products and categories outside your role\'s websites/store views are left out '
             . '(usages_hidden_by_permissions) but still count in in_use. A restored asset may get a new id, so id '
-            . 'references to it stop resolving.';
+            . 'references to it stop resolving.'
+            . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
     /**

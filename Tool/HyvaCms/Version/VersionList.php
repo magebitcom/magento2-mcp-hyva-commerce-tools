@@ -52,7 +52,9 @@ class VersionList extends AbstractContentTool
     public function getDescription(): string
     {
         return 'List version-history items (newest first) with state (draft/published), author, date, pinned flag, '
-            . 'name and whether it was published by a schedule or restored from another version.';
+            . 'name and whether it was published by a schedule or restored from another version.'
+            . ' Not paginated: limit (default 50, max 200) caps the versions returned, newest first; total '
+            . 'counts all of them.';
     }
 
     /**

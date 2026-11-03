@@ -36,6 +36,11 @@ abstract class AbstractContentTool extends AbstractTool implements ContextualAcl
     public const EXTRA_ACL_RESOURCES = [];
 
     /**
+     * Content types a generic tool can work on; tools/list counts only these (e.g. migration: pages and blocks).
+     */
+    public const LISTING_CONTENT_TYPES = ContentLocator::TYPES;
+
+    /**
      * Content type a variant of a generic tool is bound to (e.g. "menu" for hyva_menu.publish); '' = from args.
      */
     public const FIXED_CONTENT_TYPE = '';
@@ -61,7 +66,7 @@ abstract class AbstractContentTool extends AbstractTool implements ContextualAcl
     {
         if (static::FIXED_CONTENT_TYPE === '') {
             return $this->contentAcl()->listingResource(
-                ContentLocator::TYPES,
+                static::LISTING_CONTENT_TYPES,
                 $this->contentVerbs([]),
                 $this->extraAclResources(),
                 static::UNDERLYING_ACL_RESOURCE

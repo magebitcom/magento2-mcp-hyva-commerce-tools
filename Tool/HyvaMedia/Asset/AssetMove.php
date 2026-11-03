@@ -19,6 +19,7 @@ use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Media\SharedMedia;
 
 /**
  * `hyva_media.asset.move`.
@@ -67,7 +68,8 @@ class AssetMove extends AbstractMediaGalleryTool
             . 'content that references the old path does not, so a move always needs "confirm": true: without it '
             . 'nothing changes and the reply lists each asset with its usages (affected) and total. Pages, '
             . 'blocks, menus, products and categories outside your role\'s websites/store views are left out of '
-            . 'them and counted in usages_hidden_by_permissions.';
+            . 'them and counted in usages_hidden_by_permissions.'
+            . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
     /**

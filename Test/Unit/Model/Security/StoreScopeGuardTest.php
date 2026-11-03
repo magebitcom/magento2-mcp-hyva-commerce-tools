@@ -101,6 +101,34 @@ class StoreScopeGuardTest extends TestCase
         $guard->assertUnrestricted('Linked product groups');
     }
 
+    public function testRefusalsShareOneOpeningAndCountStoreViews(): void
+    {
+        $guard = $this->storeScope([1]);
+        $messages = [];
+        foreach ([
+            fn () => $guard->assertReadable('CMS page #5', [2]),
+            fn () => $guard->assertWritable('CMS page #6', [1, 2]),
+            fn () => $guard->assertWritable('CMS block #7', [0]),
+            fn () => $guard->assertAssignable('CMS page #8', [], [2]),
+            fn () => $guard->assertUnrestricted('email templates'),
+        ] as $call) {
+            try {
+                $call();
+                $this->fail('The call must be refused.');
+            } catch (AuthorizationException $e) {
+                $messages[] = $e->getMessage();
+            }
+        }
+        foreach ($messages as $message) {
+            $this->assertStringStartsWith(StoreScopeGuard::RESTRICTED, $message);
+        }
+        $this->assertStringContainsString('CMS page #5 (store view 2) is outside it', $messages[0]);
+        $this->assertStringContainsString('assigned to store views 1, 2.', $messages[1]);
+        $this->assertStringContainsString('assigned to store view 0 ("All Store Views").', $messages[2]);
+        $this->assertStringContainsString('assign CMS page #8 to store view 2 (', $messages[3]);
+        $this->assertStringContainsString('may not change email templates: they apply', $messages[4]);
+    }
+
     public function testResolveStoreIdKeepsTheValueForAnUnrestrictedCaller(): void
     {
         $guard = $this->storeScope(null);

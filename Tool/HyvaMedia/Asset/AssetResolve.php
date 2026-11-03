@@ -19,6 +19,7 @@ use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Media\SharedMedia;
 
 /**
  * `hyva_media.asset.resolve`.
@@ -64,7 +65,8 @@ class AssetResolve extends AbstractMediaGalleryTool
             . 'where '
             . 'it is used (Hyvä CMS pages, blocks and menus by path or asset id, catalog, and Magento-tracked CMS '
             . 'content). Use it before moving or trashing an asset. Pages, blocks, menus, products and categories '
-            . 'outside your role\'s websites/store views are left out and counted in usages_hidden_by_permissions.';
+            . 'outside your role\'s websites/store views are left out and counted in usages_hidden_by_permissions.'
+            . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
     /**

@@ -18,7 +18,11 @@ use Magento\Store\Model\StoreManagerInterface;
  * - read: an entity is visible when it has no store assignment or one of its store views is allowed; store view 0
  *   ("All Store Views") is always visible. Lists show only entities linked to an allowed store view or to 0.
  * - write: every assigned store view must be allowed; store view 0 is inherited by every store view, so it needs
- *   all of them. Re-assigning may not drop a store view outside the role either.
+ *   all of them (Hyvä DataFieldWriteRule::isStoreWriteDenied() with GlobalWritePolicy). This covers create too.
+ * - re-assign: judged by the new assignment, which must be writable, and may not drop a store view outside the
+ *   role; dropping store view 0 is not dropping a foreign store view (Hyvä EntityScopeWriteGuard
+ *   ::unassignsForeignScope()). So a restricted role may move an "All Store Views" entity into its own store
+ *   views, as the Hyvä admin lets it, while it may not change it where it is.
  * - data without a store assignment (global): a restricted role may not change it.
  * - catalog (read): a product is visible in an allowed website or in none, a category under the root category of
  *   an allowed store view (Hyvä's CatalogProductEntityGuard and CatalogCategoryEntityGuard).
@@ -26,6 +30,11 @@ use Magento\Store\Model\StoreManagerInterface;
  */
 class StoreScopeGuard
 {
+    /**
+     * Opening of every store scope refusal in this module, so all of them read the same.
+     */
+    public const RESTRICTED = 'Your admin role is restricted to some websites or store views';
+
     /**
      * @var array<string, list<int>> Category root ids per allowed store view list.
      */
@@ -206,9 +215,10 @@ class StoreScopeGuard
     {
         if (!$this->allowsRead($storeIds)) {
             throw new AuthorizationException(__(
-                'Your admin role is restricted to other websites or store views; %1 (store views %2) is outside it.',
+                '%1; %2 (%3) is outside it.',
+                self::RESTRICTED,
                 $label,
-                implode(', ', $storeIds)
+                self::storeViewList($storeIds)
             ));
         }
     }
@@ -237,8 +247,8 @@ class StoreScopeGuard
         }
         if ($storeId === 0) {
             throw new AuthorizationException(__(
-                'Your admin role is restricted to some websites or store views; store view 0 ("All Store Views") '
-                . 'is outside it. Pass the store_id of one of your store views.'
+                '%1; store view 0 ("All Store Views") is outside it. Pass the store_id of one of your store views.',
+                self::RESTRICTED
             ));
         }
         $this->assertReadable('store view ' . $storeId, [$storeId]);
@@ -259,13 +269,38 @@ class StoreScopeGuard
         $this->assertReadable($label, $storeIds);
         if (!$this->allowsWrite($storeIds)) {
             throw new AuthorizationException(__(
-                'Your admin role is restricted to some websites or store views and may not change %1: it is '
-                . 'assigned to store views %2. Only content assigned to your own store views can be changed '
-                . '(store view 0, "All Store Views", needs every store view).',
+                '%1 and may not change %2: it is assigned to %3. Only content assigned to your own store views can '
+                . 'be changed (store view 0, "All Store Views", needs every store view).',
+                self::RESTRICTED,
                 $label,
-                implode(', ', $storeIds)
+                self::storeViewList($storeIds)
             ));
         }
+    }
+
+    /**
+     * Refuse a change to an existing entity, judged as the Hyvä admin judges the save
+     *
+     * Without a new assignment the entity's store views must be writable (assertWritable()). A save that
+     * re-assigns it is judged by the assignment it enters instead: the entity must be readable and the move
+     * allowed (assertAssignable()), so an "All Store Views" entity can be moved into the caller's store views.
+     *
+     * @param string $label
+     * @param array $storeIds Current assignment.
+     * @param array|null $newStoreIds Assignment this call saves, or null when it keeps the current one.
+     * @return void
+     * @throws AuthorizationException
+     * @phpstan-param list<int> $storeIds
+     * @phpstan-param list<int>|null $newStoreIds
+     */
+    public function assertChangeable(string $label, array $storeIds, ?array $newStoreIds): void
+    {
+        if ($newStoreIds === null) {
+            $this->assertWritable($label, $storeIds);
+            return;
+        }
+        $this->assertReadable($label, $storeIds);
+        $this->assertAssignable($label, $storeIds, $newStoreIds);
     }
 
     /**
@@ -283,11 +318,11 @@ class StoreScopeGuard
     {
         if (!$this->allowsAssignment($currentStoreIds, $newStoreIds)) {
             throw new AuthorizationException(__(
-                'Your admin role is restricted to some websites or store views and may not assign %1 to store '
-                . 'views %2 (store view 0, "All Store Views", needs every store view; removing a store view '
-                . 'outside your role is not allowed either).',
+                '%1 and may not assign %2 to %3 (store view 0, "All Store Views", needs every store view; removing '
+                . 'a store view outside your role is not allowed either).',
+                self::RESTRICTED,
                 $label,
-                implode(', ', $newStoreIds)
+                self::storeViewList($newStoreIds)
             ));
         }
     }
@@ -295,7 +330,7 @@ class StoreScopeGuard
     /**
      * Refuse a change to data shared by every store view (no store assignment) for a restricted caller
      *
-     * @param string $what E.g. "Email templates".
+     * @param string $what Plural, e.g. "email templates".
      * @return void
      * @throws AuthorizationException
      */
@@ -303,11 +338,26 @@ class StoreScopeGuard
     {
         if ($this->restrictedStoreIds() !== null) {
             throw new AuthorizationException(__(
-                '%1 apply to every store view; a role restricted to some websites or store views may not '
-                . 'change them.',
+                '%1 and may not change %2: they apply to every store view.',
+                self::RESTRICTED,
                 $what
             ));
         }
+    }
+
+    /**
+     * "store view 1" / "store views 1, 2" for a refusal message
+     *
+     * @param array $storeIds
+     * @return string
+     * @phpstan-param list<int> $storeIds
+     */
+    public static function storeViewList(array $storeIds): string
+    {
+        if ($storeIds === [0]) {
+            return 'store view 0 ("All Store Views")';
+        }
+        return (count($storeIds) === 1 ? 'store view ' : 'store views ') . implode(', ', $storeIds);
     }
 
     /**

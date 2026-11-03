@@ -18,6 +18,11 @@ class Status extends AbstractStoreCreditTool
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_store_credit_status';
 
     /**
+     * Status tool: stays listed (under customer access) while the module is missing and reports it unavailable.
+     */
+    protected const FEATURE_MISSING_ACL_RESOURCE = 'Magento_Customer::customer';
+
+    /**
      * @inheritDoc
      */
     public function getTitle(): string

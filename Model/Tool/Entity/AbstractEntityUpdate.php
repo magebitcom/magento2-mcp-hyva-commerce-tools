@@ -23,7 +23,6 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ContentSchema;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
-use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 /**
@@ -44,7 +43,6 @@ abstract class AbstractEntityUpdate extends AbstractTool
      * @param DraftEditor $draftEditor
      * @param EntityWriter $entityWriter
      * @param LiveSettings $liveSettings
-     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         private readonly ContentLocator $contentLocator,
@@ -52,8 +50,7 @@ abstract class AbstractEntityUpdate extends AbstractTool
         private readonly ComponentTree $componentTree,
         private readonly DraftEditor $draftEditor,
         private readonly EntityWriter $entityWriter,
-        private readonly LiveSettings $liveSettings,
-        private readonly StoreScopeGuard $storeScopeGuard
+        private readonly LiveSettings $liveSettings
     ) {
     }
 
@@ -124,21 +121,18 @@ abstract class AbstractEntityUpdate extends AbstractTool
      */
     protected function run(array $arguments): ToolResultInterface
     {
-        $entity = $this->contentLocator->locateForWrite(static::ENTITY_TYPE, $arguments);
         $components = $this->arrayArg($arguments, 'components');
         $operations = $this->arrayArg($arguments, 'operations');
         $settings = $this->arrayArg($arguments, 'settings');
-        if ($components === [] && $operations === [] && $settings === []) {
-            return $this->softError('Nothing to update: pass components, operations and/or settings.');
-        }
-
+        $newStoreIds = null;
         if (array_key_exists('store_ids', $settings) && $settings['store_ids'] !== null) {
             $storeIds = $settings['store_ids'];
-            $this->storeScopeGuard->assertAssignable(
-                $this->contentLocator->label($entity),
-                $entity['store_ids'],
-                Cast::intList(is_array($storeIds) ? $storeIds : [$storeIds])
-            );
+            $newStoreIds = Cast::intList(is_array($storeIds) ? $storeIds : [$storeIds]);
+        }
+        // A re-assigning call is judged by the store views it enters (Hyvä admin rule, see StoreScopeGuard).
+        $entity = $this->contentLocator->locateForWrite(static::ENTITY_TYPE, $arguments, $newStoreIds);
+        if ($components === [] && $operations === [] && $settings === []) {
+            return $this->softError('Nothing to update: pass components, operations and/or settings.');
         }
 
         // Layout, heading and meta are not part of the located row: load them so an unchanged value is no change.

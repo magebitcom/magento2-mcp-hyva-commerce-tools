@@ -30,6 +30,7 @@ class MigrationConvertToDraft extends AbstractContentTool
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_cms_migration_convert_to_draft';
     public const IS_WRITE = true;
     public const CONTENT_VERBS = [ContentAcl::VERB_SAVE];
+    public const LISTING_CONTENT_TYPES = [ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK];
 
     /**
      * @param ContentLocator $contentLocator
