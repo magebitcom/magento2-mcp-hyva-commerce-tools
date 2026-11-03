@@ -219,7 +219,7 @@ class StoreScopeGuard
                 '%1; %2 (%3) is outside it.',
                 self::RESTRICTED,
                 $label,
-                $this->storeViewList($storeIds)
+                $this->describeStoreViews($storeIds)
             ));
         }
     }
@@ -269,7 +269,7 @@ class StoreScopeGuard
     {
         $this->assertReadable($label, $storeIds);
         if (!$this->allowsWrite($storeIds)) {
-            // storeViewList([0]) already names "All Store Views": say the rule once, after it.
+            // describeStoreViews([0]) already names "All Store Views": say the rule once, after it.
             throw new OutOfScopeException(__(
                 $storeIds === [0]
                     ? '%1 and may not change %2: it is assigned to %3, which needs every store view. Only content '
@@ -278,7 +278,7 @@ class StoreScopeGuard
                         . 'can be changed (store view 0, "All Store Views", needs every store view).',
                 self::RESTRICTED,
                 $label,
-                $this->storeViewList($storeIds)
+                $this->describeStoreViews($storeIds)
             ));
         }
     }
@@ -346,7 +346,7 @@ class StoreScopeGuard
                 '%1 and may not assign %2 to %3: %4.',
                 self::RESTRICTED,
                 $label,
-                $this->storeViewList($newStoreIds),
+                $this->describeStoreViews($newStoreIds),
                 $this->assignmentRefusalReason($currentStoreIds, $newStoreIds)
             ));
         }
@@ -374,10 +374,11 @@ class StoreScopeGuard
         }
         $foreign = array_values(array_diff($newStoreIds, $allowed, [0]));
         if ($foreign !== []) {
-            return $this->storeViewList($foreign) . (count($foreign) === 1 ? ' is' : ' are') . ' outside your role';
+            return $this->describeStoreViews($foreign) . (count($foreign) === 1 ? ' is' : ' are')
+                . ' outside your role';
         }
         $removed = array_values(array_diff($currentStoreIds, $newStoreIds, $allowed, [0]));
-        return 'that removes it from ' . $this->storeViewList($removed) . ', '
+        return 'that removes it from ' . $this->describeStoreViews($removed) . ', '
             . (count($removed) === 1 ? 'which is' : 'which are') . ' outside your role';
     }
 
@@ -400,13 +401,15 @@ class StoreScopeGuard
     }
 
     /**
-     * "store view 1" / "store views 1, 2" for a refusal message
+     * "store view 1" / "store views 1, 2" for a refusal message; [0] is 'store view 0 ("All Store Views")'
+     *
+     * Shared by every scope refusal so the store view wording stays the same; callers add their own suffix.
      *
      * @param array $storeIds
      * @return string
      * @phpstan-param list<int> $storeIds
      */
-    private function storeViewList(array $storeIds): string
+    public function describeStoreViews(array $storeIds): string
     {
         if ($storeIds === [0]) {
             return 'store view 0 ("All Store Views")';

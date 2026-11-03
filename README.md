@@ -688,8 +688,9 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
 - **Admin area for saves.** Page and block saves run in an emulated `adminhtml` area. In the frontend area, where
   `/mcp` runs, Hyvä's `Plugin\Model\Page::afterGetContent` fails for a page without an id.
 - **Published URLs.** Hyvä's page provider reports a page's address as `published_url` in every store view, active
-  or not. `published_urls` leaves out, and preview store rows give `published_url: null` for, an inactive entity and a
-  store view it is not assigned to.
+  or not, and its menu provider marks a menu assigned (`is_assigned: true`) in every store view. `published_urls`
+  leaves out, and preview store rows give `published_url: null` for, an inactive entity and a store view it is not
+  assigned to; for a menu, that is decided by the menu's own store views.
 - **Component links.** `hyva_cms.component.validate` warns (`invalid_link`) about link field values with neither `type`
   and `value` nor a non-empty `src`, such as `{"url": "..."}`. They render an empty href.
 - **Image ids.** Hyvä writers outside the editor must call `ImageIdBackfiller::backfill()` themselves
@@ -719,13 +720,29 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
 
 ## Upgrade notes
 
-### Since 0.0.1 (breaking for custom gateways)
+### Since 0.0.1 (breaking for custom gateways and for clients that parse replies)
 
 `Api\Adapter\MenuGatewayInterface` has a new method `delete(int $menuId): void`, used by `hyva_menu.delete`.
 
 - **Projects that keep the module's `MenuGateway`** need no change.
 - **Projects that replace the module's preference for this interface** in their own `di.xml` must add the method.
   Otherwise PHP stops with a fatal error when the class is loaded.
+
+Three reply shapes changed. Clients that read them must switch:
+
+- **Confirm previews have one envelope: `affected` is always a list and context sits in `details`.** In 0.0.1
+  `hyva_media.asset.trash` had `affected.assets` and `affected.in_use`, `hyva_media.asset.move` had `affected.assets`
+  and `affected.target_folder`, and `hyva_media.image.replace` (scope=global) had `affected.hyva_entities`. Now the
+  items are `affected[]` and the context is `details.*` (e.g. `details.in_use`, `details.target_folder`).
+  `hyva_media.optimization.clear` (all_images) had its counts and `mode` as the only `affected` entry; now `affected`
+  lists sample paths, `total` counts every file and the counts and `mode` are in `details`.
+- **`hyva_media.asset.trash`: `in_use` is a boolean**, in the preview (`details.in_use`) and in the confirmed reply,
+  as in the delete tools. In 0.0.1 it was the number of assets still in use (preview: `affected.in_use`). Read that
+  number from `in_use_count` (preview: `details.in_use_count`).
+- **`hyva_media.image.replace` (scope=global) preview lists each entity once.** In 0.0.1 every usage that is not
+  changed was in `affected.not_editable_usages`. Now the usages of an entity that is changed sit on that entity's
+  `affected[]` row as `not_editable_usages`, and `details.not_editable_usages` keeps only entities that are not
+  changed at all. Read both to get every usage. The confirmed reply's `not_changed` still lists all of them.
 
 ## Development
 

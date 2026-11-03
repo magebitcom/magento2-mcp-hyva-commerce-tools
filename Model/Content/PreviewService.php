@@ -31,13 +31,15 @@ class PreviewService
      * @param LoggerInterface $logger
      * @param StoreScopeGuard $storeScopeGuard
      * @param StoreManagerInterface $storeManager
+     * @param ContentIndex $contentIndex
      */
     public function __construct(
         private readonly ContentProvider $contentProvider,
         private readonly BackendUrl $backendUrl,
         private readonly LoggerInterface $logger,
         private readonly StoreScopeGuard $storeScopeGuard,
-        private readonly StoreManagerInterface $storeManager
+        private readonly StoreManagerInterface $storeManager,
+        private readonly ContentIndex $contentIndex
     ) {
     }
 
@@ -71,11 +73,13 @@ class PreviewService
             $error = $e->getMessage();
         }
         $visible = $this->storeScopeGuard->restrictedStoreIds();
+        $menuStoreIds = $this->menuStoreIds($type, $id);
         $hidden = 0;
         foreach ($data as $store) {
             if (!is_array($store)) {
                 continue;
             }
+            $store = $this->withMenuAssignment($store, $menuStoreIds);
             if ($storeId !== null && Cast::int($store['store_id'] ?? -1) !== $storeId) {
                 continue;
             }
@@ -132,6 +136,7 @@ class PreviewService
             return [];
         }
         $visible = $this->storeScopeGuard->restrictedStoreIds();
+        $menuStoreIds = $this->menuStoreIds($type, $id);
         $urls = [];
         foreach ($data as $store) {
             if (!is_array($store)
@@ -139,7 +144,7 @@ class PreviewService
             ) {
                 continue;
             }
-            $url = $this->liveUrl($store);
+            $url = $this->liveUrl($this->withMenuAssignment($store, $menuStoreIds));
             if ($url !== null) {
                 $urls[] = [
                     'store_id' => Cast::int($store['store_id'] ?? 0),
@@ -174,10 +179,59 @@ class PreviewService
     }
 
     /**
+     * Store views a menu is assigned to, or null to keep Hyvä's rows as they are.
+     *
+     * Null when this is not a menu, the menu is missing from the index, the lookup fails or the menu has store
+     * view 0 (all store views). A menu with no store view rows (its only store view was deleted) gives an empty
+     * list, so no store view is assigned, as Hyvä's frontend loader (inner join on the store table) shows it nowhere.
+     *
+     * @param string $type
+     * @param int $id
+     * @return list<int>|null
+     */
+    private function menuStoreIds(string $type, int $id): ?array
+    {
+        if ($type !== ContentLocator::TYPE_MENU || $id <= 0) {
+            return null;
+        }
+        try {
+            $storeIds = $this->contentIndex->getStoreIds($type, [$id]);
+        } catch (Throwable $e) {
+            $this->logger->error('Hyvä menu store views could not be read.', ['id' => $id, 'exception' => $e]);
+            return null;
+        }
+        if (!array_key_exists($id, $storeIds)) {
+            return null;
+        }
+        return in_array(0, $storeIds[$id], true) ? null : $storeIds[$id];
+    }
+
+    /**
+     * Store row with is_assigned set from the menu's own store views.
+     *
+     * Hyvä's MenuProvider::getStoreContentData() hard-codes is_assigned => true for every store view, so a menu
+     * assigned only to store view 1 would still report a live URL for store view 2.
+     *
+     * @param array $store
+     * @param list<int>|null $menuStoreIds
+     * @return array
+     * @phpstan-param array<mixed> $store
+     * @phpstan-return array<mixed>
+     */
+    private function withMenuAssignment(array $store, ?array $menuStoreIds): array
+    {
+        if ($menuStoreIds !== null && !in_array(Cast::int($store['store_id'] ?? -1), $menuStoreIds, true)) {
+            $store['is_assigned'] = false;
+        }
+        return $store;
+    }
+
+    /**
      * Live URL of a Hyvä store row, or null when the entity is inactive or not assigned to that store view.
      *
-     * Hyvä's page provider reports the page's address for every store view, active or not (T-86); the block, form
-     * and menu providers already leave unassigned store views out.
+     * Hyvä's page provider reports the page's address for every store view, active or not (T-86); the block and
+     * form providers already leave unassigned store views out. Hyvä's menu provider marks every store view assigned,
+     * so menu rows get their is_assigned flag from the menu's own store views first (withMenuAssignment()).
      *
      * @param array $store
      * @return string|null

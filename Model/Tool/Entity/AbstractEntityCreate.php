@@ -161,9 +161,12 @@ abstract class AbstractEntityCreate extends AbstractTool implements ContextualAc
         $deniedStores = $this->deniedStoreIds($fields);
         if ($deniedStores !== []) {
             return $this->softError(
-                'Nothing was created: your admin role may not write to store view(s) '
-                    . implode(', ', $deniedStores) . ' (0 = all store views). Pass store_ids within your scope.',
-                ['status' => 403, 'denied_store_ids' => $deniedStores]
+                StoreScopeGuard::RESTRICTED . ' and may not create content in '
+                    . $this->storeScopeGuard->describeStoreViews($deniedStores)
+                    . $this->allStoreViewsRule($deniedStores)
+                    . '. Nothing was created: pass store_ids within your scope.',
+                ['status' => 403, 'denied_store_ids' => $deniedStores],
+                'out_of_scope'
             );
         }
 
@@ -186,7 +189,8 @@ abstract class AbstractEntityCreate extends AbstractTool implements ContextualAc
             return $this->softError('Nothing was created: the content is invalid.', $validation);
         }
 
-        $live = $this->liveSettings->changes(['is_active' => false], ['is_active' => !empty($fields['is_active'])]);
+        $isActive = !empty($fields['is_active']);
+        $live = $this->liveSettings->changes(['is_active' => false], ['is_active' => $isActive]);
         if ($live !== [] && !$this->boolArg($arguments, 'confirm')) {
             return $this->confirmationRequired('create_active', [[
                 'entity_type' => static::ENTITY_TYPE,
@@ -213,10 +217,11 @@ abstract class AbstractEntityCreate extends AbstractTool implements ContextualAc
             'id' => $id,
             'identifier' => $fields['identifier'] ?? null,
             'draft' => $saved,
+            'is_active' => $isActive,
             'published' => false,
             'preview' => $this->previewService->getPreview(static::ENTITY_TYPE, $id),
             'next_step' => 'Review the preview, then call hyva_cms_publish to make the content live'
-                . (empty($fields['is_active']) ? ' (and set is_active=true with the update tool).' : '.'),
+                . ($isActive ? '.' : ' (and set is_active=true with the update tool).'),
         ], ['entity_type' => static::ENTITY_TYPE, 'id' => $id, 'components' => count($components)]);
     }
 
@@ -244,6 +249,21 @@ abstract class AbstractEntityCreate extends AbstractTool implements ContextualAc
             $ids,
             fn (int $id): bool => !$this->storeScopeGuard->allowsWrite([$id])
         ));
+    }
+
+    /**
+     * Create-specific suffix after StoreScopeGuard::describeStoreViews(): why store view 0 was refused, if named
+     *
+     * @param array $storeIds
+     * @return string
+     * @phpstan-param list<int> $storeIds
+     */
+    private function allStoreViewsRule(array $storeIds): string
+    {
+        if ($storeIds === [0]) {
+            return ', which needs every store view';
+        }
+        return in_array(0, $storeIds, true) ? ' (0 = "All Store Views", which needs every store view)' : '';
     }
 
     /**

@@ -14,12 +14,17 @@ use Magebit\McpHyvaCommerceTools\Api\Adapter\LinkedProductsGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
+use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DeletionUsage;
+use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\EntityWriter;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
+use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockCreate;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageCreate;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageDelete;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterPublish;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupGet;
@@ -73,6 +78,41 @@ class SoftErrorAuditTest extends TestCase
         $this->assertTrue($result->isError());
         $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
         $this->assertSame(['error' => 'out_of_scope'], $result->getAuditSummary());
+    }
+
+    /**
+     * The create tools' own store view check is a scope refusal too: audited as out_of_scope, same soft 403 reply.
+     *
+     * @param class-string<PageCreate|BlockCreate> $class
+     * @dataProvider createToolProvider
+     */
+    public function testACreateOutsideTheScopeIsAuditedAsOutOfScope(string $class): void
+    {
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->expects($this->never())->method('create');
+        $result = (new $class(
+            $writer,
+            $this->createMock(ContentService::class),
+            $this->createMock(ComponentTree::class),
+            $this->createMock(DraftEditor::class),
+            $this->createMock(ContentLocator::class),
+            $this->createMock(PreviewService::class),
+            new LiveSettings(),
+            $this->createMock(ContentAcl::class),
+            $this->storeScope([1])
+        ))->execute(['title' => 'Sale', 'identifier' => 'sale', 'store_ids' => [2]]);
+
+        $this->assertTrue($result->isError());
+        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        $this->assertSame(['error' => 'out_of_scope'], $result->getAuditSummary());
+    }
+
+    /**
+     * @return array<string, array{class-string<PageCreate|BlockCreate>}>
+     */
+    public static function createToolProvider(): array
+    {
+        return ['page' => [PageCreate::class], 'block' => [BlockCreate::class]];
     }
 
     public function testAPermissionRefusalKeepsTheStatusCode(): void

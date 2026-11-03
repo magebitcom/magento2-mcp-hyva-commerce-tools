@@ -16,6 +16,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\EntityWriter;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockCreate;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageCreate;
@@ -69,6 +70,7 @@ class PageCreateConfirmTest extends TestCase
 
         $this->assertTrue($payload['created'] ?? null);
         $this->assertSame(12, $payload['id'] ?? null);
+        $this->assertTrue($payload['is_active'] ?? null);
     }
 
     public function testAnInactiveCreateNeedsNoConfirm(): void
@@ -85,6 +87,25 @@ class PageCreateConfirmTest extends TestCase
 
         $this->assertArrayNotHasKey('confirmation_required', $payload);
         $this->assertTrue($payload['created'] ?? null);
+        // T-96: a boolean, as hyva_cms_page_get reports it, not a missing key.
+        $this->assertFalse($payload['is_active'] ?? null);
+    }
+
+    /**
+     * @param class-string<PageCreate|BlockCreate> $class
+     * @dataProvider createToolProvider
+     */
+    public function testACreateWithoutIsActiveReportsItInactive(string $class): void
+    {
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->expects($this->once())->method('create')->willReturn(12);
+
+        $payload = $this->payload($this->tool($writer, $this->contentService(), null, $class)->execute([
+            'title' => 'Sale',
+            'identifier' => 'sale',
+        ]));
+
+        $this->assertFalse($payload['is_active'] ?? null);
     }
 
     public function testARestrictedRoleCannotCreateForAllStoreViews(): void
@@ -102,6 +123,12 @@ class PageCreateConfirmTest extends TestCase
         $payload = $this->payload($result);
         $this->assertSame(403, $payload['status'] ?? null);
         $this->assertSame([0], $payload['denied_store_ids'] ?? null);
+        // T-94: the shared scope refusal opening, then what was (not) done.
+        $this->assertSame(
+            StoreScopeGuard::RESTRICTED . ' and may not create content in store view 0 ("All Store Views"), which '
+                . 'needs every store view. Nothing was created: pass store_ids within your scope.',
+            $payload['error'] ?? null
+        );
     }
 
     public function testARestrictedRoleCannotCreateForAnotherStoreView(): void
@@ -117,6 +144,30 @@ class PageCreateConfirmTest extends TestCase
         ]));
 
         $this->assertSame([2], $payload['denied_store_ids'] ?? null);
+        $this->assertSame(
+            StoreScopeGuard::RESTRICTED . ' and may not create content in store view 2. Nothing was created: pass '
+                . 'store_ids within your scope.',
+            $payload['error'] ?? null
+        );
+    }
+
+    public function testTheRefusalNamesEveryDeniedStoreView(): void
+    {
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->expects($this->never())->method('create');
+
+        $payload = $this->payload($this->tool($writer, $this->contentService(), [1])->execute([
+            'title' => 'Sale',
+            'identifier' => 'sale',
+            'store_ids' => [0, 2],
+        ]));
+
+        $this->assertSame([0, 2], $payload['denied_store_ids'] ?? null);
+        $this->assertSame(
+            StoreScopeGuard::RESTRICTED . ' and may not create content in store views 0, 2 (0 = "All Store Views", '
+                . 'which needs every store view). Nothing was created: pass store_ids within your scope.',
+            $payload['error'] ?? null
+        );
     }
 
     public function testARestrictedRoleCreatesInsideItsScope(): void
@@ -196,19 +247,21 @@ class PageCreateConfirmTest extends TestCase
     }
 
     /**
-     * Page create tool for a caller with the given Advanced Admin Permissions scopes.
+     * Page (or block) create tool for a caller with the given Advanced Admin Permissions scopes.
      *
      * @param EntityWriter $writer
      * @param ContentService $contentService
      * @param list<int>|null $scopes Store views of a restricted caller; null = unrestricted.
-     * @return PageCreate
+     * @param class-string<PageCreate|BlockCreate> $class
+     * @return PageCreate|BlockCreate
      */
     private function tool(
         EntityWriter $writer,
         ContentService $contentService,
-        ?array $scopes = null
-    ): PageCreate {
-        return new PageCreate(
+        ?array $scopes = null,
+        string $class = PageCreate::class
+    ): PageCreate|BlockCreate {
+        return new $class(
             $writer,
             $contentService,
             $this->createMock(ComponentTree::class),

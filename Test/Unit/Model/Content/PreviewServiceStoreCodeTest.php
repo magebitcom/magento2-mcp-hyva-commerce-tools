@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content;
 
 use Hyva\CmsLiveviewEditor\Model\Provider as ContentProvider;
 use Magebit\Mcp\Api\LoggerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magento\Backend\Model\UrlInterface as BackendUrl;
@@ -75,7 +76,8 @@ class PreviewServiceStoreCodeTest extends TestCase
             $this->createMock(BackendUrl::class),
             $this->createMock(LoggerInterface::class),
             $guard,
-            $storeManager
+            $storeManager,
+            $this->createMock(ContentIndex::class)
         );
     }
 }

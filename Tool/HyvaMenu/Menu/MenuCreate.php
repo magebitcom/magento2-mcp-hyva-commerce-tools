@@ -150,11 +150,12 @@ class MenuCreate extends AbstractMenuTool
             return $this->softError('Nothing was created: the menu content is invalid.', $validation);
         }
 
+        $isActive = $this->boolArg($arguments, 'is_active');
         $menuId = $this->menuGateway->create([
             'title' => $this->requireString($arguments, 'title'),
             'identifier' => $this->requireString($arguments, 'identifier'),
             'store_ids' => $this->intListArg($arguments, 'store_ids'),
-            'is_active' => $this->boolArg($arguments, 'is_active'),
+            'is_active' => $isActive,
             'preview_url_key' => $this->stringArg($arguments, 'preview_url_key'),
         ]);
         $document = $this->componentTree->normalizeDocument($document, ContentLocator::TYPE_MENU, $menuId);
@@ -165,6 +166,7 @@ class MenuCreate extends AbstractMenuTool
             'id' => $menuId,
             'draft' => $saved,
             'structure' => $this->menuService->describe($document),
+            'is_active' => $isActive,
             'published' => false,
             'preview' => $this->previewService->getPreview(ContentLocator::TYPE_MENU, $menuId),
             'next_step' => 'Publish with hyva_menu_publish (it also activates the menu) and assign it in design '

@@ -96,6 +96,31 @@ class PublishInactiveNoteTest extends TestCase
 
     public function testMenuCreateNextStepNeedsNoActivationCall(): void
     {
+        $payload = $this->menuCreatePayload([]);
+        $nextStep = Cast::string($payload['next_step'] ?? '');
+
+        $this->assertStringContainsString('hyva_menu_publish (it also activates the menu)', $nextStep);
+        $this->assertStringNotContainsString('hyva_menu_update', $nextStep);
+    }
+
+    /**
+     * T-96: the menu create reply reports is_active as a boolean, false when the call leaves it out.
+     */
+    public function testMenuCreateReportsTheActiveFlag(): void
+    {
+        $this->assertFalse($this->menuCreatePayload([])['is_active'] ?? null);
+        $this->assertFalse($this->menuCreatePayload(['is_active' => false])['is_active'] ?? null);
+        $this->assertTrue($this->menuCreatePayload(['is_active' => true])['is_active'] ?? null);
+    }
+
+    /**
+     * Decoded reply of hyva_menu_create for an empty "main" menu, plus the given arguments.
+     *
+     * @param array<string, mixed> $arguments
+     * @return array<string, mixed>
+     */
+    private function menuCreatePayload(array $arguments): array
+    {
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn(true);
         $gateway = $this->createMock(MenuGatewayInterface::class);
@@ -114,12 +139,9 @@ class PublishInactiveNoteTest extends TestCase
             $this->storeScope(null)
         );
 
-        $text = $tool->execute(['title' => 'Main', 'identifier' => 'main', 'template' => 'empty', 'store_ids' => [0]])
-            ->getContent()[0]['text'] ?? '';
-        $payload = Cast::stringKeyed(json_decode(is_string($text) ? $text : '', true));
-        $nextStep = Cast::string($payload['next_step'] ?? '');
-
-        $this->assertStringContainsString('hyva_menu_publish (it also activates the menu)', $nextStep);
-        $this->assertStringNotContainsString('hyva_menu_update', $nextStep);
+        $text = $tool->execute(
+            $arguments + ['title' => 'Main', 'identifier' => 'main', 'template' => 'empty', 'store_ids' => [0]]
+        )->getContent()[0]['text'] ?? '';
+        return Cast::stringKeyed(json_decode(is_string($text) ? $text : '', true));
     }
 }
