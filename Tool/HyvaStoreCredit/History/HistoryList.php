@@ -12,6 +12,7 @@ use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ListPagination;
 use Magebit\McpHyvaCommerceTools\Model\Tool\StoreCredit\AbstractStoreCreditTool;
 
 class HistoryList extends AbstractStoreCreditTool
@@ -37,7 +38,8 @@ class HistoryList extends AbstractStoreCreditTool
         return 'List Hyvä store credit ledger entries, newest first: credits, debits, spends at checkout, refunds, '
             . 'with the balance after each, the reason, who made it (admin_user_id / source) and linked order or '
             . 'credit memo. Filter by customer (customer_id or email), website, event_type (ids from '
-            . 'hyva_store_credit.status) and created_at range.';
+            . 'hyva_store_credit_status) and created_at range. '
+            . ListPagination::DESCRIPTION_NOTE;
     }
 
     /**
@@ -51,8 +53,7 @@ class HistoryList extends AbstractStoreCreditTool
                 ->description('created_at from (Y-m-d or Y-m-d H:i:s, UTC).'))
             ->string('to', fn (StringBuilder $s) => $s->pattern(self::DATE_PATTERN)
                 ->description('created_at up to (Y-m-d or Y-m-d H:i:s, UTC).'))
-            ->integer('page', fn (IntegerBuilder $i) => $i->minimum(1))
-            ->integer('page_size', fn (IntegerBuilder $i) => $i->minimum(1)->maximum(200))
+            ->with(new ListPagination())
             ->toArray();
     }
 

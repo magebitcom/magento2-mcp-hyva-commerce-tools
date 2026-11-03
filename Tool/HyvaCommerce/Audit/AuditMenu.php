@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaCommerce\Audit;
 
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
@@ -47,8 +48,8 @@ class AuditMenu extends AbstractTool
     /**
      * Hyvä resource the tool is listed with.
      *
-     * Menu Builder's resources only exist while the module is enabled; without it the tool stays listed under
-     * Hyvä CMS access and answers that the feature is unavailable.
+     * Menu Builder's resources only exist while the module is enabled; without it the tool is hidden from
+     * tools/list (hyva_menu.status still answers available:false).
      *
      * @return string|null
      */
@@ -56,7 +57,7 @@ class AuditMenu extends AbstractTool
     {
         return $this->featureChecker->getStatus(FeatureCheckerInterface::MENU_BUILDER)['enabled']
             ? static::UNDERLYING_ACL_RESOURCE
-            : 'Hyva_Cms::cms';
+            : ContentAcl::UNAVAILABLE_RESOURCE;
     }
 
     /**

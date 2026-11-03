@@ -40,7 +40,7 @@ class TranslationStatus extends AbstractTranslationTool
         return 'Show how much of a Hyvä CMS page, block or menu is translated for each store view with its own '
             . 'language (Hyvä AI Translations settings), and which texts still miss a translation. Reads the working '
             . 'copy (draft if there is one). Translations are stored inside the content; '
-            . 'hyva_cms.translation.run fills the gaps.';
+            . 'hyva_cms_translation_run fills the gaps.';
     }
 
     /**
@@ -78,7 +78,7 @@ class TranslationStatus extends AbstractTranslationTool
         $notes = [];
         if (!$settings['enabled']) {
             $notes[] = 'AI translations are disabled (hyva_ai/hyva_cms_translations/enabled); '
-                . 'hyva_cms.translation.run will refuse until they are on.';
+                . 'hyva_cms_translation_run will refuse until they are on.';
         }
         if ($targets === []) {
             $notes[] = 'No store view has a target language different from the content language ('

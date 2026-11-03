@@ -69,7 +69,7 @@ class ItemAdd extends AbstractMenuEditTool
             )
             ->string('parent_uid', fn (StringBuilder $s) => $s
                 ->minLength(1)
-                ->description('Insert under this item/root uid (see hyva_menu.get structure).'))
+                ->description('Insert under this item/root uid (see hyva_menu_get structure).'))
             ->string('root', fn (StringBuilder $s) => $s
                 ->enum(array_keys(self::ROOT_FILTERS))
                 ->description('When no parent_uid: which root components get the item. Default all.'))

@@ -79,10 +79,11 @@ class MenuUpdate extends AbstractMenuTool
             . 'menu) need "confirm": true, otherwise nothing is written and the reply lists what would change. '
             . 'preview_url_key only sets the page the editor previews the menu on and needs no confirm. '
             . 'Structure '
-            . 'edits (operations, same as hyva_cms.draft.update: '
+            . 'edits (operations, same as hyva_cms_draft_update: '
             . 'add/remove/move/set_field/set_fields/replace_node/replace_text) are saved as a DRAFT; removing or '
             . 'replacing an item with children also needs "confirm": true (the reply lists those items). Prefer '
-            . 'hyva_menu.item.* for single items.';
+            . 'hyva_menu_item_* for single items. ' . sprintf(self::ADMIN_ONLY_DELETE_NOTE, 'menu') . ' Single '
+            . 'items can be removed with hyva_menu_item_remove.';
     }
 
     /**
@@ -135,7 +136,7 @@ class MenuUpdate extends AbstractMenuTool
         if ($operations !== []) {
             $document = $this->contentService->getWorkingDocument(ContentLocator::TYPE_MENU, $menuId);
             $applied = $this->draftEditor->apply($document, $operations);
-            $removed = array_map([$this->menuItemBuilder, 'describe'], $applied['dropped']);
+            $removed = array_map([$this->menuItemBuilder, 'describeForRemoval'], $applied['dropped']);
         }
         if (($live !== [] || $removed !== []) && !$this->boolArg($arguments, 'confirm')) {
             $action = $live === [] ? 'remove_menu_item_with_children'

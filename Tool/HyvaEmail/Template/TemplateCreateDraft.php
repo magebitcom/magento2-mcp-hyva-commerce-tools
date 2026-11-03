@@ -37,7 +37,7 @@ class TemplateCreateDraft extends AbstractEmailTool
     public function getDescription(): string
     {
         return 'Create the Hyvä CMS version of a core store email (order confirmation, invoice, shipment, credit '
-            . 'memo, customer account and newsletter emails; orig_code from hyva_email.audit.coverage), with '
+            . 'memo, customer account and newsletter emails; orig_code from hyva_email_audit_coverage), with '
             . 'Hyvä\'s ready-made design as draft and content. Store emails keep sending their current template '
             . 'until this one is assigned in configuration, so creating it changes nothing customers receive. '
             . 'Reuses the existing Hyvä version when there is one.';
@@ -70,7 +70,7 @@ class TemplateCreateDraft extends AbstractEmailTool
             'template' => $template,
             'live' => ($template['assigned_to'] ?? []) !== [],
             'preview' => $this->previewService->getPreview(self::TEMPLATE_TYPE, $created['template_id']),
-            'next_step' => 'Edit with hyva_email.template.update_draft, check hyva_email.template.preview, then '
+            'next_step' => 'Edit with hyva_email_template_update_draft, check hyva_email_template_preview, then '
                 . 'publish; assign it to the store email in configuration to make customers receive it.',
         ], ['id' => $created['template_id'], 'orig_code' => $origCode]);
     }

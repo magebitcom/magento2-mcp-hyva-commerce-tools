@@ -5,7 +5,7 @@
 - `Model/Auth/CallerContext` is the one adapter over the core's non-API caller classes; a public core API is proposed upstream.
 - `hyva_ai.*` is monitoring only and `hyva_admin_perm.*` read only, by design; no generation or permission writes through MCP.
 - Not covered on purpose (README "Not covered"): Image Editor, Admin Theme, Commerce Module, CMS Google Maps.
-- Tools with `entity_type` are listed for any Hyvä CMS role and refused per call (`-32004`): `tools/list` has no arguments to decide on.
+- Tools with `entity_type` are listed for a role holding their verbs on at least one content type (`ContentAcl::listingResource()`, the core takes one resource and no arguments) and refused per call (`-32004`) on a type the role lacks. The core sets its caller only when it dispatches a tool, so `Plugin/JsonRpc/BindCallerContextPlugin` binds it before `tools/list` and the `tools/call` ACL gate (frontend area, where `/mcp` runs).
 - Store scope: menus and forms are scoped by their store views although the Hyvä admin does not scope them; stricter on purpose.
 - Store scope: email/newsletter templates, linked groups and category positions have no store view; restricted roles read them, never write.
 - `hyva_media.trash.restore` has no confirm: it never overwrites (skips taken paths, as Hyvä's `TrashRepository` does).
@@ -14,3 +14,5 @@
 - Store scope: a product in no website stays visible to restricted roles; mirrors Hyvä CatalogProductEntityGuard.
 - Store scope: catalog usages are judged by product website / category tree, not the description's store view (the usage index has no store_id).
 - Media files, folders, trash and sync status are not store-scoped; the Hyvä Media Gallery has no website or store view scope.
+- Store scope: the MCP Activity widget shows a website-restricted admin only their own calls (the audit log has no store view); unrestricted admins keep the global view.
+- Menu Builder / Media Optimization off: their tools return the undeclared `ContentAcl::UNAVAILABLE_RESOURCE` as listing resource, so `tools/list` hides them (`bin/magento magebit:mcp:tools:validate-acl` lists them as not resolving, by design); status tools stay.

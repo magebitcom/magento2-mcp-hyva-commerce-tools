@@ -68,10 +68,10 @@ class MenuHealthCheckPrompt implements PromptInterface
                 <<<TXT
                 The store owner wants to know whether their navigation menus are healthy.
 
-                1. Call hyva_menu.status. If Menu Builder is not available, explain that in one sentence (use the
+                1. Call hyva_menu_status. If Menu Builder is not available, explain that in one sentence (use the
                    reason from the result) and stop.
-                2. Call hyva_menu.audit_all.
-                3. For every menu with errors, call hyva_menu.find_usage so you can say where shoppers see it (header,
+                2. Call hyva_menu_audit_all.
+                3. For every menu with errors, call hyva_menu_find_usage so you can say where shoppers see it (header,
                    footer, inside a page).
                 4. Report in plain language, most serious first: links that lead nowhere (deleted categories, products
                    or pages), disabled categories or products still linked, empty columns or promo blocks, menus that

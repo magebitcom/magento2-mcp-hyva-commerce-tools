@@ -68,9 +68,9 @@ class MediaAuditReportPrompt implements PromptInterface
                 <<<TXT
                 The store owner wants a short report on the images used on their storefront.
 
-                1. Call hyva_media.status, then hyva_media.optimization.config_validate (skip it if image optimisation
+                1. Call hyva_media_status, then hyva_media_optimization_config_validate (skip it if image optimisation
                    is not available, and say so).
-                2. Call hyva_media.audit_all.
+                2. Call hyva_media_audit_all.
                 3. Report in plain language:
                    - images that are too heavy (name, size, where they are used) and which of them are big hero or
                    banner images;
@@ -79,10 +79,10 @@ class MediaAuditReportPrompt implements PromptInterface
                    - images or files that are missing;
                    - whether modern formats (WebP/AVIF) and automatic image replacement are switched on.
                 4. Suggest the three changes with the biggest effect first. You may offer to add missing descriptions
-                   with hyva_media.image.update_alt (saved as drafts) or to swap an image with
-                   hyva_media.image.replace, but only after the owner agrees.
+                   with hyva_media_image_update_alt (saved as drafts) or to swap an image with
+                   hyva_media_image_replace, but only after the owner agrees.
 
-                Never call hyva_media.optimization.clear in this conversation.
+                Never call hyva_media_optimization_clear in this conversation.
                 TXT
             ),
         ];

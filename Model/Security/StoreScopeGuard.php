@@ -56,6 +56,20 @@ class StoreScopeGuard
     }
 
     /**
+     * Admin user id of the caller when a website / store view restriction applies to it, or null when unrestricted
+     *
+     * @return int|null
+     */
+    public function restrictedAdminUserId(): ?int
+    {
+        $adminUserId = $this->callerContext->adminUserId();
+        if ($adminUserId === null) {
+            return null;
+        }
+        return $this->adminScopeGuard->allowedScopes($adminUserId)['restricted'] ? $adminUserId : null;
+    }
+
+    /**
      * Store view ids a list may show entities of (the allowed ones plus 0), or null when unrestricted
      *
      * @return array|null

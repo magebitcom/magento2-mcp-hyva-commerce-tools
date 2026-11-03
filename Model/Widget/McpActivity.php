@@ -75,6 +75,14 @@ class McpActivity extends AbstractHealthWidget
             }
             return $result;
         };
+        $notice = (string) __(
+            'Approval workflows (hyva_mcp_approval_*) are not part of this release; every write still needs the '
+                . 'MCP write gate and client confirmation.'
+        );
+        if ($this->activityReader->viewerAdminUserId() !== null) {
+            $notice = (string) __('Your role is restricted to some websites, so only your own MCP calls are shown.')
+                . ' ' . $notice;
+        }
         return [
             'stats' => [
                 $this->stat(sprintf('Calls (%dh)', $hours), $totals['calls']),
@@ -118,10 +126,7 @@ class McpActivity extends AbstractHealthWidget
                     'empty' => (string) __('None.'),
                 ],
             ],
-            'notice' => (string) __(
-                'Approval workflows (hyva_mcp.approval.*) are not part of this release; every write still needs the '
-                    . 'MCP write gate and client confirmation.'
-            ),
+            'notice' => $notice,
             'links' => [
                 [
                     'label' => (string) __('Open MCP audit log'),

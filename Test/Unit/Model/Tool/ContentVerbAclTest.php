@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool;
 
 use Hyva\CmsLiveviewEditor\Model\Security\ContentTypeAuthorization;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
+use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Acl\VersionHistoryAcl;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Entity\AbstractEntityCreate;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Entity\AbstractEntityGet;
@@ -44,7 +45,7 @@ class ContentVerbAclTest extends TestCase
         $authorization->method('getResource')->willReturnCallback(
             static fn (string $type, string $verb): string => 'Hyva::' . $type . '_' . $verb
         );
-        $this->acl = new ContentAcl($authorization);
+        $this->acl = new ContentAcl($authorization, $this->createMock(CallerContext::class));
     }
 
     public function testDraftCreateFromAVersionNeedsVersionHistory(): void

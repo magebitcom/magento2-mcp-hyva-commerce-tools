@@ -64,7 +64,7 @@ class TransferExport extends AbstractContentTool
     {
         return 'Export the Hyvä CMS content of a page, block or menu (draft and/or published) as JSON in the Hyvä '
             . 'Import/Export format, with entity settings, link/category/product reference hints for another '
-            . 'environment and the media paths it needs. Feed the payload to hyva_cms.import.';
+            . 'environment and the media paths it needs. Feed the payload to hyva_cms_import.';
     }
 
     /**

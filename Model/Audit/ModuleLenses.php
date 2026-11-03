@@ -118,7 +118,7 @@ class ModuleLenses
             'inactive' => $inactive,
             'with_delivery_errors' => count($broken),
             'with_delivery_errors_sample' => array_slice($broken, 0, 10),
-            'details' => 'hyva_form.delivery.audit',
+            'details' => 'hyva_form_delivery_audit',
         ], 'forms_hidden_by_permissions', $hidden);
     }
 
@@ -147,7 +147,7 @@ class ModuleLenses
             'hyva_templates' => count(array_filter($templates, static fn (array $t): bool => $t['hyva_enabled'])),
             'live_in_config' => count($live),
             'not_assigned_to_any_email' => count($unassigned),
-            'details' => 'hyva_email.audit.coverage',
+            'details' => 'hyva_email_audit_coverage',
         ];
     }
 
@@ -166,7 +166,7 @@ class ModuleLenses
         return $this->scopeFilter->withHidden([
             'documents_checked' => $report['documents_checked'],
             'counts' => $report['counts'],
-            'details' => 'hyva_media.audit.literal_urls',
+            'details' => 'hyva_media_audit_literal_urls',
         ], 'documents_hidden_by_permissions', $report['documents_hidden_by_permissions'] ?? 0);
     }
 
@@ -187,7 +187,7 @@ class ModuleLenses
                 array_filter($websites, static fn (array $w): bool => $w['enabled']),
                 'code'
             )),
-            'details' => 'hyva_store_credit.status',
+            'details' => 'hyva_store_credit_status',
         ];
     }
 
@@ -203,7 +203,7 @@ class ModuleLenses
         }
         return [
             'groups' => $this->linkedGroups->getList(null, null, 1, 1)['total'],
-            'details' => 'hyva_linked.group.list',
+            'details' => 'hyva_linked_group_list',
         ];
     }
 }

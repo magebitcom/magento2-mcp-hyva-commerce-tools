@@ -16,6 +16,7 @@ use Magebit\Mcp\Model\Util\ResolverPipeline;
 use Magebit\McpHyvaCommerceTools\Api\ContentFieldResolverInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\VersionHistoryAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\IdentityResolver;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
 
@@ -26,6 +27,11 @@ abstract class AbstractEntityGet extends AbstractTool implements ContextualAclAw
 {
     public const ENTITY_TYPE = '';
     public const ENTITY_LABEL = '';
+
+    /**
+     * Keys of the identity group that fields also accepts on their own; they come back at the top level.
+     */
+    public const IDENTITY_FIELDS = ['type', 'id', 'identifier', 'title', 'is_active', 'store_ids', 'published_urls'];
 
     /**
      * @param ContentLocator $contentLocator
@@ -70,9 +76,12 @@ abstract class AbstractEntityGet extends AbstractTool implements ContextualAclAw
         }
         return sprintf(
             'Fetch one CMS %s with its Hyvä CMS content: status, outline, draft and published component trees, '
-                . 'preview URLs, recent versions and images. Response keys: %s. Use fields / exclude to narrow it.',
+                . 'preview URLs, recent versions and images. Response keys (groups): %s. Use fields / exclude to '
+                . 'narrow it: fields takes group names or the identity keys %s, which come back at the top level '
+                . '(e.g. fields ["id", "title", "store_ids"]).',
             strtolower(static::ENTITY_LABEL),
-            implode(', ', $keys)
+            implode(', ', $keys),
+            implode(', ', self::IDENTITY_FIELDS)
         );
     }
 
@@ -83,7 +92,9 @@ abstract class AbstractEntityGet extends AbstractTool implements ContextualAclAw
     {
         return Schema::object()
             ->with(EntityTarget::fixed())
-            ->array('fields', fn (ArrayBuilder $a) => $a->ofStrings()->description('Whitelist of response keys.'))
+            ->array('fields', fn (ArrayBuilder $a) => $a->ofStrings()->description(
+                'Response keys to return: group names or identity keys (id, identifier, title, store_ids, ...).'
+            ))
             ->array('exclude', fn (ArrayBuilder $a) => $a->ofStrings()->description('Response keys to drop.'))
             ->toArray();
     }
@@ -94,11 +105,34 @@ abstract class AbstractEntityGet extends AbstractTool implements ContextualAclAw
     protected function run(array $arguments): ToolResultInterface
     {
         $entity = $this->contentLocator->locate(static::ENTITY_TYPE, $arguments);
+        $groups = [];
+        foreach ($this->fieldResolvers as $resolver) {
+            $groups[] = $resolver->getKey();
+        }
+        $fields = $this->stringListArg($arguments, 'fields');
+        $flat = array_values(array_diff(array_intersect($fields, self::IDENTITY_FIELDS), $groups));
+        $unknown = array_values(array_diff($fields, $groups, self::IDENTITY_FIELDS));
+        if ($flat !== []) {
+            $arguments['fields'] = array_values(array_unique([...array_diff($fields, $flat), IdentityResolver::KEY]));
+        }
         $response = [];
         foreach ($this->pipeline->plan($this->fieldResolvers, $arguments) as $resolver) {
             if ($resolver instanceof ContentFieldResolverInterface) {
                 $response[$resolver->getKey()] = $resolver->resolve($entity, $arguments);
             }
+        }
+        if ($flat !== []) {
+            $identity = is_array($response[IdentityResolver::KEY] ?? null) ? $response[IdentityResolver::KEY] : [];
+            if (!in_array(IdentityResolver::KEY, $fields, true)) {
+                unset($response[IdentityResolver::KEY]);
+            }
+            foreach ($flat as $key) {
+                $response[$key] = $identity[$key] ?? null;
+            }
+        }
+        if ($unknown !== []) {
+            $response['unknown_fields'] = $unknown;
+            $response['available_fields'] = array_values(array_merge($groups, self::IDENTITY_FIELDS));
         }
         return $this->jsonResult($response, ['entity_type' => static::ENTITY_TYPE, 'id' => $entity['id']]);
     }

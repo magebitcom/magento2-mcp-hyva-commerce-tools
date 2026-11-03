@@ -49,7 +49,7 @@ class TrashRestore extends AbstractMediaGalleryTool
     {
         $schema = Schema::object()
             ->rawProperty('trash_ids', ['type' => 'array', 'items' => ['type' => 'integer', 'minimum' => 1],
-                'minItems' => 1, 'description' => 'Ids from hyva_media.trash.list.'])
+                'minItems' => 1, 'description' => 'Ids from hyva_media_trash_list.'])
             ->toArray();
         $schema['required'] = ['trash_ids'];
         return $schema;

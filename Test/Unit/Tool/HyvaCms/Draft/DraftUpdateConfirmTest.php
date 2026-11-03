@@ -14,6 +14,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuItemBuilder;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\ToolPayloadTrait;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Draft\DraftUpdate;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -49,6 +50,8 @@ class DraftUpdateConfirmTest extends TestCase
         $this->assertTrue($this->payloadAt($result, 'confirmation_required'));
         $this->assertSame('remove_menu_item_with_children', $this->payloadAt($result, 'action'));
         $this->assertSame('c1', $this->payloadAt($result, 'affected.0.children.0.uid'));
+        $this->assertSame(1, $this->payloadAt($result, 'affected.0.children_count'));
+        $this->assertSame(1, $this->payloadAt($result, 'total'));
     }
 
     public function testConfirmSavesTheMenuDraft(): void
@@ -92,6 +95,9 @@ class DraftUpdateConfirmTest extends TestCase
         $editor->method('apply')->willReturn(['document' => [], 'applied' => [], 'dropped' => [self::DROPPED]]);
         $builder = $this->createMock(MenuItemBuilder::class);
         $builder->method('describe')->willReturnArgument(0);
+        $builder->method('describeForRemoval')->willReturnCallback(
+            static fn (array $node): array => $node + ['children_count' => count(Cast::array($node['children'] ?? []))]
+        );
         return new DraftUpdate(
             $locator,
             $this->contentService,

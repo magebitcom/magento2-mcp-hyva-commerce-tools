@@ -9,9 +9,9 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Model\Tool\Email;
 
 use Magebit\Mcp\Api\ToolResultInterface;
-use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ListPagination;
 
 /**
  * List email or newsletter templates with their Hyvä CMS state.
@@ -25,7 +25,7 @@ abstract class AbstractTemplateList extends AbstractEmailTool
     {
         return sprintf(
             'List %ss (newest first): name, subject, whether Hyvä CMS designs them (hyva_enabled, draft, '
-            . 'published, preheader)%s.',
+            . 'published, preheader)%s. ' . ListPagination::DESCRIPTION_NOTE,
             static::LABEL,
             static::TEMPLATE_TYPE === 'email_template' ? ' and which store emails send them (assigned_to)' : ''
         );
@@ -38,8 +38,7 @@ abstract class AbstractTemplateList extends AbstractEmailTool
     {
         return Schema::object()
             ->string('search', fn (StringBuilder $s) => $s->description('Name or subject contains.'))
-            ->integer('page', fn (IntegerBuilder $i) => $i->minimum(1))
-            ->integer('page_size', fn (IntegerBuilder $i) => $i->minimum(1)->maximum(200))
+            ->with(new ListPagination())
             ->toArray();
     }
 

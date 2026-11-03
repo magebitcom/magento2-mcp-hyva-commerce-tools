@@ -61,7 +61,7 @@ class VersionRestore extends AbstractFormTool
      */
     public function getDescription(): string
     {
-        return 'Restore an older form version as the new DRAFT (nothing goes live until hyva_form.form.publish).';
+        return 'Restore an older form version as the new DRAFT (nothing goes live until hyva_form_form_publish).';
     }
 
     /**

@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Audit;
 
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\Mcp\Api\ToolRegistryInterface;
 use Magebit\Mcp\Model\Tool\WriteMode;
@@ -71,12 +72,28 @@ class McpActivityReader
      * @param ResourceConnection $resourceConnection
      * @param AuthorizationInterface $authorization
      * @param ToolRegistryInterface $toolRegistry
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         private readonly ResourceConnection $resourceConnection,
         private readonly AuthorizationInterface $authorization,
-        private readonly ToolRegistryInterface $toolRegistry
+        private readonly ToolRegistryInterface $toolRegistry,
+        private readonly StoreScopeGuard $storeScopeGuard
     ) {
+    }
+
+    /**
+     * Admin whose own calls are the only ones shown, or null for every admin's calls
+     *
+     * An admin restricted to some websites / store views (Advanced Admin Permissions, the same restriction the tools
+     * apply) sees only their own MCP calls: the audit log has no store scope, and other admins' calls may concern
+     * content outside the restriction. An unrestricted admin keeps the global view.
+     *
+     * @return int|null
+     */
+    public function viewerAdminUserId(): ?int
+    {
+        return $this->storeScopeGuard->restrictedAdminUserId();
     }
 
     /**
@@ -235,6 +252,10 @@ class McpActivityReader
             ->where('l.tool_name IS NOT NULL')
             ->order('l.id DESC')
             ->limit($limit);
+        $viewer = $this->viewerAdminUserId();
+        if ($viewer !== null) {
+            $select->where('l.admin_user_id = ?', $viewer);
+        }
         if (!empty($filters['since'])) {
             $select->where('l.created_at >= ?', $filters['since']);
         }
@@ -288,22 +309,25 @@ class McpActivityReader
             return $empty;
         }
         $writeTools = $this->getWriteTools();
-        $row = $connection->fetchRow(
-            $connection->select()
-                ->from($table, [
-                    'calls' => 'COUNT(*)',
-                    'errors' => "SUM(response_status <> 'ok')",
-                    'writes' => $writeTools === []
-                        ? 'SUM(0)'
-                        : $connection->quoteInto(
-                            'SUM(tool_name IN (?) AND ' . sprintf(self::NOT_DRY_RUN_SQL, 'result_summary_json') . ')',
-                            $writeTools
-                        ),
-                    'admins' => 'COUNT(DISTINCT admin_user_id)',
-                ])
-                ->where('method = ?', 'tools/call')
-                ->where('created_at >= ?', $since)
-        );
+        $select = $connection->select()
+            ->from($table, [
+                'calls' => 'COUNT(*)',
+                'errors' => "SUM(response_status <> 'ok')",
+                'writes' => $writeTools === []
+                    ? 'SUM(0)'
+                    : $connection->quoteInto(
+                        'SUM(tool_name IN (?) AND ' . sprintf(self::NOT_DRY_RUN_SQL, 'result_summary_json') . ')',
+                        $writeTools
+                    ),
+                'admins' => 'COUNT(DISTINCT admin_user_id)',
+            ])
+            ->where('method = ?', 'tools/call')
+            ->where('created_at >= ?', $since);
+        $viewer = $this->viewerAdminUserId();
+        if ($viewer !== null) {
+            $select->where('admin_user_id = ?', $viewer);
+        }
+        $row = $connection->fetchRow($select);
         $row = is_array($row) ? $row : [];
         return [
             'calls' => Cast::int($row['calls'] ?? 0),

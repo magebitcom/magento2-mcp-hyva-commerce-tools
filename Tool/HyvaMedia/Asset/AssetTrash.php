@@ -61,8 +61,9 @@ class AssetTrash extends AbstractMediaGalleryTool
      */
     public function getDescription(): string
     {
-        return 'Move assets to Hyvä\'s Trash (restorable with hyva_media.trash.restore during the retention period, '
-            . 'default 7 days; then purged by cron). Without confirm=true you get where each asset is used first; '
+        return 'Move assets to Hyvä\'s Trash (restorable with hyva_media_trash_restore during the retention period, '
+            . 'default 7 days; then purged by cron). Always needs "confirm": true: without it nothing changes and the '
+            . 'reply lists each asset with where it is used (affected), total and in_use; '
             . 'pages, blocks, menus, products and categories outside your role\'s websites/store views are left out '
             . '(usages_hidden_by_permissions) but still count in in_use. A restored asset may get a new id, so id '
             . 'references to it stop resolving.';
@@ -76,7 +77,8 @@ class AssetTrash extends AbstractMediaGalleryTool
         $schema = Schema::object()
             ->rawProperty('ids', ['type' => 'array', 'items' => ['type' => 'integer', 'minimum' => 1], 'minItems' => 1,
                 'maxItems' => 100])
-            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description('Trash after reviewing the preview.'))
+            ->boolean('confirm', fn (BooleanBuilder $b) => $b
+                ->description('Always required; call without it first to get the preview.'))
             ->toArray();
         $schema['required'] = ['ids'];
         return $schema;
@@ -106,11 +108,10 @@ class AssetTrash extends AbstractMediaGalleryTool
             );
         }
         if (!$this->boolArg($arguments, 'confirm')) {
-            return $this->confirmationRequired('trash_assets', [
-                'assets' => $affected,
+            return $this->confirmationRequired('trash_assets', $affected, array_filter([
                 'in_use' => $inUse,
                 'note' => $inUse > 0 ? 'Assets still in use show as broken images until replaced or restored.' : null,
-            ]);
+            ], static fn ($value): bool => $value !== null));
         }
         $trashed = $this->gallery->trash(array_column($assets, 'id'), $this->adminUserId());
         return $this->jsonResult(['trashed' => $trashed, 'in_use' => $inUse], ['trashed' => $trashed]);

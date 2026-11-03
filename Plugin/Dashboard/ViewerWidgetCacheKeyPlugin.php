@@ -35,6 +35,7 @@ class ViewerWidgetCacheKeyPlugin
         'magebit_campaign_calendar_widget',
         'magebit_migration_status_widget',
         'magebit_campaign_asset_readiness_widget',
+        'magebit_mcp_activity_widget',
     ];
 
     /**
@@ -76,6 +77,10 @@ class ViewerWidgetCacheKeyPlugin
         }
         if (!$this->activityReader->isAllowed()) {
             $viewer[] = 'no-audit-log';
+        }
+        $ownCallsOf = $this->activityReader->viewerAdminUserId();
+        if ($ownCallsOf !== null) {
+            $viewer[] = 'admin-' . $ownCallsOf;
         }
         if (!$this->featureChecker->isAvailable(FeatureCheckerInterface::MENU_BUILDER)) {
             $viewer[] = 'no-menu';

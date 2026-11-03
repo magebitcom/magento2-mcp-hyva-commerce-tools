@@ -32,6 +32,12 @@ abstract class AbstractTool implements ToolInterface, UnderlyingAclAwareInterfac
     public const IS_WRITE = false;
 
     /**
+     * Description note for content MCP cannot delete (%s = what, e.g. "CMS page"); agents must not substitute.
+     */
+    public const ADMIN_ONLY_DELETE_NOTE = 'Deleting a %s is not possible over MCP: it is admin-only (Magento admin). '
+        . 'When asked to delete one, tell the user so; do not deactivate, empty or unassign it instead.';
+
+    /**
      * @inheritDoc
      */
     public function getName(): string
@@ -179,24 +185,40 @@ abstract class AbstractTool implements ToolInterface, UnderlyingAclAwareInterfac
     /**
      * Preview returned by destructive tools when `confirm: true` is missing.
      *
+     * Same envelope for every tool: `affected` is always a list (one entry per item that would change, or a sample
+     * of them), `total` counts every item that would change (more than `affected` holds when it is a sample),
+     * `details` holds context that is not an affected item (only when there is any), and `hint` says what
+     * confirming does.
+     *
      * @param string $action
      * @param array $affected
+     * @param array $details
+     * @param int|null $total Default: count($affected)
+     * @param string $hint Added to the standard hint, e.g. what still needs to happen after confirming
      * @return ToolResultInterface
      * @throws LocalizedException
-     * @phpstan-param array<mixed> $affected
+     * @phpstan-param list<mixed> $affected
+     * @phpstan-param array<string, mixed> $details
      */
-    protected function confirmationRequired(string $action, array $affected): ToolResultInterface
-    {
-        return $this->jsonResult(
-            [
-                'dry_run' => true,
-                'confirmation_required' => true,
-                'action' => $action,
-                'affected' => $affected,
-                'hint' => 'Nothing was changed. Call again with "confirm": true to apply.',
-            ],
-            ['dry_run' => true, 'action' => $action]
-        );
+    protected function confirmationRequired(
+        string $action,
+        array $affected,
+        array $details = [],
+        ?int $total = null,
+        string $hint = ''
+    ): ToolResultInterface {
+        $payload = [
+            'dry_run' => true,
+            'confirmation_required' => true,
+            'action' => $action,
+            'affected' => $affected,
+            'total' => $total ?? count($affected),
+        ];
+        if ($details !== []) {
+            $payload['details'] = $details;
+        }
+        $payload['hint'] = trim('Nothing was changed. Call again with "confirm": true to apply. ' . $hint);
+        return $this->jsonResult($payload, ['dry_run' => true, 'action' => $action]);
     }
 
     /**

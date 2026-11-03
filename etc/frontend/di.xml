@@ -17,6 +17,16 @@
         <plugin name="magebit_mcp_hyva_commerce_admin_user_id"
                 type="Magebit\McpHyvaCommerceTools\Plugin\Authorization\McpAdminUserIdPlugin"/>
     </type>
+    <!-- The core knows the MCP caller only once it dispatches a tool; bind it before tools/list and the tools/call
+         ACL gate so ContentAcl::listingResource() checks the caller's role, not the static fallback. -->
+    <type name="Magebit\Mcp\Model\JsonRpc\Handler\ToolsListHandler">
+        <plugin name="magebit_mcp_hyva_commerce_bind_caller"
+                type="Magebit\McpHyvaCommerceTools\Plugin\JsonRpc\BindCallerContextPlugin"/>
+    </type>
+    <type name="Magebit\Mcp\Model\JsonRpc\Handler\ToolsCallHandler">
+        <plugin name="magebit_mcp_hyva_commerce_bind_caller"
+                type="Magebit\McpHyvaCommerceTools\Plugin\JsonRpc\BindCallerContextPlugin"/>
+    </type>
     <!-- Marks this module's tool calls only. The two plugins above act inside that scope, so core and sibling
          tools see Magento's authorization unchanged. -->
     <type name="Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool">

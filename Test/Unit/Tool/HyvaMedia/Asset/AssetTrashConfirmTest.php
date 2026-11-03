@@ -79,10 +79,10 @@ class AssetTrashConfirmTest extends TestCase
         $result = $this->tool->execute(['ids' => [1, 2, 3]]);
 
         $this->assertTrue($this->payloadAt($result, 'confirmation_required'));
-        $this->assertSame(2, $this->payloadAt($result, 'affected.in_use'));
-        $this->assertCount(1, $this->arrayAt($result, 'affected.assets.0.used_in.hyva_and_catalog'));
-        $this->assertSame([], $this->payloadAt($result, 'affected.assets.1.used_in.magento_tracked'));
-        $this->assertCount(1, $this->arrayAt($result, 'affected.assets.2.used_in.magento_tracked'));
+        $this->assertSame(2, $this->payloadAt($result, 'details.in_use'));
+        $this->assertCount(1, $this->arrayAt($result, 'affected.0.used_in.hyva_and_catalog'));
+        $this->assertSame([], $this->payloadAt($result, 'affected.1.used_in.magento_tracked'));
+        $this->assertCount(1, $this->arrayAt($result, 'affected.2.used_in.magento_tracked'));
     }
 
     /**

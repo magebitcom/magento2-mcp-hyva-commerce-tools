@@ -61,7 +61,7 @@ class FormPublish extends AbstractFormTool
      */
     public function getDescription(): string
     {
-        return 'Make the form LIVE: publish its current draft (or a version_id from hyva_form.version.list). '
+        return 'Make the form LIVE: publish its current draft (or a version_id from hyva_form_version_list). '
             . 'Hyvä also '
             . 'enables the form. Refused (status 422 with field_errors) when field names repeat, a pattern does not '
             . 'compile or a default is not an option; the same checks run here first.';

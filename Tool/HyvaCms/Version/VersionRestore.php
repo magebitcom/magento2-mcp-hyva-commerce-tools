@@ -53,7 +53,7 @@ class VersionRestore extends AbstractContentTool
     public function getDescription(): string
     {
         return 'Restore a version-history item (any version: published, pinned or draft) as a new DRAFT, the same way '
-            . 'the Liveview editor does. The live content is unchanged until hyva_cms.publish.';
+            . 'the Liveview editor does. The live content is unchanged until hyva_cms_publish.';
     }
 
     /**

@@ -98,7 +98,7 @@ abstract class AbstractEntityCreate extends AbstractTool implements ContextualAc
     {
         return sprintf(
             'Create a CMS %1$s with Hyvä CMS content saved as a DRAFT. The %1$s is inactive by default and nothing is '
-                . 'visible on the storefront until hyva_cms.publish. is_active=true puts the %1$s live at once and '
+                . 'visible on the storefront until hyva_cms_publish. is_active=true puts the %1$s live at once and '
                 . 'needs "confirm": true; without it nothing is created and the reply shows what would go live. Start '
                 . 'from components, or copy the current content of another page/block/menu (copy_from). Returns the '
                 . 'id, draft version and preview URLs.',
@@ -213,7 +213,7 @@ abstract class AbstractEntityCreate extends AbstractTool implements ContextualAc
             'draft' => $saved,
             'published' => false,
             'preview' => $this->previewService->getPreview(static::ENTITY_TYPE, $id),
-            'next_step' => 'Review the preview, then call hyva_cms.publish to make the content live'
+            'next_step' => 'Review the preview, then call hyva_cms_publish to make the content live'
                 . (empty($fields['is_active']) ? ' (and set is_active=true with the update tool).' : '.'),
         ], ['entity_type' => static::ENTITY_TYPE, 'id' => $id, 'components' => count($components)]);
     }

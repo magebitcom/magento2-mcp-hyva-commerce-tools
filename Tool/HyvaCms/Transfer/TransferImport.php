@@ -77,7 +77,7 @@ class TransferImport extends AbstractContentTool
      */
     public function getDescription(): string
     {
-        return 'Import Hyvä CMS content (the hyva_cms.export payload, or a bare content document) as a DRAFT into an '
+        return 'Import Hyvä CMS content (the hyva_cms_export payload, or a bare content document) as a DRAFT into an '
             . 'existing page/block/menu (entity_type + id/identifier) or a new page/block (create_new: true, uses '
             . 'payload.entity for title/identifier/stores). Content is validated first and references (categories, '
             . 'products, links) are resolved for this store. dry_run validates only. Never publishes.';
@@ -91,7 +91,7 @@ class TransferImport extends AbstractContentTool
         return Schema::object()
             ->rawProperty(
                 'payload',
-                ['type' => 'object', 'description' => 'hyva_cms.export output, or a document with "content".'],
+                ['type' => 'object', 'description' => 'hyva_cms_export output, or a document with "content".'],
                 true
             )
             ->with(EntityTarget::ofTypes(ContentLocator::TYPES))
@@ -157,7 +157,7 @@ class TransferImport extends AbstractContentTool
 
         if ($this->boolArg($arguments, 'create_new')) {
             if ($type === ContentLocator::TYPE_MENU) {
-                return $this->softError('Create the menu with hyva_menu.create first, then import into it.');
+                return $this->softError('Create the menu with hyva_menu_create first, then import into it.');
             }
             $fields = $this->entityFields(Cast::array($payload['entity'] ?? null));
             $this->storeScopeGuard->assertAssignable(

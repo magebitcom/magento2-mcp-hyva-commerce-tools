@@ -46,7 +46,7 @@ class AuditMedia extends AbstractTool
     {
         return 'Media health across storefront content: large images, missing alt text, broken references, '
             . 'unsupported formats, missing optimized variants and Media Optimization configuration gaps (same '
-            . 'checks as hyva_media.audit_all, summarised). Usages in pages, blocks, menus, products and categories '
+            . 'checks as hyva_media_audit_all, summarised). Usages in pages, blocks, menus, products and categories '
             . 'outside your role\'s websites/store views are not checked (usages_hidden_by_permissions).';
     }
 

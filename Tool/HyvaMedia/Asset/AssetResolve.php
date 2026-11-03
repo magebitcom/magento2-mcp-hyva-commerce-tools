@@ -91,7 +91,7 @@ class AssetResolve extends AbstractMediaGalleryTool
             $asset = $path !== null ? $this->gallery->getByPath($path) : null;
         }
         if ($asset === null) {
-            return $this->softError('No Media Gallery asset matches. Run hyva_media.sync.status if the file exists '
+            return $this->softError('No Media Gallery asset matches. Run hyva_media_sync_status if the file exists '
                 . 'but is not in the gallery yet.');
         }
         $scoped = $this->scopeFilter->filterAssetUsages([$asset['id'] => $this->usage($asset)]);

@@ -63,11 +63,11 @@ class AssetMove extends AbstractMediaGalleryTool
     public function getDescription(): string
     {
         return 'Move assets to another folder under wysiwyg/ (Hyvä\'s MediaMover; asset ids stay the same, files '
-            . 'whose '
-            . 'name exists in the target are skipped). Content that references an asset by id keeps working; '
-            . 'content that references the old path does not, so without confirm=true you get the affected usages '
-            . 'first. Pages, blocks, menus, products and categories outside your role\'s websites/store views are '
-            . 'left out of them and counted in usages_hidden_by_permissions.';
+            . 'whose name exists in the target are skipped). Content that references an asset by id keeps working; '
+            . 'content that references the old path does not, so a move always needs "confirm": true: without it '
+            . 'nothing changes and the reply lists each asset with its usages (affected) and total. Pages, '
+            . 'blocks, menus, products and categories outside your role\'s websites/store views are left out of '
+            . 'them and counted in usages_hidden_by_permissions.';
     }
 
     /**
@@ -79,7 +79,8 @@ class AssetMove extends AbstractMediaGalleryTool
             ->rawProperty('ids', ['type' => 'array', 'items' => ['type' => 'integer', 'minimum' => 1], 'minItems' => 1,
                 'maxItems' => 100])
             ->string('target_folder', fn (StringBuilder $s) => $s->minLength(1)->description('e.g. wysiwyg/campaigns.'))
-            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description('Move after reviewing the preview.'))
+            ->boolean('confirm', fn (BooleanBuilder $b) => $b
+                ->description('Always required; call without it first to get the preview.'))
             ->toArray();
         $schema['required'] = ['ids', 'target_folder'];
         return $schema;
@@ -109,11 +110,10 @@ class AssetMove extends AbstractMediaGalleryTool
                     $scoped['hidden'][$asset['id']]
                 );
             }
-            return $this->confirmationRequired('move_assets', [
+            return $this->confirmationRequired('move_assets', $affected, [
                 'target_folder' => $target,
-                'assets' => $affected,
                 'note' => 'Usages by literal path break after the move; those by asset id keep working '
-                    . '(hyva_media.audit.literal_urls lists the literal ones).',
+                    . '(hyva_media_audit_literal_urls lists the literal ones).',
             ]);
         }
         $result = $this->gallery->move(array_column($assets, 'id'), $target);

@@ -31,7 +31,7 @@ class BalanceGet extends AbstractStoreCreditTool
     public function getDescription(): string
     {
         return 'Read a customer\'s Hyvä store credit balance (by customer_id or email). With website_id: that '
-            . 'website only; without it: every website your role may see. Use hyva_store_credit.history.list for '
+            . 'website only; without it: every website your role may see. Use hyva_store_credit_history_list for '
             . 'how the balance came about.';
     }
 

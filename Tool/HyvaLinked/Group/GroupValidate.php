@@ -33,7 +33,7 @@ class GroupValidate extends AbstractLinkedTool
         return 'Check a new or changed Hyvä Linked Products group without saving: errors Hyvä would refuse '
             . '(fewer than 2 products, unknown SKUs, products already in another group, attributes that cannot '
             . 'link, duplicate name) and storefront warnings (members not shown, members shoppers cannot tell '
-            . 'apart). Same inputs as hyva_linked.group.save.';
+            . 'apart). Same inputs as hyva_linked_group_save.';
     }
 
     /**

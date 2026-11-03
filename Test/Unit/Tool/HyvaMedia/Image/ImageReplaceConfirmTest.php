@@ -14,6 +14,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageContentEditor;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageReplace;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -52,6 +53,11 @@ class ImageReplaceConfirmTest extends TestCase
         ]));
 
         $this->assertTrue($payload['confirmation_required'] ?? null);
+        $this->assertSame(self::TARGETS, $payload['affected'] ?? null);
+        $this->assertSame(count(self::TARGETS), $payload['total'] ?? null);
+        $this->assertSame([], Cast::array($payload['details'] ?? [])['not_editable_usages'] ?? null);
+        $this->assertStringContainsString('DRAFT', Cast::string($payload['hint'] ?? ''));
+        $this->assertStringContainsString('hyva_cms_publish', Cast::string($payload['hint'] ?? ''));
     }
 
     public function testConfirmRewritesEveryDraft(): void

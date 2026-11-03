@@ -100,7 +100,7 @@ abstract class AbstractLinkedTool extends AbstractTool
                 ->description('Group name (unique). Required for a new group.'))
             ->array('attribute_codes', fn (ArrayBuilder $a) => $a->ofStrings()->maxItems(10)
                 ->description('Link attributes the switcher shows (user-defined dropdowns such as color, size; '
-                    . 'listed in linkable_attributes of hyva_linked.group.list). Default: unchanged.'))
+                    . 'listed in linkable_attributes of hyva_linked_group_list). Default: unchanged.'))
             ->array('skus', $skuList('Complete member list. Default: the current members.'))
             ->array('add_skus', $skuList('Members to add to the current ones.'))
             ->array('remove_skus', $skuList('Members to remove from the current ones.'));

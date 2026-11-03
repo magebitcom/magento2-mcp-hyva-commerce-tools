@@ -89,6 +89,7 @@ class FeatureCheckerTest extends TestCase
         $this->assertFalse($response['available']);
         $this->assertSame('menu_builder', $response['feature']);
         $this->assertStringContainsString('not installed', $response['reason']);
+        $this->assertNull($checker->getStatus('menu_builder')['acl_allowed']);
     }
 
     public function testInstalledButDisabledNamesTheModule(): void
@@ -100,6 +101,7 @@ class FeatureCheckerTest extends TestCase
         $response = $this->checker()->getUnavailableResponse('menu_builder');
         $this->assertStringContainsString('disabled (Hyva_MenuBuilder)', $response['reason']);
         $this->assertStringContainsString('module:enable Hyva_MenuBuilder', $response['hint']);
+        $this->assertNull($this->checker()->getStatus('menu_builder')['acl_allowed']);
     }
 
     public function testAclDenied(): void

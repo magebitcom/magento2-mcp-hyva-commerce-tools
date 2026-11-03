@@ -34,6 +34,12 @@ class StoreScopeGuardTest extends TestCase
         $guard->assertUnrestricted('Email templates');
     }
 
+    public function testRestrictedAdminUserIdNamesOnlyARestrictedCaller(): void
+    {
+        $this->assertNull($this->storeScope(null)->restrictedAdminUserId());
+        $this->assertSame(7, $this->storeScope([2])->restrictedAdminUserId());
+    }
+
     public function testWithoutTheScopeModuleOrAnMcpAdminNothingIsRestricted(): void
     {
         $gateway = $this->createMock(AdminScopeGatewayInterface::class);

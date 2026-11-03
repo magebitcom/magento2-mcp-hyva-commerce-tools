@@ -43,7 +43,7 @@ class CategoryImport extends AbstractMenuEditTool
         return 'Import the category tree under root_category_id into the menu DRAFT as editable items (nested or '
             . 'flat) or as one dynamic category-tree component. Categories already linked in the menu are skipped; '
             . 'inactive and "not in menu" categories are left out unless included. dry_run (or '
-            . 'hyva_menu.category.sync_preview) shows what would be created, skipped and flagged without saving. '
+            . 'hyva_menu_category_sync_preview) shows what would be created, skipped and flagged without saving. '
             . 'Never publishes.';
     }
 

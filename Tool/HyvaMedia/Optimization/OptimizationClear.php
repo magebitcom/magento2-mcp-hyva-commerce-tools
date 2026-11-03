@@ -28,6 +28,11 @@ class OptimizationClear extends AbstractOptimizationTool
     public const IS_WRITE = true;
 
     /**
+     * Paths of generated files the all_images preview lists.
+     */
+    private const SAMPLE_SIZE = 10;
+
+    /**
      * @param FeatureCheckerInterface $featureChecker
      * @param MediaOptimizationGatewayInterface $gateway
      * @param ImageContentEditor $editor
@@ -54,9 +59,9 @@ class OptimizationClear extends AbstractOptimizationTool
     public function getDescription(): string
     {
         return 'Delete generated (resized/converted) variants of one image path so they regenerate on the next '
-            . 'request; mode all, resized or converted. all_images=true clears every generated image in the store '
-            . 'and needs "confirm": true (without it, returns how many files would be removed). Original images are '
-            . 'never touched.';
+            . 'request; mode all, resized or converted. One path needs no confirm. all_images=true clears every '
+            . 'generated image in the store and needs "confirm": true: without it nothing changes and the reply '
+            . 'gives the total number of files and sample paths. Original images are never touched.';
     }
 
     /**
@@ -73,7 +78,7 @@ class OptimizationClear extends AbstractOptimizationTool
                 ->description('Default all.'))
             ->boolean('all_images', fn (BooleanBuilder $b) => $b
                 ->description('Clear generated variants of every image.'))
-            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description('Required with all_images=true.'))
+            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description('Required only with all_images=true.'))
             ->toArray();
     }
 
@@ -85,9 +90,21 @@ class OptimizationClear extends AbstractOptimizationTool
         $mode = $this->stringArg($arguments, 'mode', 'all') ?? 'all';
         if ($this->boolArg($arguments, 'all_images')) {
             if (!$this->boolArg($arguments, 'confirm')) {
+                $counts = $this->gateway->countAllGenerated(self::SAMPLE_SIZE);
+                $resized = $mode !== 'converted';
+                $converted = $mode !== 'resized';
+                $sample = array_merge(
+                    $resized ? $counts['sample']['resized'] : [],
+                    $converted ? $counts['sample']['converted'] : []
+                );
+                $total = ($resized ? $counts['resized'] : 0) + ($converted ? $counts['converted'] : 0);
                 return $this->confirmationRequired(
                     'clear_all_optimized_images',
-                    [$this->gateway->countAllGenerated() + ['mode' => $mode]]
+                    array_slice($sample, 0, self::SAMPLE_SIZE),
+                    ['mode' => $mode, 'resized' => $counts['resized'], 'converted' => $counts['converted']],
+                    $total,
+                    '"affected" lists sample paths of the generated files that would be removed; "total" counts '
+                        . 'them all. Original images are never touched.'
                 );
             }
             $removed = $this->gateway->clearAll($mode);

@@ -13,6 +13,7 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuItemBuilder;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
@@ -109,6 +110,7 @@ class MenuUpdateConfirmTest extends TestCase
         $this->assertTrue($payload['confirmation_required'] ?? null);
         $this->assertSame('remove_menu_item_with_children', $payload['action'] ?? null);
         $this->assertSame('c1', $payload['affected'][0]['children'][0]['uid'] ?? null);
+        $this->assertSame(1, $payload['affected'][0]['children_count'] ?? null);
     }
 
     public function testConfirmSavesARemovalOfAnItemWithChildren(): void
@@ -145,6 +147,9 @@ class MenuUpdateConfirmTest extends TestCase
         $editor->method('apply')->willReturn(['document' => [], 'applied' => [], 'dropped' => $dropped]);
         $builder = $this->createMock(MenuItemBuilder::class);
         $builder->method('describe')->willReturnArgument(0);
+        $builder->method('describeForRemoval')->willReturnCallback(
+            static fn (array $node): array => $node + ['children_count' => count(Cast::array($node['children'] ?? []))]
+        );
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn(true);
         $menus = $this->createMock(MenuService::class);

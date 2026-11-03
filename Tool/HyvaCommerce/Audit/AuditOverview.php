@@ -140,7 +140,8 @@ class AuditOverview extends AbstractTool
                     if (str_starts_with($name, $prefix)) {
                         $available = (bool) ($features[$feature]['available'] ?? false);
                         $tools[$feature]['available'] = $available;
-                        $tools[$feature]['tools'][] = $name;
+                        // Wire name, the one an agent calls (the registry keeps the dotted canonical name).
+                        $tools[$feature]['tools'][] = str_replace('.', '_', $name);
                     }
                 }
             }

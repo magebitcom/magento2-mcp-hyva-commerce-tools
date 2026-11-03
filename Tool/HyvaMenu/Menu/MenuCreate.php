@@ -83,9 +83,11 @@ class MenuCreate extends AbstractMenuTool
      */
     public function getDescription(): string
     {
-        return 'Create a menu with its first content saved as a DRAFT (nothing renders until hyva_cms.publish with '
-            . 'entity_type=menu). template picks the root components: header (mega menu columns + mobile), drilldown '
-            . '(drilldown + mobile), mobile, footer (footer columns) or empty. items are added to every root '
+        return 'Create a menu with its first content saved as a DRAFT (nothing renders until hyva_menu_publish). '
+            . 'The menu is inactive unless is_active=true; an inactive menu stays hidden after publishing until '
+            . 'hyva_menu_update {"settings": {"is_active": true}, "confirm": true}. template picks the root '
+            . 'components: header (mega menu columns + mobile), drilldown (drilldown + mobile), mobile, footer '
+            . '(footer columns) or empty. items are added to every root '
             . '({label, type: category|product|cms_page|custom_url|text|category_tree|content, value, children}).';
     }
 
@@ -166,8 +168,12 @@ class MenuCreate extends AbstractMenuTool
             'structure' => $this->menuService->describe($document),
             'published' => false,
             'preview' => $this->previewService->getPreview(ContentLocator::TYPE_MENU, $menuId),
-            'next_step' => 'Publish with hyva_cms.publish (entity_type=menu) and assign it in design config '
-                . '(header/footer) to show it.',
+            'next_step' => 'Publish with hyva_menu_publish'
+                . ($this->boolArg($arguments, 'is_active')
+                    ? ''
+                    : ', activate the menu (it is inactive) with hyva_menu_update '
+                        . '{"settings": {"is_active": true}, "confirm": true}')
+                . ' and assign it in design config (header/footer) to show it.',
         ], ['id' => $menuId, 'roots' => count($roots)]);
     }
 }

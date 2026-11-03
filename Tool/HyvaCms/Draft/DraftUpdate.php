@@ -67,7 +67,7 @@ class DraftUpdate extends AbstractContentTool
             . 'draft). Operations run in order and are all-or-nothing; the result is validated before saving. Use '
             . 'dry_run to see the outline and validation without saving. On a menu, removing or replacing an item '
             . 'with children needs "confirm": true; without it the affected items are listed and nothing is saved. '
-            . 'Never publishes. Get uids from hyva_cms.page.get (outline).';
+            . 'Never publishes. Get uids from hyva_cms_page_get (outline).';
     }
 
     /**
@@ -103,7 +103,7 @@ class DraftUpdate extends AbstractContentTool
         $applied = $this->draftEditor->apply($document, $this->arrayArg($arguments, 'operations'));
 
         $removed = $entity['type'] === ContentLocator::TYPE_MENU
-            ? array_map([$this->menuItemBuilder, 'describe'], $applied['dropped'])
+            ? array_map([$this->menuItemBuilder, 'describeForRemoval'], $applied['dropped'])
             : [];
 
         if ($this->boolArg($arguments, 'dry_run')) {

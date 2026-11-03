@@ -12,6 +12,7 @@ use Magebit\Mcp\Api\ToolInterface;
 use Magebit\Mcp\Api\ToolRegistryInterface;
 use Magebit\Mcp\Model\Tool\WriteMode;
 use Magebit\McpHyvaCommerceTools\Model\Audit\McpActivityReader;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\AuthorizationInterface;
 use Magento\Framework\DB\Adapter\AdapterInterface;
@@ -243,12 +244,64 @@ class McpActivityReaderTest extends TestCase
     }
 
     /**
+     * @return array<string, array{0: int|null, 1: list<string>}>
+     */
+    public static function viewerProvider(): array
+    {
+        return [
+            'unrestricted admin sees every call' => [null, []],
+            'restricted admin sees only own calls' => [7, ['l.admin_user_id = ?', 'admin_user_id = ?']],
+        ];
+    }
+
+    /**
+     * @dataProvider viewerProvider
+     * @param int|null $viewer
+     * @param list<string> $expected
+     */
+    public function testARestrictedViewerOnlySeesOwnCalls(?int $viewer, array $expected): void
+    {
+        $connection = $this->createMock(AdapterInterface::class);
+        $connection->method('isTableExists')->willReturn(true);
+        $byAdmin = [];
+        $select = $this->createMock(Select::class);
+        $select->method('from')->willReturnSelf();
+        $select->method('joinLeft')->willReturnSelf();
+        $select->method('order')->willReturnSelf();
+        $select->method('limit')->willReturnSelf();
+        $select->method('where')->willReturnCallback(
+            function (string $condition, mixed $value = null) use (&$byAdmin, $select): Select {
+                if (str_contains($condition, 'admin_user_id')) {
+                    $byAdmin[] = $condition;
+                    $this->assertSame(7, $value);
+                }
+                return $select;
+            }
+        );
+        $connection->method('select')->willReturn($select);
+        $connection->method('quoteInto')->willReturnArgument(0);
+        $connection->method('fetchAll')->willReturn([]);
+        $connection->method('fetchRow')->willReturn([]);
+        $reader = $this->reader(['hyva_menu.update' => true], $connection, $viewer);
+
+        $reader->getRows([], 5);
+        $reader->getTotals('2026-01-01 00:00:00');
+
+        $this->assertSame($expected, $byAdmin);
+        $this->assertSame($viewer, $reader->viewerAdminUserId());
+    }
+
+    /**
      * @param array<string, bool> $tools name => is write
      * @param AdapterInterface $connection
+     * @param int|null $restrictedAdminUserId
      * @return McpActivityReader
      */
-    private function reader(array $tools, AdapterInterface $connection): McpActivityReader
-    {
+    private function reader(
+        array $tools,
+        AdapterInterface $connection,
+        ?int $restrictedAdminUserId = null
+    ): McpActivityReader {
         $registered = [];
         foreach ($tools as $name => $isWrite) {
             $tool = $this->createMock(ToolInterface::class);
@@ -263,7 +316,9 @@ class McpActivityReaderTest extends TestCase
         $resource->method('getTableName')->willReturnArgument(0);
         $authorization = $this->createMock(AuthorizationInterface::class);
         $authorization->method('isAllowed')->willReturn(true);
-        return new McpActivityReader($resource, $authorization, $registry);
+        $scopeGuard = $this->createMock(StoreScopeGuard::class);
+        $scopeGuard->method('restrictedAdminUserId')->willReturn($restrictedAdminUserId);
+        return new McpActivityReader($resource, $authorization, $registry, $scopeGuard);
     }
 
     /**

@@ -93,6 +93,16 @@ class HealthWidgetScopeTest extends TestCase
         $this->assertNull($include);
     }
 
+    public function testMigrationStatusLabelsSayWhichCountsIncludeBlocks(): void
+    {
+        $include = null;
+        $data = $this->migrationStatus(null, $include)->getDisplayData($this->ctx(), $this->instance());
+        $labels = array_column($this->list($data, 'stats'), 'label');
+        $this->assertSame('CMS pages', $labels[0]);
+        $this->assertContains('Page Builder pages + blocks', $labels);
+        $this->assertContains('WYSIWYG pages + blocks', $labels);
+    }
+
     public function testCampaignCalendarListsOnlyTheAdminsScheduledContent(): void
     {
         $data = $this->campaignCalendar([1])->getDisplayData($this->ctx(), $this->instance());

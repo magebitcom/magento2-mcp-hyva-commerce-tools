@@ -26,6 +26,15 @@ class Publish extends AbstractContentTool
     public const TOOL_NAME = 'hyva_cms.publish';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_cms_publish';
     public const IS_WRITE = true;
+    /**
+     * Tool that sets the active flag of each content type (wire names).
+     */
+    private const UPDATE_TOOLS = [
+        ContentLocator::TYPE_PAGE => 'hyva_cms_page_update',
+        ContentLocator::TYPE_BLOCK => 'hyva_cms_block_update',
+        ContentLocator::TYPE_MENU => 'hyva_menu_update',
+    ];
+
     public const CONTENT_VERBS = [ContentAcl::VERB_PUBLISH];
 
     /**
@@ -99,7 +108,9 @@ class Publish extends AbstractContentTool
             'components_after' => $after !== null ? $this->componentTree->countComponents($after) : [],
             'note' => $entity['is_active']
                 ? null
-                : 'The Magento entity is inactive, so the content is not visible yet.',
+                : 'The Magento entity is inactive, so the content is not visible yet. Activate it with '
+                    . (self::UPDATE_TOOLS[$entity['type']] ?? 'its update tool')
+                    . ' {"settings": {"is_active": true}, "confirm": true}.',
         ], ['entity_type' => $entity['type'], 'id' => $entity['id'], 'source' => $result['source']]);
     }
 

@@ -42,7 +42,9 @@ class ItemUpdate extends AbstractMenuEditTool
     {
         return 'Change one menu item in the DRAFT: label, link target (type + value), open in new tab, text-only '
             . 'heading, highlight style (background_color, text_color, font_weight), or move it (parent_uid / '
-            . 'position). The category name in the catalog is not changed. Never publishes.';
+            . 'position). The category name in the catalog is not changed. Never publishes. Changes one uid only: '
+            . 'header and drilldown menus keep a separate desktop and mobile copy of each item (different uids, '
+            . 'listed by hyva_menu_get), so update both or the other one keeps the old value.';
     }
 
     /**
@@ -88,7 +90,7 @@ class ItemUpdate extends AbstractMenuEditTool
         if ($linkArguments !== []) {
             return $this->softError(sprintf(
                 'Item "%s" is a %s, which only has a label, so %s cannot be set. Change a link inside it'
-                . ' (hyva_menu.get lists the children) or add one with hyva_menu.item.add and parent_uid "%s".',
+                . ' (hyva_menu_get lists the children) or add one with hyva_menu_item_add and parent_uid "%s".',
                 $uid,
                 $component,
                 implode(', ', $linkArguments),

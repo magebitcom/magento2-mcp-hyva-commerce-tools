@@ -12,6 +12,7 @@ use Hyva\AdminDashboardApi\Api\V1\WidgetContextInterface;
 use Hyva\AdminDashboardFramework\Api\V1\WidgetInstance\WidgetInstanceInterface;
 use Magebit\Mcp\Api\ToolRegistryInterface;
 use Magebit\McpHyvaCommerceTools\Model\Audit\McpActivityReader;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Widget\McpActivity;
 use Magento\Backend\Model\UrlInterface;
 use Magento\Framework\App\ResourceConnection;
@@ -55,7 +56,8 @@ class McpActivityAclTest extends TestCase
         $reader = new McpActivityReader(
             $connection,
             $this->authorization(false),
-            $this->createMock(ToolRegistryInterface::class)
+            $this->createMock(ToolRegistryInterface::class),
+            $this->createMock(StoreScopeGuard::class)
         );
 
         $this->assertSame([], $reader->getRows(['tool_prefix' => 'hyva_media.'], 5));
@@ -100,7 +102,8 @@ class McpActivityAclTest extends TestCase
         return new McpActivityReader(
             $this->createMock(ResourceConnection::class),
             $this->authorization($audit),
-            $this->createMock(ToolRegistryInterface::class)
+            $this->createMock(ToolRegistryInterface::class),
+            $this->createMock(StoreScopeGuard::class)
         );
     }
 

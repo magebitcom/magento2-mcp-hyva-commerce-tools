@@ -13,6 +13,7 @@ use Hyva\CmsConnect\Exception\UnprocessableContentException;
 use Hyva\CmsLiveviewEditor\Model\Security\ContentTypeAuthorization;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
+use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractContentTool;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Component\ComponentValidate;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageReplace;
@@ -34,7 +35,7 @@ class AbstractContentToolTest extends TestCase
         $authorization->method('getResource')->willReturnCallback(
             static fn (string $type, string $verb): string => 'Hyva::' . $type . '_' . $verb
         );
-        $this->acl = new ContentAcl($authorization);
+        $this->acl = new ContentAcl($authorization, $this->createMock(CallerContext::class));
     }
 
     public function testResourcesFollowTheEntityTypeArgument(): void

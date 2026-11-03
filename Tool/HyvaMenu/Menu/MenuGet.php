@@ -77,7 +77,7 @@ class MenuGet extends AbstractMenuTool implements ContextualAclAwareInterface
             $keys[] = $resolver->getKey();
         }
         return 'Return a menu: settings and store views, header/footer placement, nested item structure (uids for '
-            . 'hyva_menu.item.*), every link with its category/product/CMS page target and state, preview URLs, '
+            . 'hyva_menu_item_*), every link with its category/product/CMS page target and state, preview URLs, '
             . 'versions and usage. Response keys: ' . implode(', ', $keys) . '. Use fields / exclude to narrow it.';
     }
 

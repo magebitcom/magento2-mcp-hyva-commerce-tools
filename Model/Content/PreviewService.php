@@ -12,11 +12,14 @@ use Hyva\CmsLiveviewEditor\Model\Provider as ContentProvider;
 use Magento\Backend\Model\UrlInterface as BackendUrl;
 use Magebit\Mcp\Api\LoggerInterface;
 use Throwable;
+use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
 /**
  * Signed storefront preview URLs (Hyvä GetPreviewQuery, valid ~7 days, tied to the current draft uid)
  * and the admin Liveview editor URL.
+ *
+ * Store rows are limited to the store views a website / store view restricted caller may see.
  */
 class PreviewService
 {
@@ -24,11 +27,13 @@ class PreviewService
      * @param ContentProvider $contentProvider
      * @param BackendUrl $backendUrl
      * @param LoggerInterface $logger
+     * @param StoreScopeGuard $storeScopeGuard
      */
     public function __construct(
         private readonly ContentProvider $contentProvider,
         private readonly BackendUrl $backendUrl,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly StoreScopeGuard $storeScopeGuard
     ) {
     }
 
@@ -41,7 +46,7 @@ class PreviewService
      * @param int|null $versionId Preview a version-history item instead of the draft.
      * @return array
      * @phpstan-return array{admin_editor_url: string, stores: list<array<string, mixed>>, error: string|null,
-     *     note: string}
+     *     note: string, stores_hidden_by_permissions?: int}
      */
     public function getPreview(string $type, int $id, ?int $storeId = null, ?int $versionId = null): array
     {
@@ -61,11 +66,17 @@ class PreviewService
             $data = [];
             $error = $e->getMessage();
         }
+        $visible = $this->storeScopeGuard->restrictedStoreIds();
+        $hidden = 0;
         foreach ($data as $store) {
             if (!is_array($store)) {
                 continue;
             }
             if ($storeId !== null && Cast::int($store['store_id'] ?? -1) !== $storeId) {
+                continue;
+            }
+            if ($visible !== null && !in_array(Cast::int($store['store_id'] ?? -1), $visible, true)) {
+                $hidden++;
                 continue;
             }
             $stores[] = [
@@ -77,7 +88,7 @@ class PreviewService
             ];
         }
 
-        return [
+        $preview = [
             'admin_editor_url' => $this->backendUrl->getUrl(
                 'liveview/editor/index',
                 ['type' => $type, 'id' => $id, '_nosecret' => true]
@@ -89,6 +100,10 @@ class PreviewService
                 . 'before Hyvä CMS 1.3 no longer work. published_url is the live address as Hyvä CMS reports it '
                 . '(null when the entity has no live URL in that store).',
         ];
+        if ($hidden > 0) {
+            $preview['stores_hidden_by_permissions'] = $hidden;
+        }
+        return $preview;
     }
 
     /**
@@ -110,9 +125,15 @@ class PreviewService
             );
             return [];
         }
+        $visible = $this->storeScopeGuard->restrictedStoreIds();
         $urls = [];
         foreach ($data as $store) {
-            if (is_array($store) && is_string($store['published_url'] ?? null) && $store['published_url'] !== '') {
+            if (!is_array($store)
+                || ($visible !== null && !in_array(Cast::int($store['store_id'] ?? -1), $visible, true))
+            ) {
+                continue;
+            }
+            if (is_string($store['published_url'] ?? null) && $store['published_url'] !== '') {
                 $urls[] = [
                     'store_id' => Cast::int($store['store_id'] ?? 0),
                     'code' => is_string($store['code'] ?? null) ? $store['code'] : null,

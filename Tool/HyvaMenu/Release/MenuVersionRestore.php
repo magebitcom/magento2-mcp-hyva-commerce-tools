@@ -33,7 +33,7 @@ class MenuVersionRestore extends VersionRestore
      */
     public function getDescription(): string
     {
-        return 'Restore an older menu version as the new DRAFT (nothing goes live until hyva_menu.publish).';
+        return 'Restore an older menu version as the new DRAFT (nothing goes live until hyva_menu_publish).';
     }
 
     /**
