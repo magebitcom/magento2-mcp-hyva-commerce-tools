@@ -76,6 +76,6 @@ class AuditMenu extends AbstractMediaTool
             $this->intArg($arguments, 'max_kb', 500) ?? 500,
             $this->intArg($arguments, 'limit', 100) ?? 100
         );
-        return $this->jsonResult($report, ['images_checked' => $report['images_checked']] + $report['counts']);
+        return $this->jsonResult($report, ['images_checked' => $report['images_checked']] + (array) $report['counts']);
     }
 }

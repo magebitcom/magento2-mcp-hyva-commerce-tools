@@ -190,7 +190,9 @@ class HealthWidgetScopeTest extends TestCase
      */
     private function mediaHealth(bool $auditAllowed, ?int $hiddenUsages = null): MediaHealth
     {
-        $report = ['scope' => 'all', 'images_checked' => 0, 'counts' => [], 'config_issues' => [], 'images' => []];
+        // No image problems: counts is the empty object MediaAuditor returns (T-115).
+        $report = ['scope' => 'all', 'images_checked' => 0, 'counts' => new \stdClass(), 'config_issues' => [],
+            'images' => []];
         if ($hiddenUsages !== null) {
             $report['usages_hidden_by_permissions'] = $hiddenUsages;
         }

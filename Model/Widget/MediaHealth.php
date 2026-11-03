@@ -60,7 +60,7 @@ class MediaHealth extends AbstractHealthWidget
             $this->intProperty($widgetInstance, 'max_kb', 500),
             $this->intProperty($widgetInstance, 'row_count', 6)
         );
-        $counts = $report['counts'];
+        $counts = (array) $report['counts'];
         $settings = $this->mediaService->getSettings();
         $engines = $this->engineInfo->getEngines();
         $rows = [];
