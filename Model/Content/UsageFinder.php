@@ -44,11 +44,12 @@ class UsageFinder
      *
      * @param int $blockId
      * @param string $identifier
+     * @param bool $ignoreMenuAcl Also scan menus the caller may not view (in-use decisions), see ContentScanner.
      * @return array
      * @phpstan-return array{hyva_content: list<array<string, mixed>>, magento_content: list<array<string, mixed>>,
      *     widget_instances: list<array<string, mixed>>, total: int}
      */
-    public function findBlockUsage(int $blockId, string $identifier): array
+    public function findBlockUsage(int $blockId, string $identifier, bool $ignoreMenuAcl = false): array
     {
         $refs = array_filter([(string) $blockId, $identifier], static fn (string $v): bool => $v !== '');
         $hyva = $this->contentScanner->findNodes(static function (array $node) use ($refs): bool {
@@ -70,7 +71,7 @@ class UsageFinder
                 }
             }
             return false;
-        });
+        }, ContentLocator::TYPES, $ignoreMenuAcl);
 
         $magento = [];
         foreach ($refs as $ref) {

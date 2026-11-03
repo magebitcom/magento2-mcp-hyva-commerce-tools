@@ -50,6 +50,7 @@ class ContentScanner
      * @param array $types
      * @param bool $includeDraft
      * @param bool $includePublished
+     * @param bool $ignoreMenuAcl Read menus whenever Menu Builder is installed and enabled, see getMenuRows().
      * @return array
      * @phpstan-param list<string> $types
      * @phpstan-return list<array{entity_type: string, id: int, identifier: string, title: string, edition: string,
@@ -58,12 +59,13 @@ class ContentScanner
     public function getDocuments(
         array $types = ContentLocator::TYPES,
         bool $includeDraft = true,
-        bool $includePublished = true
+        bool $includePublished = true,
+        bool $ignoreMenuAcl = false
     ): array {
         $documents = [];
         foreach ($types as $type) {
             $rows = $type === ContentLocator::TYPE_MENU
-                ? $this->getMenuRows()
+                ? $this->getMenuRows($ignoreMenuAcl)
                 : $this->contentIndex->getRows($type, true);
             array_push($documents, ...$this->documentsOfRows($type, $rows, $includeDraft, $includePublished));
         }
@@ -132,16 +134,20 @@ class ContentScanner
      *
      * @param callable $predicate
      * @param array $types
+     * @param bool $ignoreMenuAcl Read menus whenever Menu Builder is installed and enabled, see getMenuRows().
      * @return array
      * @phpstan-param callable(array<string, mixed>): bool $predicate
      * @phpstan-param list<string> $types
      * @phpstan-return list<array{entity_type: string, id: int, identifier: string, title: string, edition: string,
      *     uid: string|null, component: string|null, menu_identifier?: string}>
      */
-    public function findNodes(callable $predicate, array $types = ContentLocator::TYPES): array
-    {
+    public function findNodes(
+        callable $predicate,
+        array $types = ContentLocator::TYPES,
+        bool $ignoreMenuAcl = false
+    ): array {
         $matches = [];
-        foreach ($this->getDocuments($types) as $entry) {
+        foreach ($this->getDocuments($types, true, true, $ignoreMenuAcl) as $entry) {
             if ($entry['document'] === null) {
                 continue;
             }
@@ -199,13 +205,17 @@ class ContentScanner
     /**
      * Get menu rows.
      *
+     * By default only for a caller allowed to view menus. With $ignoreMenuAcl the caller's menu ACL is not checked,
+     * for in-use decisions (delete tools) that must count every reference; the caller then hides what it may not see.
+     *
+     * @param bool $ignoreMenuAcl
      * @return array
      * @phpstan-return list<array<string, mixed>>
      */
-    public function getMenuRows(): array
+    public function getMenuRows(bool $ignoreMenuAcl = false): array
     {
         // The table survives module:disable, but without the module no menu can be loaded or saved.
-        if (!$this->featureChecker->isAvailable(FeatureCheckerInterface::MENU_BUILDER)) {
+        if (!$this->isMenuBuilderReadable($ignoreMenuAcl)) {
             return [];
         }
         $connection = $this->resourceConnection->getConnection();
@@ -222,5 +232,20 @@ class ContentScanner
             $rows[] = $row;
         }
         return $rows;
+    }
+
+    /**
+     * Whether menus can be read: Menu Builder installed and enabled, and the caller may view them unless ignored.
+     *
+     * @param bool $ignoreMenuAcl
+     * @return bool
+     */
+    private function isMenuBuilderReadable(bool $ignoreMenuAcl): bool
+    {
+        if (!$ignoreMenuAcl) {
+            return $this->featureChecker->isAvailable(FeatureCheckerInterface::MENU_BUILDER);
+        }
+        $status = $this->featureChecker->getStatus(FeatureCheckerInterface::MENU_BUILDER);
+        return $status['installed'] && $status['enabled'];
     }
 }

@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScanner;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\DeletionUsage;
@@ -21,6 +23,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * T-22: the delete preview of a CMS page finds the store views using it as home / 404 page and links to it.
+ * PR #2 review: menus count for the in-use decision even when the caller may not view them, without being listed.
  */
 class DeletionUsageTest extends TestCase
 {
@@ -36,6 +39,67 @@ class DeletionUsageTest extends TestCase
             $report['store_config']
         );
         $this->assertSame([5], array_column(Cast::array($report['links']), 'id'));
+        $this->assertArrayNotHasKey('usages_hidden_by_permissions', $report);
+    }
+
+    public function testAPageLinkedOnlyFromAMenuTheCallerMayNotViewIsStillInUse(): void
+    {
+        $scanned = [];
+        $report = $this->usage(false, $scanned)->forPage(10, 'contact', [1]);
+
+        // Menus are scanned whatever the caller's menu ACL, so the force gate applies.
+        $this->assertSame([true], $scanned);
+        $this->assertTrue($report['used']);
+        $this->assertSame(0, $report['total']);
+        $this->assertSame([], $report['links']);
+        $this->assertSame(1, $report['usages_hidden_by_permissions']);
+    }
+
+    public function testACallerAllowedToViewMenusSeesTheMenuLink(): void
+    {
+        $report = $this->usage()->forPage(10, 'contact', [1]);
+
+        $this->assertTrue($report['used']);
+        $this->assertSame(1, $report['total']);
+        $this->assertSame([4], array_column(Cast::array($report['links']), 'id'));
+        $this->assertArrayNotHasKey('usages_hidden_by_permissions', $report);
+    }
+
+    public function testABlockPlacedInAMenuTheCallerMayNotViewIsInUseWithTheMenuHidden(): void
+    {
+        $finder = $this->createMock(UsageFinder::class);
+        $finder->expects($this->once())->method('findBlockUsage')->with(3, 'promo', true)->willReturn([
+            'hyva_content' => [['entity_type' => ContentLocator::TYPE_MENU, 'id' => 4],
+                ['entity_type' => ContentLocator::TYPE_PAGE, 'id' => 2]],
+            'magento_content' => [],
+            'widget_instances' => [],
+            'total' => 2,
+        ]);
+
+        $report = $this->usage(false, $scanned, $finder)->forBlock(3, 'promo');
+
+        $this->assertTrue($report['used']);
+        $this->assertSame(1, $report['total']);
+        $this->assertSame([2], array_column(Cast::array($report['hyva_content']), 'id'));
+        $this->assertSame(1, $report['usages_hidden_by_permissions']);
+    }
+
+    public function testABlockUsedOnlyInAMenuTheCallerMayNotViewIsStillInUse(): void
+    {
+        $finder = $this->createMock(UsageFinder::class);
+        $finder->method('findBlockUsage')->willReturn([
+            'hyva_content' => [['entity_type' => ContentLocator::TYPE_MENU, 'id' => 4]],
+            'magento_content' => [],
+            'widget_instances' => [],
+            'total' => 1,
+        ]);
+
+        $report = $this->usage(false, $scanned, $finder)->forBlock(3, 'promo');
+
+        $this->assertTrue($report['used']);
+        $this->assertSame(0, $report['total']);
+        $this->assertSame([], $report['hyva_content']);
+        $this->assertSame(1, $report['usages_hidden_by_permissions']);
     }
 
     public function testAnUnusedPageIsNotInUse(): void
@@ -56,12 +120,20 @@ class DeletionUsageTest extends TestCase
 
     /**
      * Store view 1: home page "home", 404 "no-route|9"; store view 2: home page "home", 404 "no-route|9". One menu
-     * node links to page 7 ("home"), one to page 8 by a custom URL.
+     * node links to page 7 ("home"), one to page 8 by a custom URL, one to page 10 ("contact").
      *
+     * @param bool $menuViewAllowed Whether the caller may view menus (Menu Builder "available").
+     * @param list<bool>|null $scanned Collects the ignoreMenuAcl argument of every content scan.
+     * @param-out list<bool> $scanned
+     * @param UsageFinder|null $usageFinder
      * @return DeletionUsage
      */
-    private function usage(): DeletionUsage
-    {
+    private function usage(
+        bool $menuViewAllowed = true,
+        ?array &$scanned = null,
+        ?UsageFinder $usageFinder = null
+    ): DeletionUsage {
+        $scanned = [];
         $stores = [];
         foreach ([1, 2] as $storeId) {
             $store = $this->createMock(StoreInterface::class);
@@ -79,9 +151,18 @@ class DeletionUsageTest extends TestCase
         $nodes = [
             ['entity_type' => 'menu', 'id' => 5, 'node' => ['link' => ['type' => 'cms_page', 'value' => 'home']]],
             ['entity_type' => 'menu', 'id' => 6, 'node' => ['link' => ['type' => 'custom_url', 'value' => '8']]],
+            ['entity_type' => 'menu', 'id' => 4, 'node' => ['link' => ['type' => 'cms_page', 'value' => 'contact']]],
         ];
         $scanner = $this->createMock(ContentScanner::class);
-        $scanner->method('findNodes')->willReturnCallback(static function (callable $predicate) use ($nodes): array {
+        $scanner->method('findNodes')->willReturnCallback(static function (
+            callable $predicate,
+            array $types = ContentLocator::TYPES,
+            bool $ignoreMenuAcl = false
+        ) use (
+            $nodes,
+            &$scanned
+        ): array {
+            $scanned[] = $ignoreMenuAcl;
             $matches = [];
             foreach ($nodes as $entry) {
                 if ($predicate($entry['node'])) {
@@ -93,13 +174,16 @@ class DeletionUsageTest extends TestCase
         $scope = $this->createMock(ContentScopeFilter::class);
         $scope->method('isRestricted')->willReturn(false);
         $scope->method('filterUsageReport')->willReturnArgument(0);
+        $features = $this->createMock(FeatureCheckerInterface::class);
+        $features->method('isAvailable')->willReturn($menuViewAllowed);
         return new DeletionUsage(
-            $this->createMock(UsageFinder::class),
+            $usageFinder ?? $this->createMock(UsageFinder::class),
             $scanner,
             $scope,
             $this->createMock(MenuService::class),
             $config,
-            $storeManager
+            $storeManager,
+            $features
         );
     }
 }

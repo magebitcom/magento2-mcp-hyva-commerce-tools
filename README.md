@@ -375,6 +375,9 @@ find-usage tools already return, so they are not unified.
 
 For a role restricted to some websites, `usages_hidden_by_permissions` counts the usages it may not see.
 
+The page and block tools also check menus when the role may not view them (`Hyva_MenuBuilder::menu_view`). Those
+usages are not listed; `usages_hidden_by_permissions` counts them, and they still set `used`, so `force` is needed.
+
 ## Optional features
 
 Tools for an optional Hyvä module stay registered when that module is missing, disabled, or not allowed for the
