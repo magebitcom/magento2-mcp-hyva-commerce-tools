@@ -122,8 +122,7 @@ class MenuGet extends AbstractMenuTool implements ContextualAclAwareInterface
             $entity,
             $arguments,
             $this->stringListArg($arguments, 'fields'),
-            MenuSettingsResolver::KEY,
-            self::SETTINGS_FIELDS
+            array_fill_keys(self::SETTINGS_FIELDS, MenuSettingsResolver::KEY)
         );
         return $this->jsonResult($response, ['id' => $entity['id']]);
     }

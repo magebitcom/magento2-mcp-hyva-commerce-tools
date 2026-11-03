@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Api\ContentFieldResolverInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\VersionHistoryAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\IdentityResolver;
+use Magebit\McpHyvaCommerceTools\Model\FieldResolver\Content\StatusResolver;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
 
@@ -34,6 +35,11 @@ abstract class AbstractEntityGet extends AbstractTool implements ContextualAclAw
      * Keys of the identity group that fields also accepts on their own; they come back at the top level.
      */
     public const IDENTITY_FIELDS = ['type', 'id', 'identifier', 'title', 'is_active', 'store_ids', 'published_urls'];
+
+    /**
+     * Keys of the status group that fields also accepts on their own, as hyva_menu.get does (T-99).
+     */
+    public const STATUS_FIELDS = ['has_draft', 'is_published', 'draft_differs'];
 
     /**
      * @param ContentLocator $contentLocator
@@ -79,11 +85,12 @@ abstract class AbstractEntityGet extends AbstractTool implements ContextualAclAw
         return sprintf(
             'Fetch one CMS %s with its Hyvä CMS content: status, outline, draft and published component trees, '
                 . 'preview URLs, recent versions and images. Response keys (groups): %s. Use fields / exclude to '
-                . 'narrow it: fields takes group names or the identity keys %s, which come back at the top level '
-                . '(e.g. fields ["id", "title", "store_ids"]).',
+                . 'narrow it: fields takes group names, the identity keys %s or the status keys %s, which come '
+                . 'back at the top level (e.g. fields ["id", "title", "has_draft"]).',
             strtolower(static::ENTITY_LABEL),
             implode(', ', $keys),
-            implode(', ', self::IDENTITY_FIELDS)
+            implode(', ', self::IDENTITY_FIELDS),
+            implode(', ', self::STATUS_FIELDS)
         );
     }
 
@@ -95,7 +102,8 @@ abstract class AbstractEntityGet extends AbstractTool implements ContextualAclAw
         return Schema::object()
             ->with(EntityTarget::fixed())
             ->array('fields', fn (ArrayBuilder $a) => $a->ofStrings()->description(
-                'Response keys to return: group names or identity keys (id, identifier, title, store_ids, ...).'
+                'Response keys to return: group names, identity keys (id, identifier, title, store_ids, ...) or '
+                    . 'status keys (has_draft, is_published, draft_differs).'
             ))
             ->array('exclude', fn (ArrayBuilder $a) => $a->ofStrings()->description('Response keys to drop.'))
             ->toArray();
@@ -113,8 +121,10 @@ abstract class AbstractEntityGet extends AbstractTool implements ContextualAclAw
             $entity,
             $arguments,
             $this->stringListArg($arguments, 'fields'),
-            IdentityResolver::KEY,
-            self::IDENTITY_FIELDS
+            array_merge(
+                array_fill_keys(self::IDENTITY_FIELDS, IdentityResolver::KEY),
+                array_fill_keys(self::STATUS_FIELDS, StatusResolver::KEY)
+            )
         );
         return $this->jsonResult($response, ['entity_type' => static::ENTITY_TYPE, 'id' => $entity['id']]);
     }
