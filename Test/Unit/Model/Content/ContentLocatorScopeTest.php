@@ -167,6 +167,41 @@ class ContentLocatorScopeTest extends TestCase
         $this->assertTrue($locator->allowsRead(ContentLocator::TYPE_PAGE, 2));
     }
 
+    public function testMenusCountedWhenCallerLacksMenuView(): void
+    {
+        // T-97: Menu Builder installed and enabled, the caller lacks Hyva_MenuBuilder::menu_view. The menu still
+        // exists, so its store views are read and the usage is counted as hidden later, not dropped as missing.
+        $features = $this->createMock(FeatureCheckerInterface::class);
+        $features->method('isAvailable')->willReturn(false);
+        $features->method('isInstalledAndEnabled')->willReturnCallback(
+            static fn (string $feature): bool => $feature === FeatureCheckerInterface::MENU_BUILDER
+        );
+        $contentIndex = $this->createMock(ContentIndex::class);
+        $contentIndex->expects($this->once())->method('getStoreIds')
+            ->with(ContentLocator::TYPE_MENU, [9, 10])
+            ->willReturn([9 => [1], 10 => [2]]);
+        $locator = $this->locator([1], [], $contentIndex, $features);
+
+        $locator->prefetchScope([
+            ['entity_type' => ContentLocator::TYPE_MENU, 'id' => 9],
+            ['entity_type' => ContentLocator::TYPE_MENU, 'id' => 10],
+        ]);
+
+        $this->assertTrue($locator->allowsRead(ContentLocator::TYPE_MENU, 9));
+        $this->assertFalse($locator->allowsRead(ContentLocator::TYPE_MENU, 10));
+    }
+
+    public function testNoMenuExistsWithoutAnEnabledMenuBuilder(): void
+    {
+        $features = $this->createMock(FeatureCheckerInterface::class);
+        $features->method('isInstalledAndEnabled')->willReturn(false);
+        $contentIndex = $this->createMock(ContentIndex::class);
+        $contentIndex->expects($this->never())->method('getStoreIds');
+        $locator = $this->locator([1], [], $contentIndex, $features);
+
+        $this->assertFalse($locator->allowsRead(ContentLocator::TYPE_MENU, 9));
+    }
+
     /**
      * Content index serving the store views of the pages.
      *
@@ -188,6 +223,7 @@ class ContentLocatorScopeTest extends TestCase
      * @param array|null $allowedStoreIds
      * @param array $identifierIds
      * @param ContentIndex|null $contentIndex
+     * @param FeatureCheckerInterface|null $features
      * @return ContentLocator
      * @phpstan-param list<int>|null $allowedStoreIds
      * @phpstan-param list<int> $identifierIds
@@ -195,7 +231,8 @@ class ContentLocatorScopeTest extends TestCase
     private function locator(
         ?array $allowedStoreIds,
         array $identifierIds,
-        ?ContentIndex $contentIndex = null
+        ?ContentIndex $contentIndex = null,
+        ?FeatureCheckerInterface $features = null
     ): ContentLocator {
         $collection = $this->createMock(PageCollection::class);
         $collection->method('addFieldToFilter')->willReturnSelf();
@@ -211,7 +248,7 @@ class ContentLocatorScopeTest extends TestCase
             $collectionFactory,
             $this->createMock(BlockCollectionFactory::class),
             $this->createMock(MenuGatewayInterface::class),
-            $this->createMock(FeatureCheckerInterface::class),
+            $features ?? $this->createMock(FeatureCheckerInterface::class),
             $this->storeScope($allowedStoreIds),
             $contentIndex ?? $this->contentIndex()
         );

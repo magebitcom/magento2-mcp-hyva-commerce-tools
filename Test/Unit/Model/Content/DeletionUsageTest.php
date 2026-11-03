@@ -27,6 +27,8 @@ use PHPUnit\Framework\TestCase;
  */
 class DeletionUsageTest extends TestCase
 {
+    use ContentScopeStub;
+
     public function testAPageIsUsedByItsStoreConfigurationAndByLinks(): void
     {
         $report = $this->usage()->forPage(7, 'home', [1]);
@@ -102,6 +104,38 @@ class DeletionUsageTest extends TestCase
         $this->assertSame(1, $report['usages_hidden_by_permissions']);
     }
 
+    public function testAScopeRestrictedCallerWithoutMenuViewStillCountsTheMenuAsHidden(): void
+    {
+        // T-97: the menu exists (Menu Builder installed and enabled) and is in the caller's store view, so the scope
+        // filter keeps it and the menu ACL hides it; the in-use decision and the hidden count both see it.
+        $features = $this->createMock(FeatureCheckerInterface::class);
+        $features->method('isAvailable')->willReturn(false);
+        $features->method('isInstalledAndEnabled')->willReturn(true);
+        $scope = $this->contentScope(
+            [1],
+            [ContentLocator::TYPE_MENU => [4 => [1]], ContentLocator::TYPE_PAGE => [2 => [1]]],
+            null,
+            [],
+            null,
+            $features
+        );
+        $finder = $this->createMock(UsageFinder::class);
+        $finder->method('findBlockUsage')->willReturn([
+            'hyva_content' => [['entity_type' => ContentLocator::TYPE_MENU, 'id' => 4],
+                ['entity_type' => ContentLocator::TYPE_PAGE, 'id' => 2]],
+            'magento_content' => [],
+            'widget_instances' => [],
+            'total' => 2,
+        ]);
+
+        $report = $this->usage(false, $scanned, $finder, $scope)->forBlock(3, 'promo');
+
+        $this->assertTrue($report['used']);
+        $this->assertSame(1, $report['total']);
+        $this->assertSame([2], array_column(Cast::array($report['hyva_content']), 'id'));
+        $this->assertSame(1, $report['usages_hidden_by_permissions']);
+    }
+
     public function testAnUnusedPageIsNotInUse(): void
     {
         $report = $this->usage()->forPage(8, 'about', [1, 2]);
@@ -126,12 +160,14 @@ class DeletionUsageTest extends TestCase
      * @param list<bool>|null $scanned Collects the ignoreMenuAcl argument of every content scan.
      * @param-out list<bool> $scanned
      * @param UsageFinder|null $usageFinder
+     * @param ContentScopeFilter|null $scopeFilter Replaces an unrestricted caller's filter.
      * @return DeletionUsage
      */
     private function usage(
         bool $menuViewAllowed = true,
         ?array &$scanned = null,
-        ?UsageFinder $usageFinder = null
+        ?UsageFinder $usageFinder = null,
+        ?ContentScopeFilter $scopeFilter = null
     ): DeletionUsage {
         $scanned = [];
         $stores = [];
@@ -179,7 +215,7 @@ class DeletionUsageTest extends TestCase
         return new DeletionUsage(
             $usageFinder ?? $this->createMock(UsageFinder::class),
             $scanner,
-            $scope,
+            $scopeFilter ?? $scope,
             $this->createMock(MenuService::class),
             $config,
             $storeManager,

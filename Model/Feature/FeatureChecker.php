@@ -51,6 +51,25 @@ class FeatureChecker implements FeatureCheckerInterface
     /**
      * @inheritDoc
      */
+    public function isInstalledAndEnabled(string $feature): bool
+    {
+        $definition = $this->features[$feature] ?? [];
+        if ($definition === []) {
+            return false;
+        }
+        foreach ($definition['modules'] ?? [] as $moduleName) {
+            if ($this->componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName) === null
+                || !$this->moduleManager->isEnabled($moduleName)
+            ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function getStatus(string $feature): array
     {
         $definition = $this->features[$feature] ?? [];
@@ -71,11 +90,18 @@ class FeatureChecker implements FeatureCheckerInterface
         // A missing or disabled feature gets no ACL verdict (null): its resource may not exist, or may belong to
         // another module that is still installed, so true or false would both mislead.
         $aclAllowed = $aclResource !== null && $installed && $enabled ? $this->isAclAllowed($aclResource) : null;
+        $unavailableReason = match (true) {
+            !$installed => 'not_installed',
+            !$enabled => 'disabled',
+            $aclAllowed === false => 'acl',
+            default => null,
+        };
 
         return [
             'feature' => $feature,
             'label' => (string) ($definition['label'] ?? $feature),
-            'available' => $installed && $enabled && $aclAllowed !== false,
+            'available' => $unavailableReason === null,
+            'unavailable_reason' => $unavailableReason,
             'installed' => $installed,
             'enabled' => $enabled,
             'version' => $this->getPackageVersion($package),

@@ -140,6 +140,70 @@ class FeatureCheckerTest extends TestCase
         $this->assertSame(['menu_builder'], array_keys($this->checker()->getAll()));
     }
 
+    public function testReasonNotInstalled(): void
+    {
+        $this->registrar->method('getPath')->willReturn(null);
+        $this->withMcpContext(true);
+        $checker = $this->checker();
+
+        $status = $checker->getStatus('menu_builder');
+        $this->assertFalse($status['available']);
+        $this->assertSame('not_installed', $status['unavailable_reason']);
+        $this->assertFalse($checker->isInstalledAndEnabled('menu_builder'));
+    }
+
+    public function testReasonDisabled(): void
+    {
+        $this->registrar->method('getPath')->willReturn('/path');
+        $this->moduleManager->method('isEnabled')->willReturn(false);
+        $this->withMcpContext(true);
+        $checker = $this->checker();
+
+        $status = $checker->getStatus('menu_builder');
+        $this->assertFalse($status['available']);
+        $this->assertSame('disabled', $status['unavailable_reason']);
+        $this->assertFalse($checker->isInstalledAndEnabled('menu_builder'));
+    }
+
+    public function testReasonAcl(): void
+    {
+        $this->registrar->method('getPath')->willReturn('/path');
+        $this->moduleManager->method('isEnabled')->willReturn(true);
+        $this->withMcpContext(false);
+        $checker = $this->checker();
+
+        $status = $checker->getStatus('menu_builder');
+        $this->assertTrue($status['installed']);
+        $this->assertTrue($status['enabled']);
+        $this->assertFalse($status['acl_allowed']);
+        $this->assertFalse($status['available']);
+        $this->assertSame('acl', $status['unavailable_reason']);
+        // A caller without the ACL resource does not make the feature missing.
+        $this->assertTrue($checker->isInstalledAndEnabled('menu_builder'));
+    }
+
+    public function testReasonNullWhenAvailable(): void
+    {
+        $this->registrar->method('getPath')->willReturn('/path');
+        $this->moduleManager->method('isEnabled')->willReturn(true);
+        $this->withMcpContext(true);
+
+        $status = $this->checker()->getStatus('menu_builder');
+        $this->assertTrue($status['available']);
+        $this->assertNull($status['unavailable_reason']);
+    }
+
+    public function testInstalledAndEnabledNeedsNoAclVerdict(): void
+    {
+        $this->registrar->method('getPath')->willReturn('/path');
+        $this->moduleManager->method('isEnabled')->willReturn(true);
+        $this->contextProvider->expects($this->never())->method('get');
+        $this->authorization->expects($this->never())->method('isAllowed');
+
+        $this->assertTrue($this->checker()->isInstalledAndEnabled('menu_builder'));
+        $this->assertFalse($this->checker()->isInstalledAndEnabled('nope'));
+    }
+
     private function withMcpContext(bool $allowed): void
     {
         $context = new AuthenticatedContext($this->createMock(TokenInterface::class), $this->createMock(User::class));
