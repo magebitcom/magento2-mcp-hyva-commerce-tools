@@ -74,7 +74,9 @@ class ImageList extends AbstractMediaTool
     {
         return Schema::object()
             ->string('folder', fn (StringBuilder $s) => $s
-                ->description('Folder under pub/media; default wysiwyg. Use "" for the gallery only.'))
+                ->description('Folder under pub/media, e.g. "wysiwyg/giftcards": only images in it and its '
+                    . 'subfolders. Without folder: every Media Gallery image plus a scan of wysiwyg. Use "" for the '
+                    . 'whole gallery without a scan.'))
             ->array('types', fn (ArrayBuilder $a) => $a->ofStrings()->description('Extensions, e.g. ["png","jpg"].'))
             ->integer('min_size_kb', fn (IntegerBuilder $i) => $i->minimum(0))
             ->integer('max_size_kb', fn (IntegerBuilder $i) => $i->minimum(0))
@@ -96,10 +98,20 @@ class ImageList extends AbstractMediaTool
      */
     protected function run(array $arguments): ToolResultInterface
     {
-        $folder = array_key_exists('folder', $arguments) ? Cast::string($arguments['folder']) : 'wysiwyg';
+        $explicitFolder = array_key_exists('folder', $arguments);
+        $folder = trim($explicitFolder ? Cast::string($arguments['folder']) : 'wysiwyg', '/');
         $assets = $this->inventory->getGalleryAssets();
+        $galleryPaths = array_map('strval', array_keys($assets));
+        if ($explicitFolder && $folder !== '') {
+            // Prefix with the separator, so "wysiwyg/gift" does not match "wysiwyg/giftcards/...".
+            $prefix = $folder . '/';
+            $galleryPaths = array_filter(
+                $galleryPaths,
+                static fn (string $path): bool => str_starts_with(ltrim($path, '/'), $prefix)
+            );
+        }
         $paths = array_map('strval', array_values(
-            array_unique(array_merge(array_keys($assets), $folder !== '' ? $this->inventory->scanFolder($folder) : []))
+            array_unique(array_merge($galleryPaths, $folder !== '' ? $this->inventory->scanFolder($folder) : []))
         ));
         $types = array_map('strtolower', $this->stringListArg($arguments, 'types'));
         if ($types !== []) {
