@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaCms;
 
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ScheduleTime;
@@ -66,7 +67,8 @@ class ScheduleCreateWarningsTest extends TestCase
             $schedule,
             $this->createMock(ScheduleTime::class),
             $conflicts,
-            $this->createMock(ContentAcl::class)
+            $this->createMock(ContentAcl::class),
+            $this->viewableAll()
         );
 
         $result = $tool->execute(['entity_type' => $type, 'id' => 4, 'release_id' => 9]);
@@ -84,5 +86,17 @@ class ScheduleCreateWarningsTest extends TestCase
         $this->assertStringContainsString('inactive', $warning);
         $this->assertStringContainsString('activates', $warning);
         $this->assertStringContainsString(LiveSettings::MENU_PLACEMENT, $warning, 'I1: one placement phrase');
+    }
+
+    /**
+     * Scope filter for a caller who may view every content type.
+     *
+     * @return ContentScopeFilter
+     */
+    private function viewableAll(): ContentScopeFilter
+    {
+        $filter = $this->createMock(ContentScopeFilter::class);
+        $filter->method('viewableTypes')->willReturnArgument(0);
+        return $filter;
     }
 }

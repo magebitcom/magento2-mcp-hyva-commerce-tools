@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule;
 
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractContentTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
@@ -30,11 +31,13 @@ class ScheduleDetectConflicts extends AbstractContentTool
      * @param ConflictReport $conflictReport
      * @param ContentLocator $contentLocator
      * @param ContentAcl $contentAcl
+     * @param ContentScopeFilter $contentScopeFilter
      */
     public function __construct(
         private readonly ConflictReport $conflictReport,
         private readonly ContentLocator $contentLocator,
-        private readonly ContentAcl $contentAcl
+        private readonly ContentAcl $contentAcl,
+        private readonly ContentScopeFilter $contentScopeFilter
     ) {
     }
 
@@ -82,13 +85,15 @@ class ScheduleDetectConflicts extends AbstractContentTool
         if ($type !== null && (isset($arguments['id']) || isset($arguments['identifier']))) {
             $entityId = $this->contentLocator->locate($type, $arguments)['id'];
         }
-        // Conflicts of content types the role may not schedule, or naming content outside its website/store view
-        // restriction, are hidden; release-level conflicts are judged by the release's items.
+        // Conflicts of content types the role may not schedule (or, for menus, view), or naming content outside its
+        // website/store view restriction, are hidden; release-level conflicts are judged by the release's items.
         $scoped = $this->conflictReport->getConflictsWithinCallerScope(
             $this->intArg($arguments, 'window_minutes', 60) ?? 60,
             $type,
             $entityId,
-            $this->contentAcl->allowedTypes(ContentLocator::TYPES, ContentAcl::VERB_SCHEDULING)
+            $this->contentScopeFilter->viewableTypes(
+                $this->contentAcl->allowedTypes(ContentLocator::TYPES, ContentAcl::VERB_SCHEDULING)
+            )
         );
         $conflicts = $scoped['conflicts'];
         $hidden = $scoped['hidden'];
@@ -108,5 +113,18 @@ class ScheduleDetectConflicts extends AbstractContentTool
     protected function contentAcl(): ContentAcl
     {
         return $this->contentAcl;
+    }
+
+    /**
+     * Scheduling; a call about a menu also needs menu view.
+     *
+     * @param array $arguments
+     * @return array
+     * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-return list<string>
+     */
+    protected function contentVerbs(array $arguments): array
+    {
+        return array_values(array_merge(parent::contentVerbs($arguments), $this->menuViewVerbs($arguments)));
     }
 }

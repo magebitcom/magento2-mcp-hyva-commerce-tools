@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule;
 
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ScheduleTime;
@@ -37,13 +38,15 @@ class ScheduleCreate extends AbstractContentTool
      * @param ScheduleTime $scheduleTime
      * @param ConflictReport $conflictReport
      * @param ContentAcl $contentAcl
+     * @param ContentScopeFilter $contentScopeFilter
      */
     public function __construct(
         private readonly ContentLocator $contentLocator,
         private readonly ScheduleService $scheduleService,
         private readonly ScheduleTime $scheduleTime,
         private readonly ConflictReport $conflictReport,
-        private readonly ContentAcl $contentAcl
+        private readonly ContentAcl $contentAcl,
+        private readonly ContentScopeFilter $contentScopeFilter
     ) {
     }
 
@@ -131,6 +134,9 @@ class ScheduleCreate extends AbstractContentTool
             $stringKeyed !== [] ? $stringKeyed : null
         );
 
+        // Conflicts naming menus stay hidden from a role without menu_view.
+        $viewable = $this->contentScopeFilter->viewableTypes(ContentLocator::TYPES);
+
         return $this->jsonResult([
             'scheduled' => true,
             'entity_type' => $entity['type'],
@@ -142,7 +148,8 @@ class ScheduleCreate extends AbstractContentTool
             'conflicts' => $this->conflictReport->getConflictsWithinCallerScope(
                 60,
                 $entity['type'],
-                $entity['id']
+                $entity['id'],
+                count($viewable) < count(ContentLocator::TYPES) ? $viewable : null
             )['conflicts'],
         ] + $result, ['entity_type' => $entity['type'], 'id' => $entity['id'], 'release_id' => $result['release_id']]);
     }
@@ -167,7 +174,7 @@ class ScheduleCreate extends AbstractContentTool
     }
 
     /**
-     * Schedule save; scheduling a version_id also reads version history.
+     * Schedule save; scheduling a version_id also reads version history, scheduling a menu needs menu view.
      *
      * @inheritDoc
      */
@@ -177,7 +184,7 @@ class ScheduleCreate extends AbstractContentTool
         if (($arguments['version_id'] ?? null) !== null) {
             $verbs[] = ContentAcl::VERB_VERSION_HISTORY;
         }
-        return $verbs;
+        return array_values(array_merge($verbs, $this->menuViewVerbs($arguments)));
     }
 
     /**

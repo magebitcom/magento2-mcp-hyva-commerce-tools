@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMenu;
 
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule\ScheduleCancel;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuScheduleCancel;
@@ -49,7 +50,8 @@ class MenuScheduleCancelTest extends TestCase
             ['entity_type' => 'cms_page', 'id' => 2],
         ]);
 
-        (new ScheduleCancel($service, $acl, $locator))->execute(['item_ids' => [10, 11], 'release_id' => 3]);
+        (new ScheduleCancel($service, $acl, $locator, $this->viewableAll()))
+            ->execute(['item_ids' => [10, 11], 'release_id' => 3]);
     }
 
     public function testAnUnrestrictedCallerLoadsNoItemsUpFront(): void
@@ -63,7 +65,7 @@ class MenuScheduleCancelTest extends TestCase
         $locator->method('isScopeRestricted')->willReturn(false);
         $locator->expects($this->never())->method('prefetchScope');
 
-        (new ScheduleCancel($service, $acl, $locator))->execute(['item_ids' => [10]]);
+        (new ScheduleCancel($service, $acl, $locator, $this->viewableAll()))->execute(['item_ids' => [10]]);
     }
 
     /**
@@ -99,8 +101,20 @@ class MenuScheduleCancelTest extends TestCase
         );
         $locator = $this->createMock(ContentLocator::class);
         $locator->method('allowsWrite')->willReturnCallback(static fn (string $type, int $id): bool => $id === 1);
-        (new $class($service, $acl, $locator))->execute(['item_ids' => [1]]);
+        (new $class($service, $acl, $locator, $this->viewableAll()))->execute(['item_ids' => [1]]);
         $this->assertIsCallable($callback);
         return static fn (string $type, int $id): bool => (bool) $callback($type, $id);
+    }
+
+    /**
+     * Scope filter for a caller who may view every content type.
+     *
+     * @return ContentScopeFilter
+     */
+    private function viewableAll(): ContentScopeFilter
+    {
+        $filter = $this->createMock(ContentScopeFilter::class);
+        $filter->method('viewableTypes')->willReturnArgument(0);
+        return $filter;
     }
 }

@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule;
 
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ScheduleTime;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractContentTool;
@@ -34,12 +35,14 @@ class ScheduleList extends AbstractContentTool
      * @param ScheduleTime $scheduleTime
      * @param ContentLocator $contentLocator
      * @param ContentAcl $contentAcl
+     * @param ContentScopeFilter $contentScopeFilter
      */
     public function __construct(
         private readonly ScheduleService $scheduleService,
         private readonly ScheduleTime $scheduleTime,
         private readonly ContentLocator $contentLocator,
-        private readonly ContentAcl $contentAcl
+        private readonly ContentAcl $contentAcl,
+        private readonly ContentScopeFilter $contentScopeFilter
     ) {
     }
 
@@ -120,14 +123,17 @@ class ScheduleList extends AbstractContentTool
                 static fn (array $item): bool => $item['release_id'] !== $cutRelease
             ));
         }
-        // Items of content outside the caller's website/store view restriction are hidden like those of content
-        // types the role may not schedule; one store view lookup per type covers all items.
+        // Items of content outside the caller's website/store view restriction, and menus of a role without
+        // menu_view, are hidden like those of content types the role may not schedule; one store view lookup per
+        // type covers all items.
+        $viewable = $this->contentScopeFilter->viewableTypes(ContentLocator::TYPES);
         $this->contentLocator->prefetchScope(array_map(
             static fn (array $item): array => ['entity_type' => $item['entity_type'], 'id' => $item['entity_id']],
             $items
         ));
         foreach ($items as $item) {
-            if (!$this->contentAcl->isAllowed($item['entity_type'], ContentAcl::VERB_SCHEDULING)
+            if (!in_array($item['entity_type'], $viewable, true)
+                || !$this->contentAcl->isAllowed($item['entity_type'], ContentAcl::VERB_SCHEDULING)
                 || !$this->contentLocator->allowsRead($item['entity_type'], $item['entity_id'])
             ) {
                 $hidden++;
@@ -176,5 +182,18 @@ class ScheduleList extends AbstractContentTool
     protected function contentAcl(): ContentAcl
     {
         return $this->contentAcl;
+    }
+
+    /**
+     * Scheduling; a call about a menu also needs menu view.
+     *
+     * @param array $arguments
+     * @return array
+     * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-return list<string>
+     */
+    protected function contentVerbs(array $arguments): array
+    {
+        return array_values(array_merge(parent::contentVerbs($arguments), $this->menuViewVerbs($arguments)));
     }
 }
