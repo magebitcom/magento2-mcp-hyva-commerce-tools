@@ -12,6 +12,7 @@ use Hyva\AdminDashboardApi\Api\V1\WidgetContextInterface;
 use Hyva\AdminDashboardApi\Api\V1\WidgetInstanceInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\AdminEditorUrl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
@@ -71,6 +72,7 @@ class CampaignCalendar extends AbstractHealthWidget
             }
         }
         $now = time();
+        // The scope filter also drops menus the caller may not view (rows, counts and conflicts alike).
         $items = $this->scopeFilter->filter(
             $this->scheduleService->getItems(
                 [
@@ -116,7 +118,14 @@ class CampaignCalendar extends AbstractHealthWidget
         }
         $conflictRows = [];
         $errors = 0;
-        foreach ($this->conflictReport->getConflictsWithinCallerScope()['conflicts'] as $conflict) {
+        $viewable = $this->scopeFilter->viewableTypes(ContentLocator::TYPES);
+        $conflicts = $this->conflictReport->getConflictsWithinCallerScope(
+            60,
+            null,
+            null,
+            count($viewable) < count(ContentLocator::TYPES) ? $viewable : null
+        )['conflicts'];
+        foreach ($conflicts as $conflict) {
             if ($conflict['severity'] === 'info') {
                 continue;
             }

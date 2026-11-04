@@ -207,19 +207,17 @@ class DeletionUsageTest extends TestCase
             }
             return $matches;
         });
-        $scope = $this->createMock(ContentScopeFilter::class);
-        $scope->method('isRestricted')->willReturn(false);
-        $scope->method('filterUsageReport')->willReturnArgument(0);
+        // An unrestricted caller: the real filter applies only the menu ACL.
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn($menuViewAllowed);
+        $features->method('isInstalledAndEnabled')->willReturn(true);
         return new DeletionUsage(
             $usageFinder ?? $this->createMock(UsageFinder::class),
             $scanner,
-            $scopeFilter ?? $scope,
+            $scopeFilter ?? $this->contentScope(null, [], null, [], null, $features),
             $this->createMock(MenuService::class),
             $config,
-            $storeManager,
-            $features
+            $storeManager
         );
     }
 }

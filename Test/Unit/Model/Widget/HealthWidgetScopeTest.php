@@ -39,6 +39,7 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Config\CacheInterface;
 use Magento\Framework\DB\Adapter\AdapterInterface;
+use Magento\Framework\DB\Select;
 use Magento\Framework\ObjectManager\ConfigLoaderInterface;
 use Magento\Framework\Serialize\Serializer\Json;
 use PHPUnit\Framework\TestCase;
@@ -139,6 +140,31 @@ class HealthWidgetScopeTest extends TestCase
     }
 
     /**
+     * PR #3 review: an admin without Hyva_MenuBuilder::menu_view sees no scheduled menu (rows, menu count, conflicts),
+     * whether restricted to some store views or not.
+     */
+    public function testCampaignCalendarHidesMenusFromAnAdminWhoMayNotViewThem(): void
+    {
+        foreach ([[1], null] as $allowedStoreIds) {
+            $data = $this->campaignCalendar($allowedStoreIds, false, ['cms_page', 'cms_block'])
+                ->getDisplayData($this->ctx(), $this->instance());
+
+            $labels = array_column($this->rows($data), 'label');
+            $this->assertNotContains('Spring: Main menu', $labels);
+            $this->assertStringNotContainsString('menu', (string) json_encode($this->rows($data)));
+            $this->assertSame(0, $this->stat($data, 'Menu changes'));
+        }
+    }
+
+    public function testCampaignCalendarShowsMenusToAnAdminWhoMayViewThem(): void
+    {
+        $data = $this->campaignCalendar([1], true, null)->getDisplayData($this->ctx(), $this->instance());
+
+        $this->assertSame(['Spring: Own', 'Spring: Main menu'], array_column($this->rows($data), 'label'));
+        $this->assertSame(1, $this->stat($data, 'Menu changes'));
+    }
+
+    /**
      * T-118: Hyvä caches the display data, so links hold the route and params, never a URL with the secret key of the
      * session that built them; health-summary.phtml builds the URL for the admin viewing the dashboard.
      */
@@ -156,6 +182,25 @@ class HealthWidgetScopeTest extends TestCase
             array_column($this->list($data, 'links'), 'route')
         );
         $this->assertStringNotContainsString('"url"', (string) json_encode($data));
+    }
+
+    /**
+     * PR #3 review: a scheduled menu in the admin's store view is checked only for an admin allowed to view menus.
+     */
+    public function testCampaignAssetReadinessHidesMenusFromAnAdminWhoMayNotViewThem(): void
+    {
+        $data = $this->assetReadinessOverAMenu(false)->getDisplayData($this->ctx(), $this->instance());
+
+        $this->assertSame(0, $this->stat($data, 'Scheduled items'));
+        $this->assertSame([], $this->rows($data));
+    }
+
+    public function testCampaignAssetReadinessChecksMenusForAnAdminWhoMayViewThem(): void
+    {
+        $data = $this->assetReadinessOverAMenu(true)->getDisplayData($this->ctx(), $this->instance());
+
+        $this->assertSame(1, $this->stat($data, 'Scheduled items'));
+        $this->assertSame(['Spring: Main menu'], array_column($this->rows($data), 'label'));
     }
 
     public function testCampaignAssetReadinessChecksOnlyTheAdminsScheduledContent(): void
@@ -280,19 +325,32 @@ class HealthWidgetScopeTest extends TestCase
     /**
      * Campaign Calendar over an upcoming item of page 1 (store view 1) and one of page 2 (store view 2).
      *
+     * With $menuView set, also over an upcoming item of menu 4 (store view 1), the admin allowed to view menus or
+     * not, and conflicts expected to be asked for the content types in $conflictTypes (null: all).
+     *
      * @param array|null $allowedStoreIds
+     * @param bool|null $menuView
+     * @param array|null $conflictTypes
      * @return CampaignCalendar
      * @phpstan-param list<int>|null $allowedStoreIds
+     * @phpstan-param list<string>|null $conflictTypes
      */
-    private function campaignCalendar(?array $allowedStoreIds): CampaignCalendar
-    {
+    private function campaignCalendar(
+        ?array $allowedStoreIds,
+        ?bool $menuView = null,
+        ?array $conflictTypes = null
+    ): CampaignCalendar {
+        $items = [$this->item(1, 'Own', '+1 day'), $this->item(2, 'Foreign', '+2 days')];
+        if ($menuView !== null) {
+            $items[] = ['entity_type' => 'menu', 'entity_id' => 4, 'item_id' => 4, 'name' => 'Main menu']
+                + $this->item(4, 'Main menu', '+3 days');
+        }
         $schedule = $this->createMock(ScheduleService::class);
-        $schedule->method('getItems')->willReturn([
-            $this->item(1, 'Own', '+1 day'),
-            $this->item(2, 'Foreign', '+2 days'),
-        ]);
+        $schedule->method('getItems')->willReturn($items);
         $conflicts = $this->createMock(ConflictReport::class);
-        $conflicts->method('getConflictsWithinCallerScope')->willReturn(['conflicts' => [], 'hidden' => 0]);
+        $conflicts->method('getConflictsWithinCallerScope')
+            ->with(60, null, null, $conflictTypes)
+            ->willReturn(['conflicts' => [], 'hidden' => 0]);
         $contentIndex = $this->createMock(ContentIndex::class);
         $contentIndex->method('getRows')->willReturn([]);
         return new CampaignCalendar(
@@ -302,8 +360,86 @@ class HealthWidgetScopeTest extends TestCase
             $this->createMock(ScopeConfigInterface::class),
             $contentIndex,
             $this->editorUrl(),
-            $this->contentScope($allowedStoreIds, ['cms_page' => [1 => [1], 2 => [2]]])
+            $this->contentScope(
+                $allowedStoreIds,
+                ['cms_page' => [1 => [1], 2 => [2]], 'menu' => [4 => [1]]],
+                null,
+                [],
+                null,
+                $menuView === null ? null : $this->menuFeatures($menuView)
+            )
         );
+    }
+
+    /**
+     * Campaign Asset Readiness for an admin of store view 1 over a pending item of menu 4 (store view 1).
+     *
+     * @param bool $menuView Whether the admin may view menus.
+     * @return CampaignAssetReadiness
+     */
+    private function assetReadinessOverAMenu(bool $menuView): CampaignAssetReadiness
+    {
+        $schedule = $this->createMock(ScheduleService::class);
+        $schedule->method('getItems')->willReturn([
+            ['entity_type' => 'menu', 'entity_id' => 4, 'item_id' => 4] + $this->item(4, 'Main menu', '+1 day'),
+        ]);
+        $adapter = $this->createMock(AdapterInterface::class);
+        $select = $this->createMock(Select::class);
+        $select->method('from')->willReturnSelf();
+        $select->method('where')->willReturnSelf();
+        $adapter->method('select')->willReturn($select);
+        $adapter->expects($menuView ? $this->once() : $this->never())->method('fetchPairs')
+            ->willReturn([4 => '{"components":[]}']);
+        $resource = $this->createMock(ResourceConnection::class);
+        $resource->method('getConnection')->willReturn($adapter);
+        $tree = $this->createMock(ComponentTree::class);
+        $tree->method('normalizeDocument')->willReturn([]);
+        $extractor = $this->createMock(ImageReferenceExtractor::class);
+        $extractor->method('fromDocument')->willReturn([]);
+        $features = $this->menuFeatures($menuView);
+        return new CampaignAssetReadiness(
+            $schedule,
+            $tree,
+            $extractor,
+            $this->createMock(ImageChecker::class),
+            $this->createMock(MediaService::class),
+            $features,
+            $this->createMock(MenuValidator::class),
+            $resource,
+            $this->editorUrl(),
+            $this->contentScope([1], ['menu' => [4 => [1]]], null, [], null, $features)
+        );
+    }
+
+    /**
+     * Menu Builder installed and enabled, the admin allowed to view menus or not.
+     *
+     * @param bool $menuView
+     * @return FeatureCheckerInterface
+     */
+    private function menuFeatures(bool $menuView): FeatureCheckerInterface
+    {
+        $features = $this->createMock(FeatureCheckerInterface::class);
+        $features->method('isAvailable')->willReturn($menuView);
+        $features->method('isInstalledAndEnabled')->willReturn(true);
+        return $features;
+    }
+
+    /**
+     * Value of a widget stat by its label.
+     *
+     * @param mixed $data
+     * @param string $label
+     * @return mixed
+     */
+    private function stat(mixed $data, string $label): mixed
+    {
+        foreach ($this->list($data, 'stats') as $stat) {
+            if (is_array($stat) && ($stat['label'] ?? null) === $label) {
+                return $stat['value'] ?? null;
+            }
+        }
+        $this->fail('No stat ' . $label);
     }
 
     /**

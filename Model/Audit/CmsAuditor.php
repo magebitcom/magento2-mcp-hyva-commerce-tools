@@ -153,7 +153,9 @@ class CmsAuditor
             }
         }
 
-        $schedulable = $this->contentAcl->allowedTypes(ContentLocator::TYPES, ContentAcl::VERB_SCHEDULING);
+        $schedulable = $this->scopeFilter->viewableTypes(
+            $this->contentAcl->allowedTypes(ContentLocator::TYPES, ContentAcl::VERB_SCHEDULING)
+        );
         $conflicts = array_values(array_filter(
             $this->conflictReport->getConflictsWithinCallerScope(60, null, null, $schedulable)['conflicts'],
             static fn (array $c): bool => !isset($c['entity_type']) || in_array($c['entity_type'], $schedulable, true)

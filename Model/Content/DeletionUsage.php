@@ -8,7 +8,6 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Content;
 
-use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Framework\App\Config\ScopeConfigInterface;
@@ -22,7 +21,8 @@ use Magento\Store\Model\StoreManagerInterface;
  * `used` counts every usage; the lists and `total` hold only what the caller's website / store view restriction may
  * see, the rest is counted in usages_hidden_by_permissions (as the find-usage tools do), so content used only
  * elsewhere is never shown as unused. Menus are scanned even when the caller may not view them
- * (Hyva_MenuBuilder::menu_view); their usages count in `used` and in usages_hidden_by_permissions, never in the lists.
+ * (Hyva_MenuBuilder::menu_view); their usages count in `used`, and ContentScopeFilter moves them from the lists to
+ * usages_hidden_by_permissions.
  */
 class DeletionUsage
 {
@@ -42,7 +42,6 @@ class DeletionUsage
      * @param MenuService $menuService
      * @param ScopeConfigInterface $scopeConfig
      * @param StoreManagerInterface $storeManager
-     * @param FeatureCheckerInterface $featureChecker
      */
     public function __construct(
         private readonly UsageFinder $usageFinder,
@@ -50,8 +49,7 @@ class DeletionUsage
         private readonly ContentScopeFilter $scopeFilter,
         private readonly MenuService $menuService,
         private readonly ScopeConfigInterface $scopeConfig,
-        private readonly StoreManagerInterface $storeManager,
-        private readonly FeatureCheckerInterface $featureChecker
+        private readonly StoreManagerInterface $storeManager
     ) {
     }
 
@@ -91,7 +89,7 @@ class DeletionUsage
             $report['usages_hidden_by_permissions'] = Cast::int($report['usages_hidden_by_permissions'] ?? 0)
                 + $filtered['hidden'];
         }
-        return $this->hideUnviewableMenus($report, ['links']);
+        return $report;
     }
 
     /**
@@ -105,11 +103,11 @@ class DeletionUsage
     public function forBlock(int $id, string $identifier): array
     {
         $report = $this->usageFinder->findBlockUsage($id, $identifier, true);
-        return $this->hideUnviewableMenus(['used' => $report['total'] > 0] + $this->scopeFilter->filterUsageReport(
+        return ['used' => $report['total'] > 0] + $this->scopeFilter->filterUsageReport(
             $report,
             ['hyva_content', 'magento_content'],
             ['widget_instances']
-        ), ['hyva_content']);
+        );
     }
 
     /**
@@ -128,42 +126,6 @@ class DeletionUsage
             ['hyva_cms_content', 'magento_cms_content'],
             ['widget_instances']
         ));
-    }
-
-    /**
-     * Hide usages in menus from a caller who may not view menus.
-     *
-     * They are taken off the lists and `total` and counted in usages_hidden_by_permissions; `used` keeps them.
-     *
-     * @param array $report
-     * @param array $lists Keys of lists naming entities by entity_type and id.
-     * @return array
-     * @phpstan-param array<string, mixed> $report
-     * @phpstan-param list<string> $lists
-     * @phpstan-return array<string, mixed>
-     */
-    private function hideUnviewableMenus(array $report, array $lists): array
-    {
-        if ($this->featureChecker->isAvailable(FeatureCheckerInterface::MENU_BUILDER)) {
-            return $report;
-        }
-        $hidden = 0;
-        foreach ($lists as $key) {
-            $items = is_array($report[$key] ?? null) ? $report[$key] : [];
-            $visible = array_values(array_filter(
-                $items,
-                static fn (mixed $item): bool => !is_array($item)
-                    || ($item['entity_type'] ?? null) !== ContentLocator::TYPE_MENU
-            ));
-            $hidden += count($items) - count($visible);
-            $report[$key] = $visible;
-        }
-        if ($hidden === 0) {
-            return $report;
-        }
-        $report['total'] = Cast::int($report['total'] ?? 0) - $hidden;
-        $report['usages_hidden_by_permissions'] = Cast::int($report['usages_hidden_by_permissions'] ?? 0) + $hidden;
-        return $report;
     }
 
     /**

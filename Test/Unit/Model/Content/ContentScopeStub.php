@@ -84,6 +84,6 @@ trait ContentScopeStub
             $guard,
             $contentIndex
         );
-        return new ContentScopeFilter($locator, $guard, $catalogReader);
+        return new ContentScopeFilter($locator, $guard, $catalogReader, $features);
     }
 }

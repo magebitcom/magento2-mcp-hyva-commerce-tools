@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Content;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Security\CatalogScopeReader;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
@@ -20,8 +21,13 @@ use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
  * - categories (category, catalog_category): by the root category of their tree.
  * Other entries (media files, configuration, ...) pass unchanged.
  *
- * Unrestricted callers get their input back without any lookup. Restricted callers cost one query per entity type
- * and request (ContentLocator::prefetchScope(), CatalogScopeReader); entities that no longer exist count as hidden.
+ * Menus are hidden as well from a caller who may not view them (Hyva_MenuBuilder::menu_view, or Menu Builder not
+ * installed and enabled), whatever the caller's website/store view restriction: everything that shows content goes
+ * through this filter, while in-use decisions count every entry before filtering (DeletionUsage, `used`).
+ *
+ * Unrestricted callers who may view menus get their input back without any lookup. Restricted callers cost one query
+ * per entity type and request (ContentLocator::prefetchScope(), CatalogScopeReader); entities that no longer exist
+ * count as hidden.
  */
 class ContentScopeFilter
 {
@@ -45,12 +51,33 @@ class ContentScopeFilter
      * @param ContentLocator $contentLocator
      * @param StoreScopeGuard $storeScopeGuard
      * @param CatalogScopeReader $catalogScopeReader
+     * @param FeatureCheckerInterface $featureChecker
      */
     public function __construct(
         private readonly ContentLocator $contentLocator,
         private readonly StoreScopeGuard $storeScopeGuard,
-        private readonly CatalogScopeReader $catalogScopeReader
+        private readonly CatalogScopeReader $catalogScopeReader,
+        private readonly FeatureCheckerInterface $featureChecker
     ) {
+    }
+
+    /**
+     * Content types from the list the caller may see entries of: menus only for a caller who may view them.
+     *
+     * @param array $types
+     * @return array
+     * @phpstan-param list<string> $types
+     * @phpstan-return list<string>
+     */
+    public function viewableTypes(array $types): array
+    {
+        if ($this->menusViewable()) {
+            return $types;
+        }
+        return array_values(array_filter(
+            $types,
+            static fn (string $type): bool => $type !== ContentLocator::TYPE_MENU
+        ));
     }
 
     /**
@@ -107,15 +134,19 @@ class ContentScopeFilter
     public function filterGrouped(array $groups, string $typeKey = 'entity_type', string $idKey = 'id'): array
     {
         $hidden = array_map(static fn (array $items): int => 0, $groups);
-        if (!$this->isRestricted()) {
+        $restricted = $this->isRestricted();
+        $menusViewable = $this->menusViewable();
+        if (!$restricted && $menusViewable) {
             return ['visible' => $groups, 'hidden' => $hidden];
         }
-        $this->prefetch([[array_merge([], ...array_values($groups)), $typeKey, $idKey]]);
+        if ($restricted) {
+            $this->prefetch([[array_merge([], ...array_values($groups)), $typeKey, $idKey]]);
+        }
         $visible = [];
         foreach ($groups as $key => $items) {
             $visible[$key] = [];
             foreach ($items as $item) {
-                if ($this->allowsItem($item, $typeKey, $idKey)) {
+                if ($this->allowsItem($item, $typeKey, $idKey, $restricted, $menusViewable)) {
                     $visible[$key][] = $item;
                 } else {
                     $hidden[$key]++;
@@ -141,22 +172,36 @@ class ContentScopeFilter
     public function filterAssetUsages(array $usages): array
     {
         $hidden = array_map(static fn (array $usage): int => 0, $usages);
-        if (!$this->isRestricted()) {
+        $restricted = $this->isRestricted();
+        $menusViewable = $this->menusViewable();
+        if (!$restricted && $menusViewable) {
             return ['visible' => $usages, 'hidden' => $hidden];
         }
-        $this->prefetch([
-            [array_merge([], ...array_values(array_column($usages, 'hyva_and_catalog'))), 'entity_type', 'id'],
-            [array_merge([], ...array_values(array_column($usages, 'magento_tracked'))), 'entity_type', 'entity_id'],
-        ]);
+        if ($restricted) {
+            $this->prefetch([
+                [array_merge([], ...array_values(array_column($usages, 'hyva_and_catalog'))), 'entity_type', 'id'],
+                [
+                    array_merge([], ...array_values(array_column($usages, 'magento_tracked'))),
+                    'entity_type',
+                    'entity_id',
+                ],
+            ]);
+        }
         $visible = [];
         foreach ($usages as $key => $usage) {
             $content = array_values(array_filter(
                 $usage['hyva_and_catalog'],
-                fn (array $item): bool => $this->allowsItem($item, 'entity_type', 'id')
+                fn (array $item): bool => $this->allowsItem($item, 'entity_type', 'id', $restricted, $menusViewable)
             ));
             $tracked = array_values(array_filter(
                 $usage['magento_tracked'],
-                fn (array $item): bool => $this->allowsItem($item, 'entity_type', 'entity_id')
+                fn (array $item): bool => $this->allowsItem(
+                    $item,
+                    'entity_type',
+                    'entity_id',
+                    $restricted,
+                    $menusViewable
+                )
             ));
             $visible[$key] = ['hyva_and_catalog' => $content, 'magento_tracked' => $tracked];
             $hidden[$key] = count($usage['hyva_and_catalog']) - count($content)
@@ -192,7 +237,8 @@ class ContentScopeFilter
     /**
      * Filter the lists of a usage report (block or menu usage).
      *
-     * For a restricted caller the hidden entries are taken off `total` and counted in usages_hidden_by_permissions;
+     * For a restricted caller, or one who may not view menus, the hidden entries are taken off `total` and counted in
+     * usages_hidden_by_permissions (always present for a restricted caller, otherwise only when something is hidden);
      * `used` keeps reporting every usage, so shared content is never mistaken for unused.
      *
      * @param array $report
@@ -206,7 +252,8 @@ class ContentScopeFilter
      */
     public function filterUsageReport(array $report, array $entityLists, array $storeLists = []): array
     {
-        if (!$this->isRestricted()) {
+        $restricted = $this->isRestricted();
+        if (!$restricted && $this->menusViewable()) {
             return $report;
         }
         $groups = [];
@@ -226,7 +273,7 @@ class ContentScopeFilter
         if (is_int($report['total'] ?? null)) {
             $report['total'] -= $hidden;
         }
-        return $report + ['usages_hidden_by_permissions' => $hidden];
+        return $restricted || $hidden > 0 ? $report + ['usages_hidden_by_permissions' => $hidden] : $report;
     }
 
     /**
@@ -288,20 +335,34 @@ class ContentScopeFilter
     }
 
     /**
-     * Whether a restricted caller may see the entity an entry names (entries naming none are kept), after prefetch().
+     * Whether the caller may see the entity an entry names (entries naming none are kept), after prefetch().
      *
-     * Content entities, products and categories that no longer exist count as hidden.
+     * Menus are hidden from a caller who may not view them. For a restricted caller content entities, products and
+     * categories outside the restriction, or that no longer exist, count as hidden.
      *
      * @param array $item
      * @param string $typeKey
      * @param string $idKey
+     * @param bool $restricted
+     * @param bool $menusViewable
      * @return bool
      * @phpstan-param array<string, mixed> $item
      */
-    private function allowsItem(array $item, string $typeKey, string $idKey): bool
-    {
+    private function allowsItem(
+        array $item,
+        string $typeKey,
+        string $idKey,
+        bool $restricted,
+        bool $menusViewable
+    ): bool {
         $target = $this->target($item, $typeKey, $idKey);
         if ($target === null) {
+            return true;
+        }
+        if (!$menusViewable && $target['entity_type'] === ContentLocator::TYPE_MENU) {
+            return false;
+        }
+        if (!$restricted) {
             return true;
         }
         if ($target['kind'] === self::KIND_PRODUCT) {
@@ -313,6 +374,16 @@ class ContentScopeFilter
             return $path !== null && $this->storeScopeGuard->allowsCategoryPath($path);
         }
         return $this->contentLocator->allowsRead($target['entity_type'], $target['id']);
+    }
+
+    /**
+     * Whether the caller may view menus: Menu Builder installed and enabled, and Hyva_MenuBuilder::menu_view allowed.
+     *
+     * @return bool
+     */
+    private function menusViewable(): bool
+    {
+        return $this->featureChecker->isAvailable(FeatureCheckerInterface::MENU_BUILDER);
     }
 
     /**
