@@ -47,12 +47,18 @@ abstract class AbstractTemplateList extends AbstractEmailTool
      */
     protected function executeEmail(array $arguments): ToolResultInterface
     {
+        // Same clamping and reply keys as AbstractEntityList, so every list echoes the page it answers.
+        $page = max(1, $this->intArg($arguments, 'page', 1) ?? 1);
+        $pageSize = min(200, max(1, $this->intArg($arguments, 'page_size', 50) ?? 50));
         $result = $this->emailGateway->getList(
             static::TEMPLATE_TYPE,
             $this->stringArg($arguments, 'search'),
-            $this->intArg($arguments, 'page', 1) ?? 1,
-            $this->intArg($arguments, 'page_size', 50) ?? 50
+            $page,
+            $pageSize
         );
-        return $this->jsonResult($result, ['total' => $result['total']]);
+        return $this->jsonResult(
+            ['total' => $result['total'], 'page' => $page, 'page_size' => $pageSize, 'items' => $result['items']],
+            ['total' => $result['total']]
+        );
     }
 }

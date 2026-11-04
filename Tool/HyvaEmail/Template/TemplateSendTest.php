@@ -13,6 +13,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Email\AbstractEmailTool;
+use Magento\Framework\Exception\MailException;
 
 /**
  * `hyva_email.template.send_test`: real email, so it is a confirmed write.
@@ -43,7 +44,8 @@ class TemplateSendTest extends AbstractEmailTool
     public function getDescription(): string
     {
         return 'Send the PUBLISHED Hyvä version of an email template to one address with Hyvä\'s sample customer '
-            . 'and order, like the admin "Send test" button. Sends a real email; nothing else changes.';
+            . 'and order, like the admin "Send test" button. Sends a real email; nothing else changes. '
+            . 'When the store cannot send mail, it answers sent: false with status "transport_error".';
     }
 
     /**
@@ -70,7 +72,24 @@ class TemplateSendTest extends AbstractEmailTool
         }
         $template = $this->locateTemplate($arguments);
         $storeId = $this->storeScopeGuard->resolveStoreId($this->intArg($arguments, 'store_id'));
-        $this->emailGateway->sendTest($template['id'], $recipient, $storeId);
+        try {
+            $this->emailGateway->sendTest($template['id'], $recipient, $storeId);
+        } catch (MailException $e) {
+            // The store's mail transport failed (no SMTP, relay refused ...). Answer a soft error so a client does
+            // not read it as a failed tool or a missing template; any other exception still propagates.
+            $message = $e->getMessage();
+            return $this->softError(
+                $message,
+                [
+                    'sent' => false,
+                    'status' => 'transport_error',
+                    'message' => $message,
+                    'id' => $template['id'],
+                    'recipient' => $recipient,
+                ],
+                'transport_error'
+            );
+        }
         return $this->jsonResult(
             ['sent' => true, 'id' => $template['id'], 'recipient' => $recipient],
             ['id' => $template['id']]
