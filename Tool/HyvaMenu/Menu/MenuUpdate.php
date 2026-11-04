@@ -124,7 +124,7 @@ class MenuUpdate extends AbstractMenuTool
         if ($settings === [] && $operations === []) {
             return $this->softError('Nothing to update: pass settings and/or operations.');
         }
-        $live = $this->liveSettings->changes($menu, $settings);
+        $live = $this->liveSettings->menuChanges($menu, $settings);
         $applied = null;
         $removed = [];
         if ($operations !== []) {

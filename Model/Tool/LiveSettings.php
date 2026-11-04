@@ -29,6 +29,12 @@ class LiveSettings
     public const NEVER_LIVE = ['preview_url_key'];
 
     /**
+     * Effect of activating a menu that is not published: Hyvä renders a menu only once it is published and placed.
+     */
+    public const MENU_ACTIVATION_EFFECT = 'Goes live on the storefront once it is published (hyva_menu_publish) and '
+        . 'placed (design config header/footer); an active, unpublished menu renders nothing.';
+
+    /**
      * Live-affecting changes, with what they do to the storefront.
      *
      * @param array $current Current values of the entity, at least of every field in $settings
@@ -60,6 +66,30 @@ class LiveSettings
                 'to' => $value,
                 'effect' => $this->effect($field, $value),
             ];
+        }
+        return $changes;
+    }
+
+    /**
+     * Live-affecting changes of a menu: as changes(), but activating an unpublished menu says it renders nothing yet.
+     *
+     * @param array $current Current menu row; is_published false or missing means not published
+     * @param array $settings Requested settings
+     * @return array
+     * @phpstan-param array<string, mixed> $current
+     * @phpstan-param array<array-key, mixed> $settings
+     * @phpstan-return list<array{field: string, from: mixed, to: mixed, effect: string}>
+     */
+    public function menuChanges(array $current, array $settings): array
+    {
+        $changes = $this->changes($current, $settings);
+        if (!empty($current['is_published'])) {
+            return $changes;
+        }
+        foreach ($changes as $i => $change) {
+            if ($change['field'] === 'is_active' && $change['to']) {
+                $changes[$i]['effect'] = self::MENU_ACTIVATION_EFFECT;
+            }
         }
         return $changes;
     }

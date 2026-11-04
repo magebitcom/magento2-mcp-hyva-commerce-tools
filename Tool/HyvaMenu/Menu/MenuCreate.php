@@ -160,12 +160,7 @@ class MenuCreate extends AbstractMenuTool
         }
 
         $isActive = $this->boolArg($arguments, 'is_active');
-        $live = $this->liveSettings->changes(['is_active' => false], ['is_active' => $isActive]);
-        foreach ($live as $i => $change) {
-            // An active menu renders nothing until it is published (T-134).
-            $live[$i]['effect'] = 'Goes live on the storefront once it is published (hyva_menu_publish) and placed '
-                . '(design config header/footer); an active, unpublished menu renders nothing.';
-        }
+        $live = $this->liveSettings->menuChanges(['is_active' => false], ['is_active' => $isActive]);
         if ($live !== [] && !$this->boolArg($arguments, 'confirm')) {
             return $this->confirmationRequired('create_active', [[
                 'entity_type' => ContentLocator::TYPE_MENU,

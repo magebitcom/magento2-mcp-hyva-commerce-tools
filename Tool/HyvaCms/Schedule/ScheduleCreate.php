@@ -63,7 +63,8 @@ class ScheduleCreate extends AbstractContentTool
             . 'the Hyvä scheduling cron. Add it to an existing pending release (release_id) or create a new release '
             . '(release_name + scheduled_at in store time, YYYY-MM-DD HH:MM). Hyvä releases have no end date: to end '
             . 'a campaign, schedule the previous content in a later release. A scheduled menu is also activated '
-            . '(is_active) when the release fires. Returns conflicts for this entity.';
+            . '(is_active) when the release fires; the reply\'s warnings say so for an inactive menu. Returns '
+            . 'conflicts for this entity.';
     }
 
     /**
@@ -136,12 +137,32 @@ class ScheduleCreate extends AbstractContentTool
             'published_now' => false,
             'note' => 'JIT Tailwind CSS is not generated server-side; classes not already compiled for the theme may '
                 . 'be missing when this release publishes.',
+            'warnings' => $this->warnings($entity),
             'conflicts' => $this->conflictReport->getConflictsWithinCallerScope(
                 60,
                 $entity['type'],
                 $entity['id']
             )['conflicts'],
         ] + $result, ['entity_type' => $entity['type'], 'id' => $entity['id'], 'release_id' => $result['release_id']]);
+    }
+
+    /**
+     * Warnings about what the release does beyond publishing the content.
+     *
+     * Hyvä Menu Builder activates a menu when its release fires (checked live, T-93), so an inactive menu goes live.
+     *
+     * @param array $entity
+     * @return array
+     * @phpstan-param array{type: string, is_active: bool} $entity
+     * @phpstan-return list<string>
+     */
+    private function warnings(array $entity): array
+    {
+        if ($entity['type'] !== ContentLocator::TYPE_MENU || $entity['is_active']) {
+            return [];
+        }
+        return ['The menu is inactive: when this release fires it activates the menu (is_active true), so it goes '
+            . 'live wherever design config (header/footer) or a widget places it.'];
     }
 
     /**

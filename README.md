@@ -128,7 +128,10 @@ The storefront changes only after `hyva_cms.publish` or a scheduled release.
 
 Publishing a menu also activates it: Hyvä Menu Builder sets `is_active` when it publishes
 (`MenuProvider::saveContent()`), and the publish reply reports the flag after publishing. A scheduled menu release
-takes the same path, so it also activates an inactive menu when it fires. Publishing a page or block
+takes the same path, so it also activates an inactive menu when it fires; the schedule reply's `warnings` list says
+so when the menu is inactive. Activating a menu that is not published yet (`hyva_menu.create` or
+`hyva_menu.update` with `is_active: true`) shows nothing until it is published and placed, and the confirm preview
+says so. Publishing a page or block
 leaves its active flag as it is; an inactive one stays hidden, and the reply's `note` names the update call.
 
 `settings` are different: they are Magento fields and apply at once. A `settings` change that affects the live

@@ -56,6 +56,7 @@ class MenuCreateConfirmTest extends TestCase
         $this->assertStringNotContainsString('Goes live on the storefront.', $effect);
         $this->assertStringContainsString('once it is published', $effect);
         $this->assertStringContainsString('hyva_menu_publish', $effect);
+        $this->assertSame(LiveSettings::MENU_ACTIVATION_EFFECT, $effect, 'one wording shared with hyva_menu_update');
         $this->assertArrayHasKey('hint', $payload);
     }
 

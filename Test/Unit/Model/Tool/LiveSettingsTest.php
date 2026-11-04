@@ -48,4 +48,28 @@ class LiveSettingsTest extends TestCase
     {
         $this->assertSame([], (new LiveSettings())->changes(['is_active' => true, 'title' => 'A'], ['title' => 'A']));
     }
+
+    /**
+     * T-134 / T-139: activating an unpublished menu renders nothing until it is published and placed.
+     */
+    public function testActivatingAnUnpublishedMenuSaysItNeedsPublishingAndPlacing(): void
+    {
+        $settings = new LiveSettings();
+        $changes = $settings->menuChanges(['is_active' => false, 'is_published' => false], ['is_active' => true]);
+
+        $this->assertSame(['is_active'], array_column($changes, 'field'));
+        $this->assertSame(LiveSettings::MENU_ACTIVATION_EFFECT, $changes[0]['effect']);
+        $this->assertStringContainsString('hyva_menu_publish', LiveSettings::MENU_ACTIVATION_EFFECT);
+        $this->assertStringContainsString('renders nothing', LiveSettings::MENU_ACTIVATION_EFFECT);
+    }
+
+    public function testActivatingAPublishedMenuOrDeactivatingKeepsTheGeneralWording(): void
+    {
+        $settings = new LiveSettings();
+        $published = $settings->menuChanges(['is_active' => false, 'is_published' => true], ['is_active' => true]);
+        $off = $settings->menuChanges(['is_active' => true, 'is_published' => false], ['is_active' => false]);
+
+        $this->assertSame('Goes live on the storefront.', $published[0]['effect']);
+        $this->assertSame('Goes offline on the storefront.', $off[0]['effect']);
+    }
 }
