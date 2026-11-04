@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Model\Content;
 
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magento\Framework\Escaper;
 
 /**
  * Menu options of the hyva_menu_widget component, cut to the menus the caller may see (T-148).
@@ -19,6 +20,10 @@ use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
  * the options by menu identifier, which several store views can share, and names the menu id in the label
  * ("Title (ID: 3)"): an option stays when the menu its label names is readable, or, for a label without an id (e.g.
  * translated), when one menu with its identifier is. The empty placeholder option always stays.
+ *
+ * The label starts with the admin title, which can itself hold "(ID: N)": the menu named is the one whose identifier
+ * is the option value and whose title + " (ID: id)" starts the label. When no menu or several qualify, the option is
+ * hidden.
  */
 class MenuOptionScope
 {
@@ -29,10 +34,12 @@ class MenuOptionScope
     /**
      * @param ContentScopeFilter $contentScopeFilter
      * @param MenuGatewayInterface $menuGateway
+     * @param Escaper $escaper
      */
     public function __construct(
         private readonly ContentScopeFilter $contentScopeFilter,
-        private readonly MenuGatewayInterface $menuGateway
+        private readonly MenuGatewayInterface $menuGateway,
+        private readonly Escaper $escaper
     ) {
     }
 
@@ -63,12 +70,15 @@ class MenuOptionScope
             return ['options' => array_values($options), 'hidden' => 0];
         }
         $readableIdentifiers = [];
-        $readableIds = [];
+        $menus = [];
         if ($viewable) {
             foreach ($this->menuGateway->getList() as $menu) {
-                if ($this->contentScopeFilter->allowsStores(Cast::intList($menu['store_ids'] ?? []))) {
-                    $readableIdentifiers[Cast::string($menu['identifier'] ?? '')] = true;
-                    $readableIds[Cast::int($menu['id'] ?? 0)] = true;
+                $identifier = Cast::string($menu['identifier'] ?? '');
+                $readable = $this->contentScopeFilter->allowsStores(Cast::intList($menu['store_ids'] ?? []));
+                $menus[Cast::int($menu['id'] ?? 0)] = ['identifier' => $identifier,
+                    'title' => Cast::string($menu['title'] ?? ''), 'readable' => $readable];
+                if ($readable) {
+                    $readableIdentifiers[$identifier] = true;
                 }
             }
         }
@@ -83,10 +93,51 @@ class MenuOptionScope
                 continue;
             }
             $label = is_array($option) && is_string($option['label'] ?? null) ? $option['label'] : '';
-            if (preg_match(self::LABEL_ID_PATTERN, $label, $match) !== 1 || isset($readableIds[(int) $match[1]])) {
+            if ($this->labelAllows($label, $value, $menus)) {
                 $visible[] = $option;
             }
         }
         return ['options' => $visible, 'hidden' => count($options) - count($visible)];
+    }
+
+    /**
+     * Whether the menu the label names is readable; a label without "(ID: N)" was already checked by identifier.
+     *
+     * @param string $label
+     * @param string $identifier Option value.
+     * @param array $menus
+     * @return bool
+     * @phpstan-param array<int, array{identifier: string, title: string, readable: bool}> $menus
+     */
+    private function labelAllows(string $label, string $identifier, array $menus): bool
+    {
+        if (preg_match_all(self::LABEL_ID_PATTERN, $label, $matches) < 1) {
+            return true;
+        }
+        $named = [];
+        foreach (array_unique(array_map('intval', $matches[1])) as $id) {
+            $menu = $menus[$id] ?? null;
+            if ($menu !== null && $menu['identifier'] === $identifier
+                && $this->startsWithTitle($label, $menu['title'], $id)
+            ) {
+                $named[] = $menu;
+            }
+        }
+        return count($named) === 1 && $named[0]['readable'];
+    }
+
+    /**
+     * Whether the label starts with "<title> (ID: <id>)"; Hyvä escapes the label with escapeHtml(), so both count.
+     *
+     * @param string $label
+     * @param string $title
+     * @param int $id
+     * @return bool
+     */
+    private function startsWithTitle(string $label, string $title, int $id): bool
+    {
+        $suffix = ' (ID: ' . $id . ')';
+        return str_starts_with($label, $title . $suffix)
+            || str_starts_with($label, Cast::string($this->escaper->escapeHtml($title)) . $suffix);
     }
 }

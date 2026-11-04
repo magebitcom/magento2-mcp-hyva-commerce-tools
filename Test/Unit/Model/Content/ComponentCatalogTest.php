@@ -18,6 +18,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\FieldValueFormat;
 use Magebit\McpHyvaCommerceTools\Model\Content\MenuOptionScope;
+use Magento\Framework\Escaper;
 use PHPUnit\Framework\TestCase;
 
 class ComponentCatalogTest extends TestCase
@@ -218,10 +219,10 @@ class ComponentCatalogTest extends TestCase
     {
         $components = $this->menuWidget();
         $menus = [
-            ['id' => 1, 'identifier' => 'main', 'store_ids' => [1]],
-            ['id' => 2, 'identifier' => 'footer', 'store_ids' => [2]],
-            ['id' => 3, 'identifier' => 'shared', 'store_ids' => [1]],
-            ['id' => 4, 'identifier' => 'shared', 'store_ids' => [2]],
+            ['id' => 1, 'identifier' => 'main', 'title' => 'Main', 'store_ids' => [1]],
+            ['id' => 2, 'identifier' => 'footer', 'title' => 'Footer', 'store_ids' => [2]],
+            ['id' => 3, 'identifier' => 'shared', 'title' => 'Shared', 'store_ids' => [1]],
+            ['id' => 4, 'identifier' => 'shared', 'title' => 'Shared', 'store_ids' => [2]],
         ];
         $scope = $this->menuScope(true, true, $menus, [2]);
 
@@ -268,7 +269,7 @@ class ComponentCatalogTest extends TestCase
             $this->catalog(
                 $this->provider($components),
                 $components,
-                new MenuOptionScope($scopeFilter, $gateway)
+                new MenuOptionScope($scopeFilter, $gateway, new Escaper())
             )->getSchema('hyva_menu_widget'),
             'menu_identifier'
         );
@@ -355,7 +356,7 @@ class ComponentCatalogTest extends TestCase
         );
         $gateway = $this->createMock(MenuGatewayInterface::class);
         $gateway->method('getList')->willReturn($menus);
-        return new MenuOptionScope($scopeFilter, $gateway);
+        return new MenuOptionScope($scopeFilter, $gateway, new Escaper());
     }
 
     /**
