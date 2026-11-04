@@ -8,6 +8,12 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Trash;
 
+use Magebit\McpHyvaCommerceTools\Api\Adapter\MediaGalleryGatewayInterface;
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
+use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
+use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
+use Magebit\McpHyvaCommerceTools\Model\Media\LiteralUrlAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Tool\MediaGallery\AbstractMediaGalleryTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\Mcp\Api\ToolResultInterface;
@@ -25,6 +31,34 @@ class TrashRestore extends AbstractMediaGalleryTool
     public const IS_WRITE = true;
 
     /**
+     * Hyvä keeps no asset id in the trash, so a restored file is indexed again under a new one (T-159).
+     */
+    public const NEW_ID_NOTE = 'A restored asset gets a new asset id (asset_id): Hyvä keeps no id in the trash. '
+        . 'References to the old id are stale: stale_references lists the image fields that still hold it (their '
+        . 'old id is asset_id, collected in previous_asset_ids). They still render (Hyvä falls back to the stored '
+        . 'path) but lose the link to the asset; re-link them with hyva_media_image_replace using the same path as '
+        . 'old_path and new_path (saves drafts with the new id; publish them).';
+
+    /**
+     * @param FeatureCheckerInterface $featureChecker
+     * @param MediaGalleryGatewayInterface $gallery
+     * @param ImageReferenceExtractor $extractor
+     * @param ImageUsageIndex $usageIndex
+     * @param CallerContext $callerContext
+     * @param LiteralUrlAuditor $literalUrlAuditor
+     */
+    public function __construct(
+        FeatureCheckerInterface $featureChecker,
+        MediaGalleryGatewayInterface $gallery,
+        ImageReferenceExtractor $extractor,
+        ImageUsageIndex $usageIndex,
+        CallerContext $callerContext,
+        private readonly LiteralUrlAuditor $literalUrlAuditor
+    ) {
+        parent::__construct($featureChecker, $gallery, $extractor, $usageIndex, $callerContext);
+    }
+
+    /**
      * @inheritDoc
      */
     public function getTitle(): string
@@ -39,8 +73,9 @@ class TrashRestore extends AbstractMediaGalleryTool
     {
         return 'Restore trashed assets to their original paths (Hyvä uses the delete permission for this). Refuses '
             . 'items '
-            . 'whose original path is taken. Restored assets are re-indexed and may get a new asset id, which is '
-            . 'reported.'
+            . 'whose original path is taken. A restored asset is re-indexed under a NEW asset id (asset_id); the reply '
+            . 'lists the image fields still holding the old id (stale_references, previous_asset_ids) and how to '
+            . 're-link them.'
             . ' ' . SharedMedia::DESCRIPTION_NOTE;
     }
 
@@ -78,12 +113,27 @@ class TrashRestore extends AbstractMediaGalleryTool
             }
         }
         $restored = $restorable !== [] ? $this->gallery->restore(array_keys($restorable)) : 0;
+        $stale = $restorable !== [] ? $this->literalUrlAuditor->staleReferences(array_values($restorable)) : [];
         $assets = [];
         foreach ($restorable as $trashId => $path) {
-            $assets[] = ['trash_id' => $trashId, 'path' => $path, 'asset' => $this->gallery->getByPath($path)];
+            $asset = $this->gallery->getByPath($path);
+            $references = $stale[$path] ?? [];
+            $assets[] = [
+                'trash_id' => $trashId,
+                'path' => $path,
+                'asset_id' => $asset['id'] ?? null,
+                'asset' => $asset,
+                'previous_asset_ids' => array_values(array_unique(array_map(
+                    static fn (array $reference): int => Cast::int($reference['asset_id'] ?? 0),
+                    $references
+                ))),
+                'stale_references' => $references,
+            ];
         }
-        return $this->jsonResult(['restored' => $restored, 'assets' => $assets, 'not_restored' => $blocked], [
-            'restored' => $restored,
-        ]);
+        $payload = ['restored' => $restored, 'assets' => $assets, 'not_restored' => $blocked];
+        if ($assets !== []) {
+            $payload['note'] = self::NEW_ID_NOTE;
+        }
+        return $this->jsonResult($payload, ['restored' => $restored]);
     }
 }

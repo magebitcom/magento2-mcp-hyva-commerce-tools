@@ -54,6 +54,7 @@ class ImageReplaceConfirmTest extends TestCase
         ]));
 
         $this->assertTrue($payload['confirmation_required'] ?? null);
+        $this->assertTrue($payload['dry_run'] ?? null);
         $this->assertSame(self::TARGETS, $payload['affected'] ?? null);
         $this->assertSame(count(self::TARGETS), $payload['total'] ?? null);
         $this->assertSame([], Cast::array($payload['details'] ?? [])['not_editable_usages'] ?? null);
@@ -75,6 +76,22 @@ class ImageReplaceConfirmTest extends TestCase
         ]));
 
         $this->assertArrayNotHasKey('confirmation_required', $payload);
+        $this->assertFalse($payload['published'] ?? null);
+    }
+
+    public function testAOneTypeScopeWritesOnTheFirstCallAndSaysSo(): void
+    {
+        $this->editor->expects($this->once())->method('rewrite')->willReturn([]);
+
+        $payload = $this->payload($this->tool()->execute([
+            'old_path' => 'wysiwyg/old.jpg',
+            'new_path' => 'wysiwyg/new.jpg',
+            'scope' => 'cms_page',
+        ]));
+
+        // T-152: no confirm needed (drafts only), and the reply says it wrote.
+        $this->assertArrayNotHasKey('confirmation_required', $payload);
+        $this->assertFalse($payload['dry_run'] ?? null);
         $this->assertFalse($payload['published'] ?? null);
     }
 

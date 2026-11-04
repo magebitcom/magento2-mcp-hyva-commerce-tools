@@ -16,8 +16,10 @@ use Hyva\EmailTemplates\Api\NewsletterTemplateRepositoryInterface;
 use Hyva\EmailTemplates\Model\DummyData\VariableSubstitutor;
 use Hyva\EmailTemplates\Model\NewsletterTemplateLoader;
 use Hyva\EmailTemplates\Model\OrderPreviewData;
+use Hyva\EmailTemplates\Model\Preview\FixtureDefaults;
 use Hyva\EmailTemplates\Model\Preview\PreviewFixtureProvider;
 use Hyva\EmailTemplates\Model\Preview\PublishedPreviewContext;
+use Hyva\EmailTemplates\Model\Preview\TestSendContext;
 use Hyva\EmailTemplates\Model\Provider\EmailTemplateProvider;
 use Hyva\EmailTemplates\Model\Provider\NewsletterTemplateProvider;
 use Hyva\EmailTemplates\Model\Render\PublishedEmailRenderer;
@@ -343,6 +345,7 @@ class EmailGateway implements EmailGatewayInterface
         }
         // Same sample variables as Hyvä's admin "Send test" (Controller\Adminhtml\Test\Send).
         $store = $storeId !== null && $storeId > 0 ? $storeId : 0;
+        $defaults = $this->orderFallbacks();
         $customer = $this->fixtureProvider()->getCustomerData($store > 0 ? (string) $store : null);
         $order = $this->orderPreviewData()->getOrderContext($store) ?? [];
         $first = Cast::string($customer['first_name'] ?? '');
@@ -354,36 +357,70 @@ class EmailGateway implements EmailGatewayInterface
             Cast::string($customer['city'] ?? ''),
             Cast::string($customer['country'] ?? ''),
         ]));
-        $this->transportBuilder
-            ->setTemplateIdentifier((string) $id)
-            ->setTemplateOptions(
-                ['area' => Area::AREA_FRONTEND, 'store' => $store > 0 ? $store : Store::DEFAULT_STORE_ID]
-            )
-            ->setTemplateVars([
-                'customer' => new DataObject([
-                    'firstname' => $first, 'first_name' => $first, 'lastname' => $last, 'last_name' => $last,
-                    'name' => $name, 'email' => Cast::string($customer['email'] ?? ''),
-                ]),
-                'order' => new DataObject([
-                    'increment_id' => $order['increment_id'] ?? '000000001',
-                    'grand_total' => $order['grand_total'] ?? '$99.00',
-                    'status' => 'processing',
-                    'shipping_description' => $order['shipping_description'] ?? 'Flat Rate - Fixed',
-                ]),
-                'order_data' => new DataObject([
-                    'customer_name' => $name,
-                    'email_customer_note' => Cast::string($customer['customer_note'] ?? ''),
-                    'is_not_virtual' => $order['is_not_virtual'] ?? '1',
-                ]),
-                'formattedBillingAddress' => $address,
-                'formattedShippingAddress' => $address,
-                'payment_html' => $order['payment_html'] ?? '<p>Credit Card</p>',
-                'created_at_formatted' => $order['created_at_formatted'] ?? date('F j, Y'),
-            ])
-            ->setFrom('general')
-            ->addTo($recipient)
-            ->getTransport()
-            ->sendMessage();
+        $vars = [
+            'customer' => new DataObject([
+                'firstname' => $first, 'first_name' => $first, 'lastname' => $last, 'last_name' => $last,
+                'name' => $name, 'email' => Cast::string($customer['email'] ?? ''),
+            ]),
+            'order' => new DataObject([
+                'increment_id' => $order['increment_id'] ?? $defaults['increment_id'],
+                'grand_total' => $order['grand_total'] ?? $defaults['grand_total'],
+                'status' => 'processing',
+                'shipping_description' => $order['shipping_description'] ?? $defaults['shipping_description'],
+            ]),
+            'order_data' => new DataObject([
+                'customer_name' => $name,
+                'email_customer_note' => Cast::string($customer['customer_note'] ?? ''),
+                'is_not_virtual' => $order['is_not_virtual'] ?? '1',
+            ]),
+            'formattedBillingAddress' => $address,
+            'formattedShippingAddress' => $address,
+            'payment_html' => $order['payment_html'] ?? $defaults['payment_html'],
+            'created_at_formatted' => $order['created_at_formatted'] ?? date('F j, Y'),
+        ];
+        // Email 1.0.1+: inside the test-send context Hyvä's order components render the preview fixture (items,
+        // totals, addresses) as the admin "Send test" does; outside it they look for a real order and stay empty.
+        // getTransport() renders the template, so the whole chain runs inside it, as in Hyvä's controller.
+        $send = function () use ($id, $store, $vars, $recipient): void {
+            $this->transportBuilder
+                ->setTemplateIdentifier((string) $id)
+                ->setTemplateOptions(
+                    ['area' => Area::AREA_FRONTEND, 'store' => $store > 0 ? $store : Store::DEFAULT_STORE_ID]
+                )
+                ->setTemplateVars($vars)
+                ->setFrom('general')
+                ->addTo($recipient)
+                ->getTransport()
+                ->sendMessage();
+        };
+        if (class_exists(TestSendContext::class)) {
+            $this->optionalServices->get(TestSendContext::class)->run($send);
+            return;
+        }
+        $send();
+    }
+
+    /**
+     * Sample order values used when the store has no order: Hyvä's FixtureDefaults (Email 1.0.1+), else 1.0.0's
+     *
+     * @return array{increment_id: string, grand_total: string, shipping_description: string, payment_html: string}
+     */
+    private function orderFallbacks(): array
+    {
+        if (class_exists(FixtureDefaults::class)) {
+            return [
+                'increment_id' => FixtureDefaults::INCREMENT_ID,
+                'grand_total' => FixtureDefaults::GRAND_TOTAL,
+                'shipping_description' => FixtureDefaults::SHIPPING_DESCRIPTION,
+                'payment_html' => FixtureDefaults::paymentHtml(),
+            ];
+        }
+        return [
+            'increment_id' => '000000001',
+            'grand_total' => '$99.00',
+            'shipping_description' => 'Flat Rate - Fixed',
+            'payment_html' => '<p>Credit Card</p>',
+        ];
     }
 
     /**

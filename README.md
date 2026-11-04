@@ -159,9 +159,6 @@ Without `"confirm": true` these calls write nothing and return a preview instead
 A call that changes `settings` writes nothing without confirm, not even the draft part of the call. Its preview lists
 each change with its storefront effect.
 
-A call outside the table writes on the first call. `hyva_menu.update` says so with `"dry_run": false` in its reply, for
-example for the title of an inactive menu or a draft structure edit.
-
 Every preview has the same keys:
 
 | Key | Content |
@@ -173,6 +170,15 @@ Every preview has the same keys:
 | `details` | Only when there is context that is not an item, e.g. `in_use` (always a boolean; trash adds `in_use_count`) for trash and the delete tools, `target_folder` for move, `menu_id` and `children_count` for a menu item removal, `not_editable_usages` for a global image replace (an affected entity's own usages sit on its `affected` entry, so each entity is listed once). |
 | `hint` | What confirming does, e.g. that a replaced image is a draft until `hyva_cms.publish`. |
 
+The rule behind the table: `confirm` guards what changes the live storefront at once, what cannot be undone, and
+what overwrites unpublished work. A call that only writes a draft, or removes generated files that are rebuilt on
+the next request, runs on the first call. That covers `hyva_cms.page.update` / `hyva_cms.block.update` without a
+live `settings` change, `hyva_menu.update` outside the table (e.g. the title of an inactive menu, `preview_url_key`
+or a draft structure edit), `hyva_media.image.update_alt`, `hyva_media.image.replace` with one content type,
+`hyva_media.optimization.clear` with one `path` and `hyva_cms.migration.convert_to_draft` with no Hyvä draft yet.
+To tell a preview from a write without knowing the table, read `dry_run`: `true` in a preview (nothing written),
+`false` in the reply of these calls, which wrote. `hyva_media.image.update_alt` accepts `confirm` but ignores it.
+
 ### Refusals
 
 A refused call is a soft error (`isError: true`) with a `status`, not a JSON-RPC error. The refusal comes from Hyvä
@@ -181,7 +187,7 @@ A refused call is a soft error (`isError: true`) with a `status`, not a JSON-RPC
 | Status | When | What to do |
 |---|---|---|
 | 422 | A provider refuses content, or Hyvä's content guard rejects it (3 MB, 5000 components, depth 50). `field_errors` lists the problems per component uid and field. | Fix the fields and call again. |
-| 409 | The draft changed since you read it. Pass `base_version_uid` to the update tools to get this check. Also a confirmed delete of an entity still in use (`in_use`). | Reload and re-apply your change; never resubmit old content. For a delete, see [Confirm and force](#confirm-and-force). |
+| 409 | The draft changed since you read it. Pass `base_version_uid` to the update tools to get this check. Also a confirmed delete of an entity still in use (`in_use`), and a `hyva_linked.group.save` that Hyvä refuses after the check passed (another save took the name or the products; `issues` code `save_refused`, Hyvä's message). | Reload and re-apply your change; never resubmit old content. For a delete, see [Confirm and force](#confirm-and-force). For a linked group, validate again and save again. |
 | 403 | Hyvä refuses a permission, or the role's store scope excludes the entity (audit summary `{"error": "out_of_scope"}`; a missing permission is `status_403`). | Grant the permission (see [Role setup](#role-setup)), or work in the role's own store views (see [Store scope](#store-scope)). |
 | `transport_error` | `hyva_email.template.send_test` could not hand the mail to Magento's mail transport. The reply has `sent: false`, `message`, `id` and `recipient`. | Check the store's mail settings. Nothing was sent. |
 
@@ -483,27 +489,36 @@ Call `hyva_commerce.audit.overview`, `hyva_menu.status` or `hyva_media.status` f
 
 ## Hyvä Commerce 1.4 coverage
 
-Hyvä Commerce 1.4.0 (`hyva-themes/commerce` 1.4.0) and what this module offers for each part. Counts are tools.
+Hyvä Commerce 1.4.1 (`hyva-themes/commerce` 1.4.1) and what this module offers for each part. Counts are tools.
+Hyvä Commerce 1.4.0 (Store Credit 1.0.1, Linked Products 1.0.0) works as well.
 
 | Module (version) | Tools | Notes |
 |---|---|---|
-| Hyvä CMS 1.3.1 (Liveview editor, Connect, Admin Styles) | `hyva_cms.*` (29, without `translation.*` and `tailwind.status`) | Pages, blocks, drafts, versions, scheduling, components, export/import, PageBuilder migration, preview, `permission.check`; per-type verbs from `ContentTypeAuthorization` |
+| Hyvä CMS 1.3.3 (Liveview editor, Connect, Admin Styles) | `hyva_cms.*` (29, without `translation.*` and `tailwind.status`) | Pages, blocks, drafts, versions, scheduling, components, export/import, PageBuilder migration, preview, `permission.check`; per-type verbs from `ContentTypeAuthorization` |
 | CMS AI Translations 1.0.2 | `hyva_cms.translation.*` (2) | Status per store view; run returns proposals and can write the draft, never publishes |
-| Menu Builder 1.1.0 | `hyva_menu.*` (21) | Includes publish, delete, versions and schedules (1.1 per-verb permissions) |
+| Menu Builder 1.1.1 | `hyva_menu.*` (21) | Includes publish, delete, versions and schedules (1.1 per-verb permissions) |
 | Media Gallery 1.0.0 | `hyva_media.asset.*`, `trash.*`, `folder.create`, `sync.status`, `audit.literal_urls` (9) | Asset ids in content (`imageOptions.id`), move, trash/restore, sync drift, literal-URL audit |
 | Media Optimization 1.1.0 | `hyva_media.optimization.*` (5) | Unchanged in 1.4 |
 | Image usage and audits (CMS + Media Gallery) | `hyva_media.image.*`, `hyva_media.audit_*`, `hyva_media.status` (10) | Find, replace and fix images across CMS content and menus |
-| Form Builder 1.0.1 | `hyva_form.*` (9) | Forms, drafts, publish, versions, delivery audit (recipients, webhook) |
-| Email & Newsletter Templates 1.0.0 | `hyva_email.*` (16) | Transactional emails and newsletters: drafts, publish, render preview, test send, delete, coverage audit |
-| Store Credit 1.0.1 | `hyva_store_credit.*` (5) | Balances, history, credit/debit with preview and idempotency key. Its GraphQL API is for shoppers and has no admin use here |
-| Linked Products 1.0.0 | `hyva_linked.*` (4) | Groups, validation with storefront warnings, save with page cache refresh |
+| Form Builder 1.0.2 | `hyva_form.*` (9) | Forms, drafts, publish, versions, delivery audit (recipients, webhook) |
+| Email & Newsletter Templates 1.0.1 | `hyva_email.*` (16) | Transactional emails and newsletters: drafts, publish, render preview, test send, delete, coverage audit |
+| Store Credit 2.0.0 (1.0.1 works too) | `hyva_store_credit.*` (5) | Balances, history, credit/debit with preview and idempotency key. Its GraphQL API is for shoppers and has no admin use here. 2.0.0 only moves the storefront route to `store-credit/`; no tool builds a Store Credit URL |
+| Linked Products 1.0.2 | `hyva_linked.*` (4) | Groups, validation with storefront warnings, save with page cache refresh. See [Linked Products 1.0.1+ in the admin](#linked-products-101-in-the-admin) |
 | Category Merchandiser 1.0.0 | `hyva_merch.category.*` (2) | Reorder only. The Enterprise package is not installed. Reports when another module (ElasticSuite) owns storefront sorting |
 | AI Worker 1.0.0 and AI Worker CMS 1.0.0 | `hyva_ai.*` (5, without `provider.status`) | Monitoring only (status, jobs, usage, errors); AI Worker CMS jobs show in `hyva_ai.job.list`. No generation by design |
 | AI providers 1.3.0 (`magento2-module-ai` 1.3.1 with the Anthropic, DeepL, Gemini and OpenAI modules) | `hyva_ai.provider.status` (1) | Which providers are configured and their models, plus whether CMS AI Translation is ready to run. API keys are never read or shown |
 | CMS Tailwind compiler 1.0.x and JIT bridge 1.0.3 | `hyva_cms.tailwind.status` (1) | Compiler daemon health, daemon management, compilation strategy and compiler version, with a hint when new CMS content is not being compiled. Read only: no start, stop or restart |
-| Advanced Admin Permissions 1.0.0 | `hyva_admin_perm.*` (2) | Read only (effective permissions, audit log). Scope restrictions are applied by the module itself, see [Store scope](#store-scope) |
+| Advanced Admin Permissions 1.0.1 | `hyva_admin_perm.*` (2) | Read only (effective permissions, audit log). Scope restrictions are applied by the module itself, see [Store scope](#store-scope) |
 | Admin Dashboard 2.0.3 (+ API 3.0.1, CMS widgets, CrUX history widget) | `hyva_dashboard.*` (3) + [widgets](#dashboard-widgets) | Views and widget types as the caller sees them; MCP activity and content health widgets |
 | Audits | `hyva_commerce.audit.*` (4) | `audit.overview` adds one health line per 1.4 module |
+
+### Linked Products 1.0.1+ in the admin
+
+Linked Products 1.0.1 gates the *Linked Products* section of the admin Product Edit page by the same resources the
+MCP tools use: with `Hyva_LinkedProducts::group_save` it is editable, with only `group_view` it is read only, and
+without either it is hidden; a product save changes groups only with `group_save`. Admin users of an MCP role
+therefore see that section differently than before 1.0.1, where it did not check them. The MCP tools themselves
+are unchanged: `group_view` lists and reads, `group_save` saves (see [Role setup](#role-setup)).
 
 ### Not covered, on purpose
 
@@ -783,8 +798,16 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
   and `value` nor a non-empty `src`, such as `{"url": "..."}`. They render an empty href.
 - **Image ids.** Hyvä writers outside the editor must call `ImageIdBackfiller::backfill()` themselves
   (`Provider::saveContent` does not). The draft tools do, so images keep their Media Gallery asset id.
-- **Trash and asset ids.** Trashing deletes the Media Gallery asset row, so a restored file can come back with a new
-  asset id. Check content that used the old id with `hyva_media.audit.literal_urls` (`stale_asset_id`).
+- **Trash and asset ids.** Trashing deletes the Media Gallery asset row and Hyvä's trash keeps no asset id, so a
+  restored file always comes back with a new asset id. References by the old id are stale: they still render (Hyvä
+  falls back to the stored path) but no longer follow the asset when it moves. The `hyva_media.trash.restore` reply
+  gives each restored asset's new `asset_id`, the image fields still holding an old id (`stale_references`, the old id
+  in `asset_id`) and those old ids (`previous_asset_ids`). Re-link them with `hyva_media.image.replace` using the same
+  path as `old_path` and `new_path`: it saves drafts that carry the new id. `hyva_media.audit.literal_urls` lists
+  them too (`stale_asset_id`).
+- **Links in the literal-URL audit.** Link field values (`{type, value, src, ...}`) are not images: their `src` is the
+  link target of a `custom_url` or `cms_page` link. `hyva_media.audit.literal_urls` skips them; before, menu
+  `custom_url` links showed up as `literal_not_in_gallery`.
 - **Optimized image cleanup.** `hyva_media.optimization.clear` also removes conversions of resized variants
   (`converted/resized/<hash>`), which Hyvä's own cleaner leaves behind.
 - **Category import.** `hyva_menu.category.import` leaves out new subcategories of a category whose menu item lies
@@ -825,9 +848,25 @@ Clients that parse replies:
 - **`hyva_email.template.send_test` mail failures are soft errors.** A transport failure was JSON-RPC error `-32011`.
   It is now a tool result with `isError: true`, `sent: false` and `status: "transport_error"`. See
   [Refusals](#refusals).
+- **`hyva_email.template.send_test` sends the admin's sample order.** With Email & Newsletter Templates 1.0.1+ the
+  mail is rendered inside Hyvä's test-send context, so order components show the preview fixture (items, totals,
+  addresses) as the admin "Send test" does, and the fallbacks are Hyvä's `FixtureDefaults`. On 1.0.0 nothing changes.
+- **`hyva_media.trash.restore` reports the id change.** Each `assets` entry gains `asset_id` (the new id),
+  `previous_asset_ids` and `stale_references`, and the reply a `note`. See
+  [Notes on Hyvä behaviour](#notes-on-hyvä-behaviour).
+- **`hyva_media.audit.literal_urls` no longer counts link fields** as `literal_not_in_gallery`.
+- **`hyva_linked.group.save` answers a Hyvä refusal softly.** A save that Linked Products refuses after the check (a
+  concurrent save took the name or the products; 1.0.2 says so in its own words) was a JSON-RPC error; it is now a
+  soft error with status 409 and `issues` code `save_refused`.
+- **Calls that write without confirm say `dry_run: false`.** Page/block update, menu update, image alt and replace,
+  optimization clear and migration convert_to_draft replies gain the key; nothing else in them changed. See
+  [Confirm and previews](#confirm-and-previews).
 
 Custom code:
 
+- **`Tool\HyvaMedia\Trash\TrashRestore` takes a `LiteralUrlAuditor`** as its last constructor argument.
+- **`Api\Adapter\LinkedProductsGatewayInterface::save()`** throws `ValidatorException` when Hyvä refuses the group;
+  `GroupSave` turns it into the soft 409.
 - **`Api\Adapter\EmailGatewayInterface`** gains `deletionUsage()`, `deleteTemplate()` and `deleteNewsletter()`. A
   project that replaces the module's preference for it must add them, or PHP stops with a fatal error.
 - **`Api\FeatureCheckerInterface`** gains `isInstalledAndEnabled(string $feature): bool`. A custom implementation must
@@ -877,7 +916,8 @@ vendor/bin/phpcs --standard=Magento2 --extensions=php,phtml app/code/Magebit/Mcp
 `Hyva\MediaOptimization\*`. Tools depend on the `Api/Adapter/*GatewayInterface` contracts, wired to generated proxies,
 so the real gateway is built only after the feature check.
 
-**CI** (`.github/workflows/ci.yml`) runs PHPStan and the unit tests. It needs four repository secrets:
+**CI** (`.github/workflows/ci.yml`) runs PHPStan and the unit tests, each twice: with Store Credit 1.0.1 (Hyvä
+Commerce 1.4.0) and 2.0.0 (1.4.1). It needs four repository secrets:
 
 | Secret | Value |
 |---|---|

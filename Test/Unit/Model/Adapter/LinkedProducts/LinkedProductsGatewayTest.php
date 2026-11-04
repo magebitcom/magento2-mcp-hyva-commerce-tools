@@ -18,7 +18,9 @@ use Hyva\LinkedProducts\Model\ResourceModel\LinkedGroup\Attribute as AttributeRe
 use Hyva\LinkedProducts\Model\ResourceModel\LinkedGroup\CollectionFactory;
 use Hyva\LinkedProducts\Model\ResourceModel\LinkedGroup\Product as ProductResource;
 use Magebit\McpHyvaCommerceTools\Model\Adapter\LinkedProducts\LinkedProductsGateway;
+use Magento\Framework\DB\Adapter\DuplicateException;
 use Magento\Framework\Event\ManagerInterface as EventManager;
+use Magento\Framework\Exception\ValidatorException;
 use Magento\Framework\Indexer\CacheContextFactory;
 use PHPUnit\Framework\TestCase;
 
@@ -111,6 +113,22 @@ class LinkedProductsGatewayTest extends TestCase
             'invalid_name',
             $this->codes($this->gateway->check(null, '  ', ['color'], [1, 4])['issues'])
         );
+    }
+
+    public function testALinkedProducts100DuplicateKeyRaceBecomesAValidatorException(): void
+    {
+        $saver = $this->createMock(LinkedGroupSaver::class);
+        $saver->method('save')->willThrowException(new DuplicateException(__('Unique constraint violation')));
+        $gateway = new LinkedProductsGateway(
+            $this->optionalServices([LinkedGroupSaver::class => $saver]),
+            $this->createMock(CacheContextFactory::class),
+            $this->createMock(EventManager::class)
+        );
+
+        // T-156: the same exception type Linked Products 1.0.2 throws for the race, so GroupSave answers softly.
+        $this->expectException(ValidatorException::class);
+        $this->expectExceptionMessage('A group with this name was just created by someone else');
+        $gateway->save(null, 'Tees', ['color'], [1, 4]);
     }
 
     /**
