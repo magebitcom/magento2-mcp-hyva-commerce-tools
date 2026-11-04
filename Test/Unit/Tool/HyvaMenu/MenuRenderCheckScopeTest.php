@@ -95,6 +95,63 @@ class MenuRenderCheckScopeTest extends TestCase
         );
     }
 
+    public function testByIdentifierAStoreViewTheMenuIsNotAssignedToGivesTheSameReasonAsById(): void
+    {
+        // T-135: the store-filtered identifier lookup misses the menu; it is then found in any store view.
+        $located = [];
+        $menus = $this->createMock(MenuService::class);
+        $menus->method('locate')->willReturnCallback(
+            static function (array $arguments) use (&$located): array {
+                $located[] = $arguments;
+                return ['id' => 4, 'identifier' => 'main', 'store_ids' => [1], 'is_active' => true,
+                    'is_published' => true];
+            }
+        );
+        $menus->method('resolveImportStoreId')->willReturnArgument(0);
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->method('findIdByIdentifier')->willReturnMap([['main', 2, null], ['main', null, 4]]);
+        $gateway->method('render')->willReturn(['html' => '', 'message' => null, 'error' => null]);
+        $features = $this->createMock(FeatureCheckerInterface::class);
+        $features->method('isAvailable')->willReturn(true);
+        $tool = new MenuRenderCheck($features, $menus, $gateway, $this->storeScope(null));
+
+        $result = $tool->execute(['identifier' => 'main', 'store_id' => 2]);
+        $payload = json_decode(Cast::string($result->getContent()[0]['text'] ?? ''), true);
+
+        $this->assertFalse($result->isError());
+        $this->assertSame([['identifier' => 'main']], $located);
+        $this->assertIsArray($payload);
+        $this->assertSame(2, $payload['checks'][0]['store_id'] ?? null);
+        $this->assertSame(
+            'Nothing rendered: the menu is not assigned to store view 2.',
+            $payload['checks'][0]['message'] ?? null
+        );
+    }
+
+    public function testByIdentifierAMenuOfThatStoreViewIsLocatedWithIt(): void
+    {
+        $located = [];
+        $menus = $this->createMock(MenuService::class);
+        $menus->method('locate')->willReturnCallback(
+            static function (array $arguments) use (&$located): array {
+                $located[] = $arguments;
+                return ['id' => 5, 'identifier' => 'main', 'store_ids' => [2], 'is_active' => true,
+                    'is_published' => true];
+            }
+        );
+        $menus->method('resolveImportStoreId')->willReturnArgument(0);
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->method('findIdByIdentifier')->willReturn(5);
+        $gateway->method('render')->willReturn(['html' => '<a href="/">Home</a>', 'message' => null, 'error' => null]);
+        $features = $this->createMock(FeatureCheckerInterface::class);
+        $features->method('isAvailable')->willReturn(true);
+        $tool = new MenuRenderCheck($features, $menus, $gateway, $this->storeScope(null));
+
+        $tool->execute(['identifier' => 'main', 'store_id' => 2]);
+
+        $this->assertSame([['identifier' => 'main', 'store_id' => 2]], $located);
+    }
+
     public function testAnAllStoreViewsMenuIsNeverReportedAsNotAssigned(): void
     {
         $check = $this->emptyCheck(['is_active' => true, 'is_published' => true], null, [0], 2);

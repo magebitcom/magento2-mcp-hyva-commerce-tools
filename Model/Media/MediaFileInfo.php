@@ -46,6 +46,18 @@ class MediaFileInfo
     }
 
     /**
+     * Whether a folder exists under pub/media.
+     *
+     * @param string $folder Relative to pub/media.
+     * @return bool
+     */
+    public function folderExists(string $folder): bool
+    {
+        $folder = trim($folder, '/');
+        return $folder !== '' && !str_contains($folder, '..') && $this->media()->isDirectory($folder);
+    }
+
+    /**
      * Describe.
      *
      * @param string $path

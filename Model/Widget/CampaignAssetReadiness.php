@@ -162,7 +162,7 @@ class CampaignAssetReadiness extends AbstractHealthWidget
                 $this->stat('Scheduled items', count($pending)),
                 $this->stat('Large images', $totals['large'], $this->level($totals['large'])),
                 $this->stat(
-                    'Missing alt (all image usages)',
+                    'Missing alt (scheduled items)',
                     $totals['missing_alt'],
                     $this->level($totals['missing_alt'])
                 ),

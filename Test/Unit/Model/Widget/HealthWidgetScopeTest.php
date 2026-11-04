@@ -182,7 +182,10 @@ class HealthWidgetScopeTest extends TestCase
         $data = $widget->getDisplayData($this->ctx(), $this->instance());
 
         $this->assertSame(0, $this->list($data, 'stats')[0]['value']);
-        $this->assertContains('Missing alt (all image usages)', array_column($this->list($data, 'stats'), 'label'));
+        // T-133: this widget checks only the images in pending scheduled items, not every image usage.
+        $labels = array_column($this->list($data, 'stats'), 'label');
+        $this->assertContains('Missing alt (scheduled items)', $labels);
+        $this->assertNotContains('Missing alt (all image usages)', $labels);
     }
 
     /**

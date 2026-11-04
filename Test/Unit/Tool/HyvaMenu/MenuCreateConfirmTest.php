@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuItemBuilder;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
+use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuCreate;
 use PHPUnit\Framework\TestCase;
@@ -50,6 +51,11 @@ class MenuCreateConfirmTest extends TestCase
         $this->assertSame('main', $affected['identifier'] ?? null);
         $this->assertSame([1], $affected['store_ids'] ?? null);
         $this->assertSame('is_active', $affected['changes'][0]['field'] ?? null);
+        // T-134: an active menu renders nothing until it is published (and placed).
+        $effect = Cast::string($affected['changes'][0]['effect'] ?? '');
+        $this->assertStringNotContainsString('Goes live on the storefront.', $effect);
+        $this->assertStringContainsString('once it is published', $effect);
+        $this->assertStringContainsString('hyva_menu_publish', $effect);
         $this->assertArrayHasKey('hint', $payload);
     }
 

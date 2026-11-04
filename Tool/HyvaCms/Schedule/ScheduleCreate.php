@@ -62,7 +62,8 @@ class ScheduleCreate extends AbstractContentTool
         return 'Schedule the current draft (or version_id) of a page, block or menu to be published automatically by '
             . 'the Hyvä scheduling cron. Add it to an existing pending release (release_id) or create a new release '
             . '(release_name + scheduled_at in store time, YYYY-MM-DD HH:MM). Hyvä releases have no end date: to end '
-            . 'a campaign, schedule the previous content in a later release. Returns conflicts for this entity.';
+            . 'a campaign, schedule the previous content in a later release. A scheduled menu is also activated '
+            . '(is_active) when the release fires. Returns conflicts for this entity.';
     }
 
     /**

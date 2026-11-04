@@ -306,6 +306,38 @@ class ImageListTest extends TestCase
     }
 
     /**
+     * T-136: a folder that does not exist under pub/media says so instead of reading like "no images".
+     *
+     * @return void
+     */
+    public function testAMissingFolderGivesAHint(): void
+    {
+        $this->fileInfo->method('folderExists')->willReturnMap([['giftcards', false]]);
+
+        $result = $this->tool->execute(['folder' => 'giftcards/', 'types' => ['gif']]);
+
+        $this->assertSame(0, $this->payloadAt($result, 'total'));
+        $this->assertSame('Folder "giftcards" does not exist under pub/media.', $this->payloadAt($result, 'hint'));
+    }
+
+    /**
+     * An existing folder, and the default one, give no hint.
+     *
+     * @return void
+     */
+    public function testAnExistingFolderGivesNoHint(): void
+    {
+        $this->fileInfo->method('folderExists')->willReturn(true);
+
+        foreach ([['folder' => 'wysiwyg'], []] as $arguments) {
+            $text = $this->tool->execute($arguments)->getContent()[0]['text'] ?? '';
+            $payload = json_decode(is_string($text) ? $text : '', true);
+            $this->assertIsArray($payload);
+            $this->assertArrayNotHasKey('hint', $payload);
+        }
+    }
+
+    /**
      * Paths listed for the given arguments, with three gallery assets and an empty folder scan.
      *
      * @param array $arguments

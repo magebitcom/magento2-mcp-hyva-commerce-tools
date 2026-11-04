@@ -80,7 +80,7 @@ class ImageList extends AbstractMediaTool
             ->string('folder', fn (StringBuilder $s) => $s
                 ->description('Folder under pub/media, e.g. "wysiwyg/giftcards": only images in it and its '
                     . 'subfolders. Without folder: every Media Gallery image plus a scan of wysiwyg. Use "" for the '
-                    . 'whole gallery without a scan.'))
+                    . 'whole gallery without a scan. A folder that does not exist gives a hint.'))
             ->array('types', fn (ArrayBuilder $a) => $a->ofStrings()->description('Extensions, e.g. ["png","jpg"].'))
             ->integer('min_size_kb', fn (IntegerBuilder $i) => $i->minimum(0))
             ->integer('max_size_kb', fn (IntegerBuilder $i) => $i->minimum(0))
@@ -204,7 +204,12 @@ class ImageList extends AbstractMediaTool
                 'usages_missing_alt' => $this->missingAlt($usages),
             ], 'usages_hidden_by_permissions', $hidden);
         }
-        return $this->jsonResult(['total' => $total, 'items' => $items], ['total' => $total]);
+        $payload = ['total' => $total, 'items' => $items];
+        if ($explicitFolder && $folder !== '' && !$this->fileInfo->folderExists($folder)) {
+            // T-136: an unknown folder (a typo, or no wysiwyg/ prefix) should not read like "no images".
+            $payload['hint'] = sprintf('Folder "%s" does not exist under pub/media.', $folder);
+        }
+        return $this->jsonResult($payload, ['total' => $total]);
     }
 
     /**

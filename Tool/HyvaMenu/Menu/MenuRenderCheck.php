@@ -76,8 +76,8 @@ class MenuRenderCheck extends AbstractMenuTool
      */
     protected function executeMenu(array $arguments): ToolResultInterface
     {
-        $menu = $this->menuService->locate($arguments);
         $storeId = $this->intArg($arguments, 'store_id');
+        $menu = $this->menuService->locate($this->lookupArguments($arguments, $storeId));
         // A restricted role renders only in store views it may read: an explicit one outside it is refused, the
         // menu's own are narrowed to it, and the fallback is its first store view instead of the default one.
         $storeIds = $storeId !== null ? [$this->menuService->resolveImportStoreId($storeId, [])] : array_values(
@@ -114,6 +114,30 @@ class MenuRenderCheck extends AbstractMenuTool
             ['id' => $menu['id'], 'identifier' => $menu['identifier'], 'passed' => $passed, 'checks' => $checks],
             ['id' => Cast::int($menu['id']), 'passed' => $passed]
         );
+    }
+
+    /**
+     * Lookup arguments: by identifier, a menu not assigned to store_id is found in any store view (T-135).
+     *
+     * The identifier lookup is store-filtered, so it would say "does not exist" for a menu that only is not
+     * assigned to that store view; the check then names that reason, as it does for a lookup by id.
+     *
+     * @param array $arguments
+     * @param int|null $storeId
+     * @return array
+     * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-return array<string, mixed>
+     */
+    private function lookupArguments(array $arguments, ?int $storeId): array
+    {
+        $identifier = $arguments['identifier'] ?? null;
+        if ($storeId === null || $this->intArg($arguments, 'id') !== null || !is_string($identifier)
+            || $identifier === '' || $this->menuGateway->findIdByIdentifier($identifier, $storeId) !== null
+        ) {
+            return $arguments;
+        }
+        unset($arguments['store_id']);
+        return $arguments;
     }
 
     /**

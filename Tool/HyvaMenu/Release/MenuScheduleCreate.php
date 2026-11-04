@@ -34,7 +34,8 @@ class MenuScheduleCreate extends ScheduleCreate
     public function getDescription(): string
     {
         return 'Schedule the menu draft (or a version) to go live at a set time in a release, like '
-            . 'hyva_cms_schedule_create with entity_type=menu.';
+            . 'hyva_cms_schedule_create with entity_type=menu. When the release fires it also activates the menu '
+            . '(is_active), as hyva_menu_publish does.';
     }
 
     /**
