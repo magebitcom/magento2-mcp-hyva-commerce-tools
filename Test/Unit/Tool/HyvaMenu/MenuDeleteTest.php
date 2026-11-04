@@ -14,15 +14,17 @@ use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\DeletionUsage;
+use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuDelete;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magento\Framework\Exception\LocalizedException;
 use PHPUnit\Framework\TestCase;
 
 /**
  * T-22: hyva_menu.delete is confirm-gated, says when the menu is still placed and keeps to the store scope. T-73: a
- * menu in use needs "force": true as well.
+ * menu in use needs "force": true as well. T-68: pending scheduled items are previewed and cancelled with the delete.
  */
 class MenuDeleteTest extends TestCase
 {
@@ -99,6 +101,85 @@ class MenuDeleteTest extends TestCase
         $this->assertArrayNotHasKey('forced', $payload);
     }
 
+    public function testThePreviewListsPendingScheduledItems(): void
+    {
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->expects($this->never())->method('delete');
+        $schedule = $this->scheduleWithPendingItem();
+        $schedule->expects($this->never())->method('cancel');
+
+        $payload = $this->payload($this->tool($gateway, null, null, [1], true, $schedule)->execute(['id' => 3]));
+
+        $this->assertSame(
+            [[
+                'item_id' => 7,
+                'release_id' => 2,
+                'release_name' => 'Winter',
+                'time_scheduled' => '2026-12-01 08:00:00',
+            ]],
+            $this->valueAt($payload, 'details', 'scheduled_items')
+        );
+        $this->assertStringContainsString('1 pending scheduled release item(s)', Cast::string($payload['hint']));
+        $this->assertStringContainsString('deleting cancels them', Cast::string($payload['hint']));
+    }
+
+    public function testThePreviewOfAMenuWithoutScheduledItemsHasNoScheduleDetails(): void
+    {
+        $payload = $this->payload($this->tool($this->createMock(MenuGatewayInterface::class))->execute(['id' => 3]));
+
+        $this->assertNull($this->valueAt($payload, 'details', 'scheduled_items'));
+        $this->assertStringNotContainsString('scheduled', Cast::string($payload['hint']));
+    }
+
+    public function testConfirmCancelsThePendingScheduledItems(): void
+    {
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->expects($this->once())->method('delete')->with(3);
+        $schedule = $this->scheduleWithPendingItem();
+        $schedule->expects($this->once())->method('cancel')->with([7])
+            ->willReturn(['cancelled_items' => [7], 'cancelled_releases' => [2]]);
+
+        $payload = $this->payload(
+            $this->tool($gateway, null, null, [1], true, $schedule)->execute(['id' => 3, 'confirm' => true])
+        );
+
+        $this->assertTrue($payload['deleted']);
+        $this->assertSame([7], $payload['scheduled_items_cancelled']);
+        $this->assertSame([2], $payload['scheduled_releases_cancelled']);
+    }
+
+    public function testAFailedCancelStillReportsTheDeleteWithAWarning(): void
+    {
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->expects($this->once())->method('delete')->with(3);
+        $schedule = $this->scheduleWithPendingItem();
+        $schedule->method('cancel')->willThrowException(new \RuntimeException('Lock wait timeout'));
+
+        $result = $this->tool($gateway, null, null, [1], true, $schedule)->execute(['id' => 3, 'confirm' => true]);
+        $payload = $this->payload($result);
+
+        $this->assertFalse($result->isError());
+        $this->assertTrue($payload['deleted']);
+        $this->assertSame([], $payload['scheduled_items_cancelled']);
+        $this->assertStringContainsString(
+            '#7 could not be cancelled (Lock wait timeout)',
+            Cast::string($payload['warning'])
+        );
+    }
+
+    public function testNothingIsCancelledWhenTheDeleteFails(): void
+    {
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->method('delete')->willThrowException(new LocalizedException(
+            __('Could not delete')
+        ));
+        $schedule = $this->scheduleWithPendingItem();
+        $schedule->expects($this->never())->method('cancel');
+
+        $this->expectException(LocalizedException::class);
+        $this->tool($gateway, null, null, [1], true, $schedule)->execute(['id' => 3, 'confirm' => true]);
+    }
+
     public function testARestrictedRoleMayNotDeleteAMenuOfAllStoreViews(): void
     {
         $gateway = $this->createMock(MenuGatewayInterface::class);
@@ -141,6 +222,7 @@ class MenuDeleteTest extends TestCase
      * @param array<string, mixed>|null $usage DeletionUsage::forMenu() report; null = unused.
      * @param list<int> $storeIds Store views of the menu.
      * @param bool $menuBuilder Whether Menu Builder is enabled.
+     * @param ScheduleService|null $schedule Defaults to one without pending items.
      * @return MenuDelete
      */
     private function tool(
@@ -148,7 +230,8 @@ class MenuDeleteTest extends TestCase
         ?array $allowedStoreIds = null,
         ?array $usage = null,
         array $storeIds = [1],
-        bool $menuBuilder = true
+        bool $menuBuilder = true,
+        ?ScheduleService $schedule = null
     ): MenuDelete {
         $menu = ['id' => 3, 'identifier' => 'main', 'title' => 'Main menu', 'is_active' => true,
             'store_ids' => $storeIds];
@@ -172,7 +255,31 @@ class MenuDeleteTest extends TestCase
         $deletionUsage->method('forMenu')->willReturn(
             $usage ?? ['identifier' => 'main', 'used' => false, 'total' => 0]
         );
-        return new MenuDelete($features, $menus, $gateway, $deletionUsage);
+        if ($schedule === null) {
+            $schedule = $this->createMock(ScheduleService::class);
+            $schedule->method('getItems')->willReturn([]);
+            $schedule->expects($this->never())->method('cancel');
+        }
+        return new MenuDelete($features, $menus, $gateway, $deletionUsage, $schedule);
+    }
+
+    /**
+     * Schedule service with one pending item (#7 in release #2) for menu 3.
+     *
+     * @return ScheduleService&\PHPUnit\Framework\MockObject\MockObject
+     */
+    private function scheduleWithPendingItem(): ScheduleService
+    {
+        $schedule = $this->createMock(ScheduleService::class);
+        $schedule->method('getItems')->with(
+            ['status' => 'pending', 'entity_type' => 'menu', 'entity_id' => 3]
+        )->willReturn([[
+            'item_id' => 7, 'release_id' => 2, 'entity_type' => 'menu', 'entity_id' => 3, 'name' => 'Main menu',
+            'status' => 'pending', 'settings' => null, 'version_history_id' => null,
+            'creation_time' => '2026-11-04 10:00:00', 'release_name' => 'Winter', 'release_status' => 'pending',
+            'time_scheduled' => '2026-12-01 08:00:00',
+        ]]);
+        return $schedule;
     }
 
     /**

@@ -327,7 +327,9 @@ Exceptions:
   in the admin area, Hyvä's menu repository for menus, Magento's template models for email and newsletter templates.
 - **Hyvä data goes with it.** Hyvä drafts, version history and Tailwind CSS are deleted too, as in the admin (foreign
   keys with `ON DELETE CASCADE`).
-- **Scheduled releases stay.** Releases that name the entity are not removed, as in the admin.
+- **Scheduled releases stay.** Releases that name a page or block are not removed, as in the admin.
+  `hyva_menu.delete` lists the menu's pending scheduled items in the preview and cancels them with the delete
+  (a release left without pending items is cancelled too), since an item whose menu is gone can never publish.
 
 To remove a single menu item use `hyva_menu.item.remove`. To remove media files, `hyva_media.asset.trash` moves them to
 the Media Gallery trash.
