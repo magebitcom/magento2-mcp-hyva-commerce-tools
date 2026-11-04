@@ -866,6 +866,10 @@ Clients that parse replies:
 Custom code:
 
 - **`Tool\HyvaMedia\Trash\TrashRestore` takes a `LiteralUrlAuditor`** as its last constructor argument.
+- **`Tool\HyvaMenu\Menu\MenuDelete` takes a `Model\Content\ScheduleService`** as its last constructor argument
+  (it cancels the deleted menu's pending scheduled items).
+- **`Model\Content\ComponentCatalog` takes a `Model\Content\MenuOptionScope`** as its last constructor argument
+  (it cuts the `hyva_menu_widget` menu options to the menus the caller may see).
 - **`Api\Adapter\LinkedProductsGatewayInterface::save()`** throws `ValidatorException` when Hyvä refuses the group;
   `GroupSave` turns it into the soft 409.
 - **`Api\Adapter\EmailGatewayInterface`** gains `deletionUsage()`, `deleteTemplate()` and `deleteNewsletter()`. A
