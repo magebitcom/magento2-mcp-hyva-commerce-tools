@@ -8,8 +8,10 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\Audit;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Media\AbstractMediaTool;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCommerce\Audit\AuditMedia;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Audit\AuditAll;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Audit\AuditCms;
@@ -45,7 +47,10 @@ class AuditEmptyCountsTest extends TestCase
         $auditor->method('audit')->willReturn(['scope' => 'all', 'images_checked' => 0,
             'counts' => new \stdClass(), 'config_issues' => [], 'images' => []]);
 
-        $result = (new $class($auditor))->execute([]);
+        $tool = is_subclass_of($class, AbstractMediaTool::class)
+            ? new $class($this->createMock(FeatureCheckerInterface::class), $auditor)
+            : new $class($auditor);
+        $result = $tool->execute([]);
 
         $this->assertFalse($result->isError());
         $text = $result->getContent()[0]['text'] ?? '';

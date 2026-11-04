@@ -27,11 +27,32 @@ class PreviewServiceScopeTest extends TestCase
         ['store_id' => 2, 'code' => 'scope_b', 'is_assigned' => true, 'preview_url' => 'p2', 'published_url' => 'u2'],
     ];
 
+    public function testUnassignedStoreRowHasNoPreviewUrl(): void
+    {
+        // T-95: menu 3 is assigned to store view 1 only; Hyvä still reports store view 2 as assigned with a preview.
+        $index = $this->createMock(ContentIndex::class);
+        $index->method('getStoreIds')->with('menu', [3])->willReturn([3 => [1]]);
+
+        $stores = $this->service(null, $index)->getPreview('menu', 3)['stores'];
+
+        $this->assertSame(
+            [
+                ['store_id' => 1, 'is_assigned' => true, 'preview_url' => 'p1', 'published_url' => 'u1'],
+                ['store_id' => 2, 'is_assigned' => false, 'preview_url' => null, 'published_url' => null],
+            ],
+            array_map(
+                static fn (array $row): array => array_diff_key($row, ['code' => true]),
+                $stores
+            )
+        );
+    }
+
     /**
      * @param list<int>|null $restricted
+     * @param ContentIndex|null $index
      * @return PreviewService
      */
-    private function service(?array $restricted): PreviewService
+    private function service(?array $restricted, ?ContentIndex $index = null): PreviewService
     {
         $provider = $this->createMock(ContentProvider::class);
         $provider->method('getStoreContentData')->willReturn(self::ROWS);
@@ -43,7 +64,7 @@ class PreviewServiceScopeTest extends TestCase
             $this->createMock(LoggerInterface::class),
             $guard,
             $this->createMock(StoreManagerInterface::class),
-            $this->createMock(ContentIndex::class)
+            $index ?? $this->createMock(ContentIndex::class)
         );
     }
 

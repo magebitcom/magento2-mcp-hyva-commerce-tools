@@ -11,7 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Media;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MediaOptimizationGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageEngineInfo;
-use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Media\AbstractMediaTool;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
@@ -20,11 +20,16 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 /**
  * `hyva_media.status`: Media Optimization / Image Editor availability, engines and key settings.
  */
-class MediaStatus extends AbstractTool
+class MediaStatus extends AbstractMediaTool
 {
     public const TOOL_NAME = 'hyva_media.status';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_media_status';
     public const UNDERLYING_ACL_RESOURCE = 'Hyva_MediaGallery::asset_view';
+
+    /**
+     * The status tool stays listed without Media Gallery, with a resource every Hyvä CMS install declares.
+     */
+    protected const FEATURE_MISSING_ACL_RESOURCE = 'Hyva_Cms::cms';
 
     /**
      * @param FeatureCheckerInterface $featureChecker
@@ -33,11 +38,12 @@ class MediaStatus extends AbstractTool
      * @param ScopeConfigInterface $scopeConfig
      */
     public function __construct(
-        private readonly FeatureCheckerInterface $featureChecker,
+        FeatureCheckerInterface $featureChecker,
         private readonly MediaOptimizationGatewayInterface $mediaGateway,
         private readonly ImageEngineInfo $imageEngineInfo,
         private readonly ScopeConfigInterface $scopeConfig
     ) {
+        parent::__construct($featureChecker);
     }
 
     /**

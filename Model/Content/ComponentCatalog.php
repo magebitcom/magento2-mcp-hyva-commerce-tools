@@ -105,7 +105,6 @@ class ComponentCatalog
                     'required' => !empty($attributes['required']),
                     'default_value' => $fieldDefinition['default_value'] ?? null,
                     'options' => is_array($options) ? $options : null,
-                    'options_source' => is_string($options) ? $options : null,
                     'translate' => !empty($fieldDefinition['translate']),
                     'validation' => array_intersect_key(
                         $attributes,

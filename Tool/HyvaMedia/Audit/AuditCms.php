@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Audit;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Media\AbstractMediaTool;
 use Magebit\Mcp\Api\ToolResultInterface;
@@ -23,11 +24,14 @@ class AuditCms extends AbstractMediaTool
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_media_audit_cms';
 
     /**
+     * @param FeatureCheckerInterface $featureChecker
      * @param MediaAuditor $auditor
      */
     public function __construct(
+        FeatureCheckerInterface $featureChecker,
         private readonly MediaAuditor $auditor
     ) {
+        parent::__construct($featureChecker);
     }
 
     /**

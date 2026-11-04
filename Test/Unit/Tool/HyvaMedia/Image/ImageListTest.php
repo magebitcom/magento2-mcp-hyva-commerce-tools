@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\Image;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaInventory;
@@ -71,7 +72,13 @@ class ImageListTest extends TestCase
             'extension' => strtolower(pathinfo($path, PATHINFO_EXTENSION)),
         ]);
         $this->usageIndex = $this->createMock(ImageUsageIndex::class);
-        $this->tool = new ImageList($inventory, $this->fileInfo, $this->usageIndex, $this->contentScope(null));
+        $this->tool = new ImageList(
+            $this->createMock(FeatureCheckerInterface::class),
+            $inventory,
+            $this->fileInfo,
+            $this->usageIndex,
+            $this->contentScope(null)
+        );
     }
 
     /**
@@ -323,7 +330,13 @@ class ImageListTest extends TestCase
             $inventory->expects($this->once())->method('scanFolder')->with($scanned)->willReturn([]);
         }
         $this->usageIndex->method('usagesOfMany')->willReturn([]);
-        $tool = new ImageList($inventory, $this->fileInfo, $this->usageIndex, $this->contentScope(null));
+        $tool = new ImageList(
+            $this->createMock(FeatureCheckerInterface::class),
+            $inventory,
+            $this->fileInfo,
+            $this->usageIndex,
+            $this->contentScope(null)
+        );
 
         return array_column($this->arrayAt($tool->execute($arguments + ['sort' => 'path']), 'items'), 'path');
     }
@@ -336,12 +349,18 @@ class ImageListTest extends TestCase
      */
     private function restrictedTool(): ImageList
     {
-        return new ImageList($this->inventory, $this->fileInfo, $this->usageIndex, $this->contentScope(
-            [1],
-            ['cms_page' => [1 => [1], 2 => [2]], 'menu' => [3 => [0]]],
-            null,
-            ['product' => [5 => [1]]]
-        ));
+        return new ImageList(
+            $this->createMock(FeatureCheckerInterface::class),
+            $this->inventory,
+            $this->fileInfo,
+            $this->usageIndex,
+            $this->contentScope(
+                [1],
+                ['cms_page' => [1 => [1], 2 => [2]], 'menu' => [3 => [0]]],
+                null,
+                ['product' => [5 => [1]]]
+            )
+        );
     }
 
     /**

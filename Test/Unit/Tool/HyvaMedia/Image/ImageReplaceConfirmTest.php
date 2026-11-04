@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\Image;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
@@ -153,7 +154,14 @@ class ImageReplaceConfirmTest extends TestCase
             static fn (array $items): array => ['visible' => $items, 'hidden' => 0]
         );
         $scopeFilter->method('withHidden')->willReturnArgument(0);
-        return new ImageReplace($this->editor, $files, $acl, $locator, $scopeFilter);
+        return new ImageReplace(
+            $this->createMock(FeatureCheckerInterface::class),
+            $this->editor,
+            $files,
+            $acl,
+            $locator,
+            $scopeFilter
+        );
     }
 
     /**

@@ -19,6 +19,15 @@ use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateList;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormList;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupList;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset\AssetSearch;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Audit\AuditAll;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Audit\AuditCms;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Audit\AuditMenu as MediaAuditMenu;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageFindUsage;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageGet;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageList;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageReplace;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageUpdateAlt;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageValidate;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Media\MediaStatus;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Optimization\OptimizationClear;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Optimization\OptimizationConfigGet;
@@ -98,12 +107,74 @@ class OptionalFeatureListingTest extends TestCase
         );
     }
 
+    /**
+     * @return array<string, array{0: class-string}>
+     */
+    public static function imageAndAuditToolProvider(): array
+    {
+        return [
+            'image list' => [ImageList::class],
+            'image get' => [ImageGet::class],
+            'image find usage' => [ImageFindUsage::class],
+            'image validate' => [ImageValidate::class],
+            'audit all' => [AuditAll::class],
+            'audit cms' => [AuditCms::class],
+            'audit menu' => [MediaAuditMenu::class],
+        ];
+    }
+
+    /**
+     * T-56: the Image and Audit tools are listed with Hyva_MediaGallery::asset_view, which exists only with Media
+     * Gallery enabled.
+     *
+     * @dataProvider imageAndAuditToolProvider
+     * @param class-string $class
+     */
+    public function testImageAndAuditToolsHiddenWhenMediaGalleryMissing(string $class): void
+    {
+        $this->assertSame(
+            'Hyva_MediaGallery::asset_view',
+            $this->tool($class, FeatureCheckerInterface::MEDIA_GALLERY, true)->getUnderlyingAclResource()
+        );
+        $this->assertSame(
+            ContentAcl::UNAVAILABLE_RESOURCE,
+            $this->tool($class, FeatureCheckerInterface::MEDIA_GALLERY, false)->getUnderlyingAclResource()
+        );
+    }
+
+    /**
+     * T-56: the image write tools keep their content-type listing rule, but only while Media Gallery is enabled.
+     */
+    public function testImageWriteToolsHiddenWhenMediaGalleryMissing(): void
+    {
+        foreach ([ImageReplace::class, ImageUpdateAlt::class] as $class) {
+            $acl = $this->createMock(ContentAcl::class);
+            $acl->method('listingResource')->willReturn('Hyva_Cms::page_save');
+
+            $enabled = $this->tool($class, FeatureCheckerInterface::MEDIA_GALLERY, true);
+            (new \ReflectionProperty($class, 'contentAcl'))->setValue($enabled, $acl);
+            $this->assertSame('Hyva_Cms::page_save', $enabled->getUnderlyingAclResource(), $class);
+
+            $missing = $this->tool($class, FeatureCheckerInterface::MEDIA_GALLERY, false);
+            (new \ReflectionProperty($class, 'contentAcl'))->setValue($missing, $acl);
+            $this->assertSame(ContentAcl::UNAVAILABLE_RESOURCE, $missing->getUnderlyingAclResource(), $class);
+        }
+    }
+
     public function testTheStatusToolsStayListed(): void
     {
         $this->assertSame('Hyva_Cms::cms', (new \ReflectionClass(MenuStatus::class))
             ->newInstanceWithoutConstructor()->getUnderlyingAclResource());
-        $this->assertSame('Hyva_MediaGallery::asset_view', (new \ReflectionClass(MediaStatus::class))
-            ->newInstanceWithoutConstructor()->getUnderlyingAclResource());
+        $this->assertSame('Hyva_MediaGallery::asset_view', $this->tool(
+            MediaStatus::class,
+            FeatureCheckerInterface::MEDIA_GALLERY,
+            true
+        )->getUnderlyingAclResource());
+        $this->assertSame('Hyva_Cms::cms', $this->tool(
+            MediaStatus::class,
+            FeatureCheckerInterface::MEDIA_GALLERY,
+            false
+        )->getUnderlyingAclResource());
         $this->assertSame('Magento_Customer::customer', $this->tool(
             StoreCreditStatus::class,
             FeatureCheckerInterface::STORE_CREDIT,

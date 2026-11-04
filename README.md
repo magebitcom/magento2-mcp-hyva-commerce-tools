@@ -14,6 +14,7 @@ and content health.
 - [ACL](#acl)
 - [Store scope](#store-scope)
 - [Delete tools](#delete-tools)
+- [Replies](#replies)
 - [Optional features](#optional-features)
 - [Hyvä Commerce 1.4 coverage](#hyvä-commerce-14-coverage)
 - [Tool catalog](#tool-catalog)
@@ -138,7 +139,7 @@ Without `"confirm": true` these calls write nothing and return a preview instead
 
 | Call | Needs `"confirm": true` |
 |---|---|
-| `hyva_cms.page.create` / `hyva_cms.block.create` with `is_active=true` | Always. The preview shows what would go live. An inactive create never needs it, whatever its identifier and store views: an inactive page or block is not served. |
+| `hyva_cms.page.create` / `hyva_cms.block.create` / `hyva_menu.create` with `is_active=true` | Always (`action: "create_active"`). The preview shows what would go live. An inactive create never needs it, whatever its identifier and store views: an inactive page, block or menu is not served. |
 | `settings`: active flag, store views, URL key or identifier | Always. |
 | `settings`: any other field | Only on an active page, block or menu. A menu's `preview_url_key` never needs it: it only picks the page the editor previews the menu on. |
 | Replacing a draft | `hyva_cms.draft.create` and `hyva_cms.import` when the current draft has unpublished changes; `hyva_cms.migration.convert_to_draft` when a Hyvä draft already exists. |
@@ -149,7 +150,7 @@ Without `"confirm": true` these calls write nothing and return a preview instead
 | `hyva_store_credit.balance.credit`, `hyva_store_credit.balance.debit` | Always. |
 | `hyva_linked.group.save` | Always. Without it the tool only validates and shows the result. |
 | `hyva_merch.category.positions_set` | Always. |
-| `hyva_cms.page.delete`, `hyva_cms.block.delete`, `hyva_menu.delete` | Always; an entity in use also needs `"force": true`. See [Delete tools](#delete-tools). |
+| `hyva_cms.page.delete`, `hyva_cms.block.delete`, `hyva_menu.delete`, `hyva_email.template.delete`, `hyva_email.newsletter.delete` | Always; an entity in use also needs `"force": true`. See [Delete tools](#delete-tools). |
 
 A call that changes `settings` writes nothing without confirm, not even the draft part of the call. Its preview lists
 each change with its storefront effect.
@@ -167,13 +168,15 @@ Every preview has the same keys:
 
 ### Refusals
 
-Hyvä's save refusals come back as soft errors with a `status`:
+A refused call is a soft error (`isError: true`) with a `status`, not a JSON-RPC error. The refusal comes from Hyvä
+(a save it rejects) or from the module's own checks (store scope, in-use deletes, mail transport):
 
 | Status | When | What to do |
 |---|---|---|
 | 422 | A provider refuses content, or Hyvä's content guard rejects it (3 MB, 5000 components, depth 50). `field_errors` lists the problems per component uid and field. | Fix the fields and call again. |
-| 409 | The draft changed since you read it. Pass `base_version_uid` to the update tools to get this check. | Reload and re-apply your change. Never resubmit old content. |
+| 409 | The draft changed since you read it. Pass `base_version_uid` to the update tools to get this check. Also a confirmed delete of an entity still in use (`in_use`). | Reload and re-apply your change; never resubmit old content. For a delete, see [Confirm and force](#confirm-and-force). |
 | 403 | Hyvä refuses a permission, or the role's store scope excludes the entity (audit summary `{"error": "out_of_scope"}`; a missing permission is `status_403`). | Grant the permission (see [Role setup](#role-setup)), or work in the role's own store views (see [Store scope](#store-scope)). |
+| `transport_error` | `hyva_email.template.send_test` could not hand the mail to Magento's mail transport. The reply has `sent: false`, `message`, `id` and `recipient`. | Check the store's mail settings. Nothing was sent. |
 
 ## ACL
 
@@ -313,10 +316,11 @@ Exceptions:
 
 ## Delete tools
 
-`hyva_cms.page.delete`, `hyva_cms.block.delete` and `hyva_menu.delete` each delete one page, block or menu.
+`hyva_cms.page.delete`, `hyva_cms.block.delete`, `hyva_menu.delete`, `hyva_email.template.delete` and
+`hyva_email.newsletter.delete` each delete one page, block, menu, email template or newsletter template.
 
 - **Same path as the admin.** They use the repository the admin delete action uses: Magento's page or block repository
-  in the admin area, Hyvä's menu repository for menus.
+  in the admin area, Hyvä's menu repository for menus, Magento's template models for email and newsletter templates.
 - **Hyvä data goes with it.** Hyvä drafts, version history and Tailwind CSS are deleted too, as in the admin (foreign
   keys with `ON DELETE CASCADE`).
 - **Scheduled releases stay.** Releases that name the entity are not removed, as in the admin.
@@ -331,11 +335,15 @@ the Media Gallery trash.
 | `hyva_cms.page.delete` | *Tool: Delete CMS Pages via MCP* | `Magento_Cms::page_delete` (the admin page Delete action) and `Hyva_Cms::page_delete` |
 | `hyva_cms.block.delete` | *Tool: Delete CMS Blocks via MCP* | `Magento_Cms::block` (Magento has no separate block delete permission) and `Hyva_Cms::block_delete` |
 | `hyva_menu.delete` | *Tool: Delete Hyvä Menus via MCP* | `Hyva_MenuBuilder::menu_delete` |
+| `hyva_email.template.delete` | *Tool: Delete Email Templates via MCP* | `Magento_Email::template` (the admin Delete action) and `Hyva_EmailTemplates::email_template_delete` |
+| `hyva_email.newsletter.delete` | *Tool: Delete Newsletter Templates via MCP* | `Magento_Newsletter::template` (Hyvä has no newsletter delete permission) |
 
 - The tool resources sit under *MCP Tools → Hyvä Commerce Tools*. The module grants them to no role. Only a role with
   *All* resources (Administrators) has them without being given them.
 - The core checks the tool resource and the "Listed with" resource on `tools/list` and `tools/call`.
 - The page and block tools check both admin delete permissions again and refuse with status 403.
+- The email tools are hidden without Hyvä Email Templates. Email and newsletter templates belong to no store view, so
+  a role restricted to some websites is refused (status 403).
 - They are write tools, so the [write gate](#write-gate) applies.
 - Store scope is as for any change: every store view the entity is assigned to must be the role's, and store view 0
   needs all of them.
@@ -350,7 +358,8 @@ the Media Gallery trash.
 
 The preview is the standard one:
 
-- `action`: `delete_cms_page`, `delete_cms_block` or `delete_menu`;
+- `action`: `delete_cms_page`, `delete_cms_block`, `delete_menu`, `delete_email_template` or
+  `delete_newsletter_template`;
 - `affected`: the entity with its store views and `in_use`;
 - `details.usage`: where it is still used (see [Usage keys](#usage-keys)).
 
@@ -372,11 +381,69 @@ find-usage tools already return, so they are not unified.
 | `hyva_cms.page.delete` | `store_config` (home / 404 / cookies page configuration), `links` (links in Hyvä CMS content and menu items) |
 | `hyva_cms.block.delete` | `hyva_content` (Hyvä CMS components), `magento_content` (widget directives in Magento content), `widget_instances` |
 | `hyva_menu.delete` | `design_config` (header/footer design configuration), `hyva_cms_content` and `magento_cms_content` (menu widgets in content), `widget_instances`, `layout_and_templates`; also `identifier`, as `hyva_menu.find_usage` |
+| `hyva_email.template.delete` | `store_config`: configuration values at any scope on a path ending in `/template` or `_template` (e.g. `sales_email/order/template`) |
+| `hyva_email.newsletter.delete` | `queue`: newsletter queues not sent yet, sending or paused. Sent and cancelled queues are history: counted in `queue_history`, not in `used`. Magento deletes every queue of the template with it, history included. |
 
 For a role restricted to some websites, `usages_hidden_by_permissions` counts the usages it may not see.
 
 The page and block tools also check menus when the role may not view them (`Hyva_MenuBuilder::menu_view`). Those
 usages are not listed; `usages_hidden_by_permissions` counts them, and they still set `used`, so `force` is needed.
+
+## Replies
+
+### Draft status
+
+`hyva_cms.page.get`, `hyva_cms.block.get` and `hyva_menu.get` report three flags. Request them in `fields` on their own
+(`"fields": ["has_draft"]`) or with their group (`status` for pages and blocks, `settings` for menus).
+
+| Flag | Meaning |
+|---|---|
+| `has_draft` | A Hyvä draft row with content exists. Hyvä keeps that row after publishing. |
+| `is_published` | A published Hyvä version exists. |
+| `draft_differs` | The draft differs from the published version. |
+
+Right after a publish, `has_draft: true` with `draft_differs: false` is normal: the draft equals the live version. Only
+`draft_differs: true` means unpublished changes.
+
+### Preview and editor links
+
+Preview replies (`hyva_cms.preview`, `hyva_menu.preview`, and the `preview` of create and get replies) have one row per
+store view and these links:
+
+| Key | What it is |
+|---|---|
+| `preview_url` | The current draft (or the given version) on the storefront. An HMAC link: no admin login, valid up to 7 days and only while the draft is unchanged. `null` for a store view a menu is not assigned to. |
+| `published_url` | The live address in that store view. `null` for an inactive entity or a store view it is not assigned to. A menu has no URL of its own: this is the page set as its `preview_url_key` (`null` when none is set). |
+| `admin_editor_url` | The Hyvä editor in the admin, on the route Hyvä registers for the type (see below). |
+| `note` | What the three links give for this type. |
+
+`admin_editor_url` routes:
+
+| Type | Route |
+|---|---|
+| Pages, blocks, menus, forms | `liveview/editor/index` |
+| Email templates | `hyva_cms_email/liveview/editor` |
+| Newsletter templates | `hyva_cms_email/liveview/newslettereditor` |
+
+The link has no admin secret key: a key minted for an MCP request cannot match the browser's admin session. With
+*Add Secret Key to URLs* on (*Stores → Configuration → Advanced → Admin → Security*), the link opens the dashboard;
+open the editor from the grid instead.
+
+A page or block on store view 0 (All Store Views) lists a `published_urls` entry for every store view, as it is live in
+each of them.
+
+### Other reply details
+
+| Tool | Detail |
+|---|---|
+| `hyva_menu.create` | `preview_url_key` is the URL key of a page that shows the menu; the editor previews the menu on it, and `published_url` points to it. |
+| `hyva_menu.render_check` | When a store view renders empty HTML and Hyvä gives no message, `message` names the reason: inactive, not published, not assigned to that store view, or no content. |
+| `hyva_email.template.list`, `hyva_email.newsletter.list` | Reply with `total`, `page`, `page_size` and `items`, as `hyva_cms.page.list`. |
+| `hyva_email.newsletter.create_draft` | Always saves a versioned draft (Hyvä's blank `email_wrapper` when no components are given) and returns `draft` with `version_id`, `version_uid` and `warnings`. |
+| `hyva_cms.tailwind.status` | `reason` is `daemon_not_responding` when `healthy` is false, else `null`. `hint` names the next step for the compilation strategy and daemon management mode. `daemon_management` honours Hyvä's legacy env.php flag `hyva_cms_tailwind/cron_daemon_manager_enabled`, as Hyvä does. |
+| `hyva_cms.component.schema` | Field `options` from a source model (e.g. the menu widget's `menu_identifier`) are read at request time, so a menu created after Hyvä cached its components is listed. |
+| `hyva_media.trash.list`, `hyva_media.asset.search` | `trashed_at` and `updated_at` are UTC `Y-m-d H:i:s`, read from the database (seconds), as in every other media reply. |
+| Media audits (`hyva_media.audit_*`, `hyva_commerce.audit.media`) | `counts` is a JSON object, `{}` when no image has a problem. |
 
 ## Optional features
 
@@ -385,13 +452,15 @@ token's admin role. What an agent sees depends on the module:
 
 | Hyvä module missing or disabled | Effect |
 |---|---|
-| Menu Builder, Media Optimization, Media Gallery, Form Builder, Email Templates, Store Credit, Linked Products, AI Worker | Their tools are hidden from `tools/list`. A call to a hidden tool is refused by the core (`-32004`). The status tools stay listed (below). |
+| Menu Builder, Media Optimization, Media Gallery, Form Builder, Email Templates, Store Credit, Linked Products, AI Worker | Their tools are hidden from `tools/list`. A call to a hidden tool is refused by the core (`-32004`). The status tools stay listed (below). Without Media Gallery this includes the image and media audit tools (`hyva_media.image.*`, `hyva_media.audit_*`): they are listed with a Media Gallery resource. |
 | Category Merchandiser, CMS AI Translations, Advanced Admin Permissions, the AI providers, the Tailwind compiler | Their tools stay listed and answer "not installed" per call. |
 
 The status tools stay listed:
 
 - `hyva_menu.status` and `hyva_media.status` report the feature with `available: false` and `acl_allowed: null` (no
-  ACL verdict for a feature that is not there).
+  ACL verdict for a feature that is not there). `unavailable_reason` says why: `not_installed`, `disabled`, `acl`
+  (installed, but the role may not use it), or `null` when `available` is true.
+- `hyva_media.status` is listed with `Hyva_Cms::cms` while Media Gallery is missing or disabled.
 - `hyva_store_credit.status` and `hyva_ai.worker.status` answer that the module is not installed.
 - `hyva_commerce.audit.overview` lists every module.
 
@@ -416,7 +485,7 @@ Hyvä Commerce 1.4.0 (`hyva-themes/commerce` 1.4.0) and what this module offers 
 | Media Optimization 1.1.0 | `hyva_media.optimization.*` (5) | Unchanged in 1.4 |
 | Image usage and audits (CMS + Media Gallery) | `hyva_media.image.*`, `hyva_media.audit_*`, `hyva_media.status` (10) | Find, replace and fix images across CMS content and menus |
 | Form Builder 1.0.1 | `hyva_form.*` (9) | Forms, drafts, publish, versions, delivery audit (recipients, webhook) |
-| Email & Newsletter Templates 1.0.0 | `hyva_email.*` (14) | Transactional emails and newsletters: drafts, publish, render preview, test send, coverage audit |
+| Email & Newsletter Templates 1.0.0 | `hyva_email.*` (16) | Transactional emails and newsletters: drafts, publish, render preview, test send, delete, coverage audit |
 | Store Credit 1.0.1 | `hyva_store_credit.*` (5) | Balances, history, credit/debit with preview and idempotency key. Its GraphQL API is for shoppers and has no admin use here |
 | Linked Products 1.0.0 | `hyva_linked.*` (4) | Groups, validation with storefront warnings, save with page cache refresh |
 | Category Merchandiser 1.0.0 | `hyva_merch.category.*` (2) | Reorder only. The Enterprise package is not installed. Reports when another module (ElasticSuite) owns storefront sorting |
@@ -481,7 +550,7 @@ with underscores (`hyva_cms_page_get`); `tools/call` accepts both forms.
 | `hyva_cms.schedule.create` | write | the verb on any type | entity_type → schedule_save (+ version_history with version_id) | Schedule Hyvä CMS Content |
 | `hyva_cms.schedule.detect_conflicts` | read | the verb on any type | entity_type → scheduling | Detect Hyvä CMS Schedule Conflicts |
 | `hyva_cms.schedule.list` | read | the verb on any type | entity_type → scheduling | List Hyvä CMS Schedules |
-| `hyva_cms.tailwind.status` | read | `Magento_Config::config_system` |  | Hyvä CMS Tailwind Status (compiler daemon health, strategy; hint when classes are not compiled) |
+| `hyva_cms.tailwind.status` | read | `Magento_Config::config_system` |  | Hyvä CMS Tailwind Status (compiler daemon health, strategy, `reason`; hint per strategy) |
 | `hyva_cms.translation.run` | write | the verb on any type | entity_type → view + `Hyva_CmsAiTranslations::translate` | Run Hyvä CMS AI Translation |
 | `hyva_cms.translation.status` | read | the verb on any type | entity_type → view | Hyvä CMS Translation Status |
 | `hyva_cms.version.list` | read | the verb on any type | entity_type → version_history | List Hyvä CMS Versions |
@@ -494,7 +563,7 @@ with underscores (`hyva_cms_page_get`); `tools/call` accepts both forms.
 | `hyva_menu.audit_all` | read | `Hyva_MenuBuilder::menu_view` |  | Audit All Hyvä Menus |
 | `hyva_menu.category.import` | write | `Hyva_MenuBuilder::menu_save` |  | Import Categories into Hyvä Menu |
 | `hyva_menu.category.sync_preview` | read | `Hyva_MenuBuilder::menu_view` |  | Preview Category Import into Hyvä Menu |
-| `hyva_menu.create` | write | `Hyva_MenuBuilder::menu_save` |  | Create Hyvä Menu |
+| `hyva_menu.create` | write | `Hyva_MenuBuilder::menu_save` |  | Create Hyvä Menu (confirm-gated when `is_active=true`) |
 | `hyva_menu.find_usage` | read | `Hyva_MenuBuilder::menu_view` |  | Find Hyvä Menu Usage |
 | `hyva_menu.get` | read | `Hyva_MenuBuilder::menu_view` | fields with versions → version_history | Get Hyvä Menu |
 | `hyva_menu.item.add` | write | `Hyva_MenuBuilder::menu_save` |  | Add Hyvä Menu Item |
@@ -537,7 +606,7 @@ with underscores (`hyva_cms_page_get`); `tools/call` accepts both forms.
 | `hyva_media.optimization.config_validate` | read | `Magento_Cms::config_cms` |  | Validate Media Optimization Config |
 | `hyva_media.optimization.preview_picture` | read | `Hyva_MediaGallery::asset_view` |  | Preview Responsive Picture |
 | `hyva_media.optimization.status` | read | `Hyva_MediaGallery::asset_view` |  | Media Optimization Status for Image |
-| `hyva_media.status` | read | `Hyva_MediaGallery::asset_view` |  | Media Optimization Status |
+| `hyva_media.status` | read | `Hyva_MediaGallery::asset_view` (`Hyva_Cms::cms` without Media Gallery) |  | Media Optimization Status |
 | `hyva_media.sync.status` | read | `Hyva_MediaGallery::asset_view` |  | Media Gallery Sync Status |
 | `hyva_media.trash.list` | read | `Hyva_MediaGallery::asset_view` |  | List Media Gallery Trash |
 | `hyva_media.trash.restore` | write | `Hyva_MediaGallery::asset_delete` |  | Restore Media Gallery Trash |
@@ -562,12 +631,14 @@ with underscores (`hyva_cms_page_get`); `tools/call` accepts both forms.
 |---|---|---|---|
 | `hyva_email.audit.coverage` | read | `Hyva_EmailTemplates::email_template_view` | Audit Hyvä Email Coverage |
 | `hyva_email.newsletter.create_draft` | write | `Hyva_EmailTemplates::newsletter_template_save` | Create Hyvä Newsletter Template |
+| `hyva_email.newsletter.delete` | write | `Magento_Newsletter::template` | Delete Hyvä Newsletter Template (own resource *Delete Newsletter Templates via MCP*; confirm-gated) |
 | `hyva_email.newsletter.get` | read | `Hyva_EmailTemplates::newsletter_template_view` | Get Hyvä Newsletter Template |
 | `hyva_email.newsletter.list` | read | `Hyva_EmailTemplates::newsletter_template_view` | List Hyvä Newsletter Templates |
 | `hyva_email.newsletter.preview` | read | `Hyva_EmailTemplates::newsletter_template_view` | Preview Hyvä Newsletter Template |
 | `hyva_email.newsletter.publish` | write | `Hyva_EmailTemplates::newsletter_template_publish` | Publish Hyvä Newsletter Template |
 | `hyva_email.newsletter.update_draft` | write | `Hyva_EmailTemplates::newsletter_template_save` | Update Hyvä Newsletter Template Draft |
 | `hyva_email.template.create_draft` | write | `Hyva_EmailTemplates::email_template_save` | Create Hyvä Email Template |
+| `hyva_email.template.delete` | write | `Hyva_EmailTemplates::email_template_delete` + `Magento_Email::template` | Delete Hyvä Email Template (own resource *Delete Email Templates via MCP*; confirm-gated) |
 | `hyva_email.template.get` | read | `Hyva_EmailTemplates::email_template_view` | Get Hyvä Email Template |
 | `hyva_email.template.list` | read | `Hyva_EmailTemplates::email_template_view` | List Hyvä Email Templates |
 | `hyva_email.template.preview` | read | `Hyva_EmailTemplates::email_template_view` | Preview Hyvä Email Template |
@@ -645,7 +716,8 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
 `Hyva\AdminDashboardFramework\Model\Config\Widget\Converter`.
 
 - **ACL.** Each widget has its own resource under *Dashboard → Magebit / AI / MCP Widgets*.
-- **Cache.** Each widget caches its data for 300 s and reuses the same services as the audit tools.
+- **Cache.** Each widget caches its data for 300 s and reuses the same services as the audit tools. The cached data
+  holds routes, not URLs: links are built when the widget renders, so their secret key is the viewing admin's.
 - **CSP.** Templates are static markup with no Alpine state, so they are CSP-safe.
 
 | Widget | Shows |
@@ -653,7 +725,7 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
 | `magebit_mcp_activity_widget` | MCP calls, failures, writes, AI-generated drafts, publish/live/destructive actions, and a link to the MCP audit log. See [How MCP Activity counts calls](#how-mcp-activity-counts-calls). |
 | `magebit_content_health_widget` | Missing alt text, broken images, invalid/disabled components, unpublished drafts, schedule problems, legacy pages |
 | `magebit_menu_health_widget` | Menus with broken links, disabled targets, empty columns, placement, last MCP menu actions |
-| `magebit_media_health_widget` | Oversized images, missing alt, broken references, missing WebP/AVIF, optimization and engine status |
+| `magebit_media_health_widget` | Oversized images, missing alt (all image usages: Hyvä CMS, Magento CMS, menus, products and categories; Hyvä's Content Health "Missing alt text" counts Hyvä CMS images only), broken references, missing WebP/AVIF, optimization and engine status |
 | `magebit_campaign_calendar_widget` | Upcoming and recent scheduled releases, homepage/menu changes, conflicts |
 | `magebit_migration_status_widget` | Hyvä vs Page Builder/WYSIWYG pages, complexity, converted drafts waiting |
 | `magebit_campaign_asset_readiness_widget` | Media and link problems in the content of pending scheduled items |
@@ -686,8 +758,12 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
 - **Schedule list cap.** `hyva_cms.schedule.list` with a status other than `pending` lists the newest releases first
   and reads at most the newest 1000 items. It reports `truncated: true` when it cut; the release cut by the cap is left
   out, so no release is partial. `total_releases` counts releases within the items read. Pending is never capped.
-- **Tailwind CSS.** JIT Tailwind CSS for content is compiled by the Liveview editor in the browser. Content written
-  over MCP can use classes that are not compiled yet for the theme.
+- **Tailwind CSS.** With the in-browser strategy, JIT Tailwind CSS for content is compiled by the Liveview editor in
+  the browser, not by the daemon. Content written over MCP can use classes that are not compiled yet for the theme.
+  `hyva_cms.tailwind.status` reports `healthy` as Hyvä does (the daemon on this host answers `/health`), whatever the
+  strategy.
+- **Component cache.** Hyvä cleans its `hyva_cms` component cache only on CMS block save and delete, so its editor can
+  list stale menus in the menu widget until then. `hyva_cms.component.schema` reads source-model options live.
 - **Admin area for saves.** Page and block saves run in an emulated `adminhtml` area. In the frontend area, where
   `/mcp` runs, Hyvä's `Plugin\Model\Page::afterGetContent` fails for a page without an id.
 - **Published URLs.** Hyvä's page provider reports a page's address as `published_url` in every store view, active
@@ -722,6 +798,39 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
   the explicit-id services, the widget configuration and the instance table.
 
 ## Upgrade notes
+
+### Since 0.1.0
+
+After deploying, run `bin/magento setup:di:compile` and `cache:flush`: several constructors changed. No DB change; the
+two new delete resources come from `etc/acl.xml` and are granted to no role.
+
+Clients that parse replies:
+
+- **Media dates are UTC `Y-m-d H:i:s`.** `hyva_media.trash.list` `trashed_at` and `hyva_media.asset.search`
+  `updated_at` were Hyvä's locale strings in store time (e.g. `"Nov 3, 2026, 2:10 PM"`). They are now UTC SQL
+  datetimes (e.g. `"2026-11-03 20:10:00"`), as in every other media reply.
+- **Media audit `counts` is always an object.** With no image problem it is `{}`, not `[]` (`hyva_media.audit_*`,
+  `hyva_commerce.audit.media`, `media.counts` in `hyva_commerce.audit.menu`).
+- **`hyva_menu.create` with `is_active: true` needs `"confirm": true`.** Without it nothing is created and the reply is
+  the preview (`action: "create_active"`), as for pages and blocks. An inactive create is unchanged.
+- **`hyva_email.template.send_test` mail failures are soft errors.** A transport failure was JSON-RPC error `-32011`.
+  It is now a tool result with `isError: true`, `sent: false` and `status: "transport_error"`. See
+  [Refusals](#refusals).
+
+Custom code:
+
+- **`Api\Adapter\EmailGatewayInterface`** gains `deletionUsage()`, `deleteTemplate()` and `deleteNewsletter()`. A
+  project that replaces the module's preference for it must add them, or PHP stops with a fatal error.
+- **`Api\FeatureCheckerInterface`** gains `isInstalledAndEnabled(string $feature): bool`. A custom implementation must
+  add it.
+- **`AbstractTool::DELETE_TOOL_NOTE`** takes the article in `%1$s` ("a menu", "an email template").
+- **Dashboard widget data holds `route` + `params`, not `url`.** This covers the rows and footer links of the Magebit
+  widgets (`AbstractHealthWidget`); `health-summary.phtml` builds the URL when it renders.
+  `AbstractHealthWidget::row()` takes `?array $link` instead of `?string $url`. `ContentHealth`, `McpActivity`,
+  `MediaHealth` and `MenuHealth` no longer take `UrlInterface`. Widget data cached before the upgrade still renders.
+- **`Model\Tool\Media\AbstractMediaTool` takes a `FeatureCheckerInterface`** (constructor), and hides its tools
+  without Media Gallery. A subclass must pass it to `parent::__construct()`. The `hyva_media.image.*` and
+  `hyva_media.audit_*` tools and `MediaStatus` take it as their first constructor argument.
 
 ### Since 0.0.1 (breaking for custom gateways and for clients that parse replies)
 

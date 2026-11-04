@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\Mcp\Api\ContextualAclAwareInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
@@ -30,17 +31,20 @@ class ImageUpdateAlt extends AbstractMediaTool implements ContextualAclAwareInte
     public const UNDERLYING_ACL_RESOURCE = 'Hyva_MediaGallery::asset_view';
 
     /**
+     * @param FeatureCheckerInterface $featureChecker
      * @param ImageContentEditor $editor
      * @param ContentAcl $contentAcl
      * @param ContentLocator $contentLocator
      * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
+        FeatureCheckerInterface $featureChecker,
         private readonly ImageContentEditor $editor,
         private readonly ContentAcl $contentAcl,
         private readonly ContentLocator $contentLocator,
         private readonly ContentScopeFilter $scopeFilter
     ) {
+        parent::__construct($featureChecker);
     }
 
     /**
@@ -129,10 +133,15 @@ class ImageUpdateAlt extends AbstractMediaTool implements ContextualAclAwareInte
     /**
      * Listed only for a role that may save drafts of at least one content type, besides Media Gallery view.
      *
+     * Hidden from tools/list while Media Gallery is missing or disabled (FEATURE_MISSING_ACL_RESOURCE).
+     *
      * @return string|null
      */
     public function getUnderlyingAclResource(): ?string
     {
+        if (!$this->isMediaGalleryEnabled()) {
+            return static::FEATURE_MISSING_ACL_RESOURCE;
+        }
         return $this->contentAcl->listingResource(
             ContentLocator::TYPES,
             [ContentAcl::VERB_SAVE],

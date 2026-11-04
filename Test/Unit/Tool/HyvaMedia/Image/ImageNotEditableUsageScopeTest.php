@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\Image;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
@@ -125,7 +126,14 @@ class ImageNotEditableUsageScopeTest extends TestCase
     {
         $files = $this->createMock(MediaFileInfo::class);
         $files->method('exists')->willReturn(true);
-        return new ImageReplace($this->editor, $files, $this->acl(), $this->locator(), $this->scopeFilter);
+        return new ImageReplace(
+            $this->createMock(FeatureCheckerInterface::class),
+            $this->editor,
+            $files,
+            $this->acl(),
+            $this->locator(),
+            $this->scopeFilter
+        );
     }
 
     /**
@@ -135,7 +143,13 @@ class ImageNotEditableUsageScopeTest extends TestCase
      */
     private function altTool(): ImageUpdateAlt
     {
-        return new ImageUpdateAlt($this->editor, $this->acl(), $this->locator(), $this->scopeFilter);
+        return new ImageUpdateAlt(
+            $this->createMock(FeatureCheckerInterface::class),
+            $this->editor,
+            $this->acl(),
+            $this->locator(),
+            $this->scopeFilter
+        );
     }
 
     /**

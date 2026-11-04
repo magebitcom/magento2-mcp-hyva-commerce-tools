@@ -161,7 +161,11 @@ class CampaignAssetReadiness extends AbstractHealthWidget
             'stats' => [
                 $this->stat('Scheduled items', count($pending)),
                 $this->stat('Large images', $totals['large'], $this->level($totals['large'])),
-                $this->stat('Missing alt', $totals['missing_alt'], $this->level($totals['missing_alt'])),
+                $this->stat(
+                    'Missing alt (all image usages)',
+                    $totals['missing_alt'],
+                    $this->level($totals['missing_alt'])
+                ),
                 $this->stat('Broken media', $totals['broken'], $this->level($totals['broken'], 'danger')),
                 $this->stat('Not optimized yet', $totals['unoptimized'], $this->level($totals['unoptimized'])),
                 $this->stat('Menu link problems', $totals['menu_links'], $this->level($totals['menu_links'], 'danger')),

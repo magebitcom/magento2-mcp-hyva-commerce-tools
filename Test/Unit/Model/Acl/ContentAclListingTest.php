@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Acl;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Media\AbstractMediaTool;
 use Hyva\CmsLiveviewEditor\Model\Security\ContentTypeAuthorization;
 use Magebit\Mcp\Api\UnderlyingAclAwareInterface;
 use Magebit\Mcp\Model\Tool\WriteMode;
@@ -65,6 +67,23 @@ class ContentAclListingTest extends TestCase
     {
         $tool = (new \ReflectionClass($class))->newInstanceWithoutConstructor();
         (new \ReflectionProperty($declaringClass, 'contentAcl'))->setValue($tool, $acl);
+        if ($tool instanceof AbstractMediaTool) {
+            // Media Gallery enabled: the content-type rule applies (T-56 hides the tool without it).
+            $features = $this->createMock(FeatureCheckerInterface::class);
+            $features->method('getStatus')->willReturn([
+                'feature' => FeatureCheckerInterface::MEDIA_GALLERY,
+                'label' => 'Media Gallery',
+                'available' => true,
+                'installed' => true,
+                'enabled' => true,
+                'version' => null,
+                'package' => '',
+                'acl_resource' => null,
+                'acl_allowed' => null,
+                'modules' => [],
+            ]);
+            (new \ReflectionProperty(AbstractMediaTool::class, 'featureChecker'))->setValue($tool, $features);
+        }
         $this->assertInstanceOf(UnderlyingAclAwareInterface::class, $tool);
         return $tool;
     }

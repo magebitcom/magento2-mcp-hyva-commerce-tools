@@ -121,6 +121,7 @@ class PreviewService
         $note .= $type === ContentLocator::TYPE_MENU
             ? 'Menus have no URL of their own: published_url is the storefront page set as the menu\'s '
                 . 'preview_url_key (null when none is set, or the menu is inactive or not assigned to that store). '
+                . 'A store view the menu is not assigned to has no preview_url either. '
             : 'published_url is the live address as Hyvä CMS reports it (null when the entity has no live URL in '
                 . 'that store: inactive, or not assigned to it). ';
         return $note . 'With Add Secret Key to URLs on, the admin link opens the dashboard; open the editor from '
@@ -223,7 +224,8 @@ class PreviewService
      * Store row with is_assigned set from the menu's own store views.
      *
      * Hyvä's MenuProvider::getStoreContentData() hard-codes is_assigned => true for every store view, so a menu
-     * assigned only to store view 1 would still report a live URL for store view 2.
+     * assigned only to store view 1 would still report a live URL for store view 2. A store view the menu is not
+     * assigned to also gets no preview_url (T-95), so a client cannot read a preview link as an assignment.
      *
      * @param array $store
      * @param list<int>|null $menuStoreIds
@@ -235,6 +237,7 @@ class PreviewService
     {
         if ($menuStoreIds !== null && !in_array(Cast::int($store['store_id'] ?? -1), $menuStoreIds, true)) {
             $store['is_assigned'] = false;
+            $store['preview_url'] = null;
         }
         return $store;
     }

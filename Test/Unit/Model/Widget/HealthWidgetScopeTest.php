@@ -95,6 +95,14 @@ class HealthWidgetScopeTest extends TestCase
         $this->assertStringNotContainsString('shared by all websites', $notice);
     }
 
+    public function testMediaWidgetsSayTheAltCountCoversAllImageUsages(): void
+    {
+        // T-108: Hyvä's Content Health "Missing alt text" counts Hyvä CMS images only; this one counts every usage.
+        $data = $this->mediaHealth(true)->getDisplayData($this->ctx(), $this->instance());
+
+        $this->assertContains('Missing alt (all image usages)', array_column($this->list($data, 'stats'), 'label'));
+    }
+
     public function testMigrationStatusCountsOnlyTheAdminsPages(): void
     {
         $include = 'not called';
@@ -172,6 +180,7 @@ class HealthWidgetScopeTest extends TestCase
         $data = $widget->getDisplayData($this->ctx(), $this->instance());
 
         $this->assertSame(0, $this->list($data, 'stats')[0]['value']);
+        $this->assertContains('Missing alt (all image usages)', array_column($this->list($data, 'stats'), 'label'));
     }
 
     /**

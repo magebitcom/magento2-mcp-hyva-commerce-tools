@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
@@ -31,17 +32,20 @@ class ImageList extends AbstractMediaTool
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_media_image_list';
 
     /**
+     * @param FeatureCheckerInterface $featureChecker
      * @param MediaInventory $inventory
      * @param MediaFileInfo $fileInfo
      * @param ImageUsageIndex $usageIndex
      * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
+        FeatureCheckerInterface $featureChecker,
         private readonly MediaInventory $inventory,
         private readonly MediaFileInfo $fileInfo,
         private readonly ImageUsageIndex $usageIndex,
         private readonly ContentScopeFilter $scopeFilter
     ) {
+        parent::__construct($featureChecker);
     }
 
     /**

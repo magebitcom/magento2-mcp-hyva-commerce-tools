@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\ArrayBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
@@ -27,15 +28,18 @@ class ImageGet extends AbstractMediaTool
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_media_image_get';
 
     /**
+     * @param FeatureCheckerInterface $featureChecker
      * @param ImageContentEditor $editor
      * @param ResolverPipeline $pipeline
      * @param ImageFieldResolverInterface[] $fieldResolvers
      */
     public function __construct(
+        FeatureCheckerInterface $featureChecker,
         private readonly ImageContentEditor $editor,
         private readonly ResolverPipeline $pipeline,
         private readonly array $fieldResolvers = []
     ) {
+        parent::__construct($featureChecker);
     }
 
     /**

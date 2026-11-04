@@ -105,7 +105,11 @@ class MediaHealth extends AbstractHealthWidget
                     ($counts['oversized_file'] ?? 0) + ($counts['oversized_dimensions'] ?? 0),
                     $this->level(($counts['oversized_file'] ?? 0) + ($counts['oversized_dimensions'] ?? 0))
                 ),
-                $this->stat('Missing alt', $counts['missing_alt'] ?? 0, $this->level($counts['missing_alt'] ?? 0)),
+                $this->stat(
+                    'Missing alt (all image usages)',
+                    $counts['missing_alt'] ?? 0,
+                    $this->level($counts['missing_alt'] ?? 0)
+                ),
                 $this->stat(
                     'Broken references',
                     $counts['broken_reference'] ?? 0,
