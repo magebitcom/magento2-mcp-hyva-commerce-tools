@@ -18,11 +18,13 @@ use Hyva\EmailTemplates\Model\NewsletterTemplateLoader;
 use Hyva\EmailTemplates\Model\OrderPreviewData;
 use Hyva\EmailTemplates\Model\Preview\PreviewFixtureProvider;
 use Hyva\EmailTemplates\Model\Preview\PublishedPreviewContext;
+use Hyva\EmailTemplates\Model\Provider\EmailTemplateProvider;
 use Hyva\EmailTemplates\Model\Provider\NewsletterTemplateProvider;
 use Hyva\EmailTemplates\Model\Render\PublishedEmailRenderer;
 use Hyva\EmailTemplates\Model\Render\PublishedNewsletterRenderer;
 use Hyva\EmailTemplates\Model\Setup\EmailTemplateManager;
 use Hyva\EmailTemplates\Model\TemplateLoader;
+use Hyva\EmailTemplates\Model\VersionHistoryCleaner;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\EmailGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Hyva\EmailTemplates\Api\ConfigInterface as HyvaEmailConfig;
@@ -484,9 +486,8 @@ class EmailGateway implements EmailGatewayInterface
     {
         $template = $this->templateLoader()->byId($id)
             ?? throw new LocalizedException(__('Email template #%1 does not exist.', $id));
-        // The model's delete(), as the admin delete action calls it: Hyvä's afterDelete plugin prunes the version
-        // history; its content row goes by the foreign key.
-        $template->delete();
+        $this->emailResource->delete($template);
+        $this->pruneVersionHistory(EmailTemplateProvider::ENTITY_TYPE, $id);
     }
 
     /**
@@ -496,7 +497,26 @@ class EmailGateway implements EmailGatewayInterface
     {
         $template = $this->newsletterLoader()->byId($id)
             ?? throw new LocalizedException(__('Newsletter template #%1 does not exist.', $id));
-        $template->delete();
+        $this->newsletterResource->delete($template);
+        $this->pruneVersionHistory(NewsletterTemplateProvider::ENTITY_TYPE, $id);
+    }
+
+    /**
+     * Drops Hyvä's version history of a deleted template.
+     *
+     * The admin delete action calls the model's delete(): the resource model's delete() (which fires the model's
+     * delete events and lets the foreign key drop Hyvä's content row) and then Hyvä's afterDelete plugin on the model
+     * (EmailTemplateDelete / NewsletterTemplateDelete), which calls this cleaner because the version-history table
+     * has no foreign key. The gateway calls the resource model, so it runs the plugin's step itself.
+     *
+     * @param string $entityType Hyvä entity type (EmailTemplateProvider / NewsletterTemplateProvider::ENTITY_TYPE)
+     * @param int $id
+     * @return void
+     * @throws LocalizedException When the package is not installed.
+     */
+    private function pruneVersionHistory(string $entityType, int $id): void
+    {
+        $this->optionalServices->get(VersionHistoryCleaner::class)->deleteForEntity($entityType, $id);
     }
 
     /**

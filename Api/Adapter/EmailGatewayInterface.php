@@ -137,7 +137,9 @@ interface EmailGatewayInterface
     public function deletionUsage(string $type, int $id): array;
 
     /**
-     * Delete an email template through Magento's model, so Hyvä's rows cascade and its plugin prunes version history.
+     * Delete an email template through Magento's resource model, then prune Hyvä's version history.
+     *
+     * Hyvä's content row goes by the foreign key; the pruning is what Hyvä's delete plugin on the model does.
      *
      * @param int $id
      * @return void
@@ -146,7 +148,9 @@ interface EmailGatewayInterface
     public function deleteTemplate(int $id): void;
 
     /**
-     * Delete a newsletter template through Magento's model (its Hyvä rows, version history and queues go with it).
+     * Delete a newsletter template through Magento's resource model, then prune Hyvä's version history.
+     *
+     * Its Hyvä row and queues go by the foreign keys; the pruning is what Hyvä's delete plugin on the model does.
      *
      * @param int $id
      * @return void
