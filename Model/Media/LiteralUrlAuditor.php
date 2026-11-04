@@ -106,6 +106,30 @@ class LiteralUrlAuditor
     }
 
     /**
+     * Image fields whose stored asset id no longer resolves, per path.
+     *
+     * E.g. after a trash and restore: Hyvä indexes a restored file under a new id, and the content keeps the old one.
+     *
+     * @param array $paths Media paths
+     * @return array Path => references (the old id is asset_id)
+     * @phpstan-param list<string> $paths
+     * @phpstan-return array<string, list<array<string, mixed>>>
+     */
+    public function staleReferences(array $paths): array
+    {
+        $byPath = [];
+        foreach ($this->audit(ContentLocator::TYPES, PHP_INT_MAX)['findings'] as $finding) {
+            $path = $finding['path'] ?? null;
+            $stale = ($finding['category'] ?? null) === 'stale_asset_id';
+            if ($stale && is_string($path) && in_array($path, $paths, true)) {
+                unset($finding['category']);
+                $byPath[$path][] = $finding;
+            }
+        }
+        return $byPath;
+    }
+
+    /**
      * Classify the image references in one field value.
      *
      * @param mixed $value
@@ -117,7 +141,7 @@ class LiteralUrlAuditor
         if (is_string($value)) {
             return $this->classifyText($value);
         }
-        if (!is_array($value)) {
+        if (!is_array($value) || $this->isLinkValue($value)) {
             return [];
         }
         if (is_string($value['src'] ?? null) && $value['src'] !== '') {
@@ -142,6 +166,23 @@ class LiteralUrlAuditor
             }
         }
         return $found;
+    }
+
+    /**
+     * Whether the value is a link field value ({type, value, label, src, ...}).
+     *
+     * Its src is the link target (custom_url, cms_page), not an image (T-160: menu custom_url links were reported as
+     * literal_not_in_gallery).
+     *
+     * @param array $value
+     * @return bool
+     * @phpstan-param array<mixed> $value
+     */
+    private function isLinkValue(array $value): bool
+    {
+        return is_string($value['type'] ?? null)
+            && array_key_exists('value', $value)
+            && !isset($value['imageOptions']);
     }
 
     /**
