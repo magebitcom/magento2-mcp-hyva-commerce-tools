@@ -19,6 +19,7 @@ use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Model\Media\SharedMedia;
+use Throwable;
 
 /**
  * `hyva_media.trash.restore`.
@@ -113,11 +114,11 @@ class TrashRestore extends AbstractMediaGalleryTool
             }
         }
         $restored = $restorable !== [] ? $this->gallery->restore(array_keys($restorable)) : 0;
-        $stale = $restorable !== [] ? $this->literalUrlAuditor->staleReferences(array_values($restorable)) : [];
+        $stale = $restorable !== [] ? $this->staleReferences(array_values($restorable)) : ['references' => []];
         $assets = [];
         foreach ($restorable as $trashId => $path) {
             $asset = $this->gallery->getByPath($path);
-            $references = $stale[$path] ?? [];
+            $references = $stale['references'][$path] ?? [];
             $assets[] = [
                 'trash_id' => $trashId,
                 'path' => $path,
@@ -134,6 +135,36 @@ class TrashRestore extends AbstractMediaGalleryTool
         if ($assets !== []) {
             $payload['note'] = self::NEW_ID_NOTE;
         }
+        if (isset($stale['warning'])) {
+            $payload['warning'] = $stale['warning'];
+        }
         return $this->jsonResult($payload, ['restored' => $restored]);
+    }
+
+    /**
+     * Image fields still holding the old ids of the restored paths, or a warning when the content scan fails.
+     *
+     * The files are back by then, so a failed scan must not turn the reply into an error. The scan reads every
+     * document: ImageUsageIndex builds its path index from the same full document pass, so it cannot narrow it.
+     *
+     * @param array $paths
+     * @return array
+     * @phpstan-param list<string> $paths
+     * @phpstan-return array{references: array<string, list<array<string, mixed>>>, warning?: string}
+     */
+    private function staleReferences(array $paths): array
+    {
+        try {
+            return ['references' => $this->literalUrlAuditor->staleReferences($paths)];
+        } catch (Throwable $e) {
+            return [
+                'references' => [],
+                'warning' => sprintf(
+                    'The assets were restored, but the content could not be scanned for references to their old '
+                        . 'asset ids (%s); find them with hyva_media_audit_literal_urls (category stale_asset_id).',
+                    $e->getMessage()
+                ),
+            ];
+        }
     }
 }

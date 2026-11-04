@@ -852,7 +852,8 @@ Clients that parse replies:
   mail is rendered inside Hyvä's test-send context, so order components show the preview fixture (items, totals,
   addresses) as the admin "Send test" does, and the fallbacks are Hyvä's `FixtureDefaults`. On 1.0.0 nothing changes.
 - **`hyva_media.trash.restore` reports the id change.** Each `assets` entry gains `asset_id` (the new id),
-  `previous_asset_ids` and `stale_references`, and the reply a `note`. See
+  `previous_asset_ids` and `stale_references`, and the reply a `note`. If the content scan for the old ids fails
+  after the restore, `stale_references` is empty and the reply gains a `warning`. See
   [Notes on Hyvä behaviour](#notes-on-hyvä-behaviour).
 - **`hyva_media.audit.literal_urls` no longer counts link fields** as `literal_not_in_gallery`.
 - **`hyva_linked.group.save` answers a Hyvä refusal softly.** A save that Linked Products refuses after the check (a
