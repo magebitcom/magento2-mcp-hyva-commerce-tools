@@ -170,6 +170,14 @@ Every preview has the same keys:
 | `details` | Only when there is context that is not an item, e.g. `in_use` (always a boolean; trash adds `in_use_count`) for trash and the delete tools, `target_folder` for move, `menu_id` and `children_count` for a menu item removal, `not_editable_usages` for a global image replace (an affected entity's own usages sit on its `affected` entry, so each entity is listed once). |
 | `hint` | What confirming does, e.g. that a replaced image is a draft until `hyva_cms.publish`. |
 
+The rule behind the table: `confirm` guards what changes the live storefront at once, what cannot be undone, and
+what overwrites unpublished work. A call that only writes a draft, or removes generated files that are rebuilt on
+the next request, runs on the first call. That covers `hyva_cms.page.update` / `hyva_cms.block.update` without a
+live `settings` change, `hyva_media.image.update_alt`, `hyva_media.image.replace` with one content type,
+`hyva_media.optimization.clear` with one `path` and `hyva_cms.migration.convert_to_draft` with no Hyvä draft yet.
+To tell a preview from a write without knowing the table, read `dry_run`: `true` in a preview (nothing written),
+`false` in the reply of these calls, which wrote. `hyva_media.image.update_alt` accepts `confirm` but ignores it.
+
 ### Refusals
 
 A refused call is a soft error (`isError: true`) with a `status`, not a JSON-RPC error. The refusal comes from Hyvä
@@ -820,6 +828,9 @@ Clients that parse replies:
 - **`hyva_email.template.send_test` mail failures are soft errors.** A transport failure was JSON-RPC error `-32011`.
   It is now a tool result with `isError: true`, `sent: false` and `status: "transport_error"`. See
   [Refusals](#refusals).
+- **Calls that write without confirm say `dry_run: false`.** Page/block update, image alt and replace, optimization
+  clear and migration convert_to_draft replies gain the key; nothing else in them changed. See
+  [Confirm and previews](#confirm-and-previews).
 
 Custom code:
 

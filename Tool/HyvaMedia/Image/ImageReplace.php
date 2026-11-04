@@ -71,8 +71,9 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
             . '(component structure kept; optional new alt text) and go live only with hyva_cms_publish. Usages in '
             . 'Magento CMS content or product/category descriptions are reported, not changed. "confirm": true is '
             . 'needed only for scope=global (every Hyvä entity): without it nothing changes and the reply lists the '
-            . 'entities it would change. A scope naming one content type (cms_page, cms_block, menu) applies at '
-            . 'once. Either way the result is a draft: publish each entity with hyva_cms_publish.';
+            . 'entities it would change (dry_run: true). A scope naming one content type (cms_page, cms_block, menu) '
+            . 'writes the drafts on the first call and says dry_run: false. Either way the result is a draft: '
+            . 'publish each entity with hyva_cms_publish.';
     }
 
     /**
@@ -153,6 +154,7 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
             'Image replaced (MCP)'
         );
         return $this->jsonResult([
+            'dry_run' => false,
             'old_path' => $old,
             'new_path' => $new,
             'drafts' => $results,

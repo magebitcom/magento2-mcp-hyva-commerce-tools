@@ -57,6 +57,7 @@ class OptimizationClearConfirmTest extends TestCase
 
         $this->assertFalse($result->isError());
         $this->assertTrue($this->payloadAt($result, 'confirmation_required'));
+        $this->assertTrue($this->payloadAt($result, 'dry_run'));
         $this->assertSame('clear_all_optimized_images', $this->payloadAt($result, 'action'));
         $this->assertSame(['catalog/resized/a.jpg'], $this->payloadAt($result, 'affected'));
         $this->assertSame(40, $this->payloadAt($result, 'total'));
@@ -85,6 +86,7 @@ class OptimizationClearConfirmTest extends TestCase
 
         $this->assertFalse($result->isError());
         $this->assertSame('all_images', $this->payloadAt($result, 'cleared'));
+        $this->assertFalse($this->payloadAt($result, 'dry_run'));
         $this->assertSame(40, $this->payloadAt($result, 'files_removed'));
     }
 
@@ -97,5 +99,7 @@ class OptimizationClearConfirmTest extends TestCase
 
         $this->assertFalse($result->isError());
         $this->assertSame(3, $this->payloadAt($result, 'files_removed'));
+        // T-152: one path clears on the first call and the reply says it wrote.
+        $this->assertFalse($this->payloadAt($result, 'dry_run'));
     }
 }

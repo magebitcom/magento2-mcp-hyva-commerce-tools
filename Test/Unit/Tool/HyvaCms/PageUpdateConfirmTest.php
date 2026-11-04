@@ -44,6 +44,7 @@ class PageUpdateConfirmTest extends TestCase
         ]));
 
         $this->assertTrue($payload['confirmation_required'] ?? null);
+        $this->assertTrue($payload['dry_run'] ?? null);
         $affected = $payload['affected'] ?? null;
         $this->assertIsArray($affected);
         $this->assertSame(['is_active'], array_column($affected, 'field'));
@@ -62,6 +63,7 @@ class PageUpdateConfirmTest extends TestCase
         ]));
 
         $this->assertSame(['is_active'], $payload['settings_changed'] ?? null);
+        $this->assertFalse($payload['dry_run'] ?? null);
     }
 
     public function testASettingOfAnInactivePageNeedsNoConfirm(): void
@@ -75,6 +77,9 @@ class PageUpdateConfirmTest extends TestCase
         ]));
 
         $this->assertArrayNotHasKey('confirmation_required', $payload);
+        // T-152: a call that writes without confirm says so.
+        $this->assertFalse($payload['dry_run'] ?? null);
+        $this->assertSame(['title'], $payload['settings_changed'] ?? null);
     }
 
     public function testAnUnchangedMetaFieldOfAnActivePageIsNoChange(): void

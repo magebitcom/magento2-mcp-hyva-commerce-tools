@@ -59,7 +59,8 @@ class OptimizationClear extends AbstractOptimizationTool
     public function getDescription(): string
     {
         return 'Delete generated (resized/converted) variants of one image path so they regenerate on the next '
-            . 'request; mode all, resized or converted. One path needs no confirm. all_images=true clears every '
+            . 'request; mode all, resized or converted. One path needs no confirm: it clears on the first call and '
+            . 'the reply says dry_run: false. all_images=true clears every '
             . 'generated image in the store and needs "confirm": true: without it nothing changes and the reply '
             . 'gives the total number of files and sample paths. Original images are never touched.';
     }
@@ -109,13 +110,14 @@ class OptimizationClear extends AbstractOptimizationTool
             }
             $removed = $this->gateway->clearAll($mode);
             return $this->jsonResult(
-                ['cleared' => 'all_images', 'mode' => $mode, 'files_removed' => $removed],
+                ['dry_run' => false, 'cleared' => 'all_images', 'mode' => $mode, 'files_removed' => $removed],
                 ['scope' => 'all', 'removed' => $removed]
             );
         }
         $path = $this->editor->normalize($this->requireString($arguments, 'path'));
         $removed = $this->gateway->clear($path, $mode);
         return $this->jsonResult([
+            'dry_run' => false,
             'cleared' => $path,
             'mode' => $mode,
             'files_removed' => $removed,

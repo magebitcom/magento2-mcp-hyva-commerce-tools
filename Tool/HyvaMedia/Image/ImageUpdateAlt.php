@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Model\Media\ImageContentEditor;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Media\AbstractMediaTool;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\ArrayBuilder;
+use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 
@@ -61,7 +62,8 @@ class ImageUpdateAlt extends AbstractMediaTool implements ContextualAclAwareInte
     public function getDescription(): string
     {
         return 'Set the alt text of an image wherever it is used in Hyvä CMS pages, blocks and menus (image fields '
-            . 'and <img> tags in rich text/HTML), saved as DRAFTS. Limit with scope and entity_ids. Never publishes.';
+            . 'and <img> tags in rich text/HTML), saved as DRAFTS. Limit with scope and entity_ids. Never publishes. '
+            . 'Needs no confirm: the drafts are written on the first call and the reply says dry_run: false.';
     }
 
     /**
@@ -79,6 +81,9 @@ class ImageUpdateAlt extends AbstractMediaTool implements ContextualAclAwareInte
                 ->enum(['cms_page', 'cms_block', 'menu', 'all'])
                 ->description('Default all.'))
             ->array('entity_ids', fn (ArrayBuilder $a) => $a->ofIntegers())
+            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description(
+                'Not needed and ignored: alt text is saved as drafts, which go live only with hyva_cms_publish.'
+            ))
             ->toArray();
     }
 
@@ -120,6 +125,7 @@ class ImageUpdateAlt extends AbstractMediaTool implements ContextualAclAwareInte
         );
         return $this->jsonResult(
             [
+                'dry_run' => false,
                 'path' => $path,
                 'drafts' => $results,
                 'published' => false,
