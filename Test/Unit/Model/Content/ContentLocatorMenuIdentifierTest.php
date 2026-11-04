@@ -69,6 +69,24 @@ class ContentLocatorMenuIdentifierTest extends TestCase
         $this->assertSame(2, $this->locator([2])->locate(ContentLocator::TYPE_MENU, ['identifier' => 'main'])['id']);
     }
 
+    /**
+     * Review lap 1 #3: without store_id the identifier matches case-insensitively, as the store_id lookup does.
+     *
+     * @return void
+     */
+    public function testTheIdentifierMatchesInAnyCaseWithAndWithoutStoreId(): void
+    {
+        $locator = $this->locator(null);
+
+        $this->assertSame(3, $locator->locate(ContentLocator::TYPE_MENU, ['identifier' => 'FOOTER'])['id']);
+        $this->assertSame(
+            2,
+            $locator->locate(ContentLocator::TYPE_MENU, ['identifier' => 'Main', 'store_id' => 2])['id']
+        );
+        $this->expectExceptionMessage('Several menus use identifier "Main" (id 1 in store views 1, id 2 in store');
+        $locator->locate(ContentLocator::TYPE_MENU, ['identifier' => 'Main']);
+    }
+
     public function testAnUnknownIdentifierDoesNotExist(): void
     {
         $this->expectException(LocalizedException::class);
@@ -78,7 +96,7 @@ class ContentLocatorMenuIdentifierTest extends TestCase
     }
 
     /**
-     * Locator over the menus, Menu Builder enabled.
+     * Locator over the menus, Menu Builder enabled; search and identifier lookup ignore case like MySQL.
      *
      * @param list<int>|null $allowedStoreIds Store views of a restricted caller; null = unrestricted.
      * @return ContentLocator
@@ -88,13 +106,15 @@ class ContentLocatorMenuIdentifierTest extends TestCase
         $gateway = $this->createMock(MenuGatewayInterface::class);
         $gateway->method('getList')->willReturnCallback(static fn (array $filters): array => array_values(array_filter(
             self::MENUS,
-            static fn (array $menu): bool => str_contains($menu['identifier'], (string) ($filters['search'] ?? ''))
+            static fn (array $menu): bool => stripos($menu['identifier'], (string) ($filters['search'] ?? '')) !== false
         )));
         $gateway->method('get')->willReturnCallback(static fn (int $id): array => self::MENUS[$id]);
         $gateway->method('findIdByIdentifier')->willReturnCallback(
             static function (string $identifier, ?int $storeId): ?int {
                 foreach (self::MENUS as $id => $menu) {
-                    if ($menu['identifier'] === $identifier && in_array($storeId, $menu['store_ids'], true)) {
+                    if (strcasecmp($menu['identifier'], $identifier) === 0
+                        && in_array($storeId, $menu['store_ids'], true)
+                    ) {
                         return $id;
                     }
                 }

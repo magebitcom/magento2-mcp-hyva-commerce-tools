@@ -449,7 +449,8 @@ class ContentLocator
      *
      * Several store views can each have a menu with the same identifier: as for pages and blocks, the call then names
      * the candidates instead of picking one. A restricted role only competes among the menus it may see; with none,
-     * the first one is returned and refused by the read check.
+     * the first one is returned and refused by the read check. The identifier matches case-insensitively, as the
+     * store_id lookup does (MySQL collation).
      *
      * @param string $identifier
      * @return int|null Null when no menu has the identifier.
@@ -459,7 +460,8 @@ class ContentLocator
     {
         $candidates = array_values(array_filter(
             $this->menuGateway->getList(['search' => $identifier]),
-            static fn (array $menu): bool => ($menu['identifier'] ?? null) === $identifier
+            static fn (array $menu): bool => is_string($menu['identifier'] ?? null)
+                && strcasecmp($menu['identifier'], $identifier) === 0
         ));
         if ($candidates === []) {
             return null;
