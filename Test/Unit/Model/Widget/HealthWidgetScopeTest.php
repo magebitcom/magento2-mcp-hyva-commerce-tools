@@ -10,9 +10,11 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Widget;
 
 use Hyva\AdminDashboardApi\Api\V1\WidgetContextInterface;
 use Hyva\AdminDashboardApi\Api\V1\WidgetInstanceInterface;
+use Magebit\Mcp\Api\LoggerInterface;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Audit\McpActivityReader;
+use Magebit\McpHyvaCommerceTools\Model\Content\AdminEditorUrl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
@@ -36,6 +38,7 @@ use Magento\Backend\Model\UrlInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\DB\Adapter\AdapterInterface;
+use Magento\Framework\ObjectManager\ConfigLoaderInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -125,6 +128,15 @@ class HealthWidgetScopeTest extends TestCase
         $this->assertCount(2, $this->rows($data));
     }
 
+    public function testWidgetEditorLinksKeepTheAdminSecretKey(): void
+    {
+        $data = $this->campaignCalendar([1])->getDisplayData($this->ctx(), $this->instance());
+        $this->assertSame(['liveview/editor/index|type=cms_page,id=1'], array_column($this->rows($data), 'url'));
+
+        $data = $this->menuHealth([1], false)->getDisplayData($this->ctx(), $this->instance());
+        $this->assertSame(['liveview/editor/index|type=menu,id=1'], array_column($this->rows($data), 'url'));
+    }
+
     public function testCampaignAssetReadinessChecksOnlyTheAdminsScheduledContent(): void
     {
         $schedule = $this->createMock(ScheduleService::class);
@@ -142,7 +154,7 @@ class HealthWidgetScopeTest extends TestCase
             $this->createMock(FeatureCheckerInterface::class),
             $this->createMock(MenuValidator::class),
             $resource,
-            $this->createMock(UrlInterface::class),
+            $this->editorUrl(),
             $this->contentScope([1], ['cms_page' => [1 => [1], 2 => [2]]])
         );
 
@@ -177,7 +189,8 @@ class HealthWidgetScopeTest extends TestCase
             $menus,
             $this->activity($auditAllowed),
             $this->url(),
-            $this->contentScope($allowedStoreIds)
+            $this->contentScope($allowedStoreIds),
+            $this->editorUrl()
         );
     }
 
@@ -233,7 +246,12 @@ class HealthWidgetScopeTest extends TestCase
                 return [];
             }
         );
-        return new MigrationStatus($migration, $contentIndex, $this->url(), $this->contentScope($allowedStoreIds));
+        return new MigrationStatus(
+            $migration,
+            $contentIndex,
+            $this->editorUrl(),
+            $this->contentScope($allowedStoreIds)
+        );
     }
 
     /**
@@ -260,7 +278,7 @@ class HealthWidgetScopeTest extends TestCase
             $this->createMock(ScheduleTime::class),
             $this->createMock(ScopeConfigInterface::class),
             $contentIndex,
-            $this->url(),
+            $this->editorUrl(),
             $this->contentScope($allowedStoreIds, ['cms_page' => [1 => [1], 2 => [2]]])
         );
     }
@@ -305,6 +323,26 @@ class HealthWidgetScopeTest extends TestCase
         $url = $this->createMock(UrlInterface::class);
         $url->method('getUrl')->willReturnCallback(static fn (string $route): string => $route);
         return $url;
+    }
+
+    /**
+     * Editor URL builder without registered routes; the backend URL renders "route|key=value,...".
+     *
+     * @return AdminEditorUrl
+     */
+    private function editorUrl(): AdminEditorUrl
+    {
+        $url = $this->createMock(UrlInterface::class);
+        $url->method('getUrl')->willReturnCallback(static function (string $route, array $params): string {
+            $pairs = [];
+            foreach ($params as $key => $value) {
+                $pairs[] = $key . '=' . (is_bool($value) ? (int) $value : $value);
+            }
+            return $route . '|' . implode(',', $pairs);
+        });
+        $loader = $this->createMock(ConfigLoaderInterface::class);
+        $loader->method('load')->willReturn([]);
+        return new AdminEditorUrl($url, $loader, $this->createMock(LoggerInterface::class));
     }
 
     /**

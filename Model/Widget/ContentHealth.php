@@ -11,6 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Model\Widget;
 use Hyva\AdminDashboardApi\Api\V1\WidgetContextInterface;
 use Hyva\AdminDashboardApi\Api\V1\WidgetInstanceInterface;
 use Magebit\McpHyvaCommerceTools\Model\Audit\CmsAuditor;
+use Magebit\McpHyvaCommerceTools\Model\Content\AdminEditorUrl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Backend\Model\UrlInterface;
@@ -23,10 +24,12 @@ class ContentHealth extends AbstractHealthWidget
     /**
      * @param CmsAuditor $cmsAuditor
      * @param UrlInterface $url
+     * @param AdminEditorUrl $editorUrl
      */
     public function __construct(
         private readonly CmsAuditor $cmsAuditor,
-        private readonly UrlInterface $url
+        private readonly UrlInterface $url,
+        private readonly AdminEditorUrl $editorUrl
     ) {
     }
 
@@ -62,10 +65,9 @@ class ContentHealth extends AbstractHealthWidget
                 $where = Cast::string($issue['entity_type']) . ' ' . Cast::string($issue['identifier'] ?? '')
                     . ' (' . Cast::string($issue['edition'] ?? '') . ')';
             }
-            $url = isset($issue['entity_type'], $issue['id']) ? $this->url->getUrl(
-                'liveview/editor/index',
-                ['type' => $issue['entity_type'], 'id' => $issue['id']]
-            ) : null;
+            $url = isset($issue['entity_type'], $issue['id'])
+                ? $this->editorUrl->build(Cast::string($issue['entity_type']), Cast::int($issue['id']), true)
+                : null;
             $rows[] = $this->row(
                 Cast::string($issue['message'] ?? ''),
                 $where,

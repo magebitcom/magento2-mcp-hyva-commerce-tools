@@ -9,7 +9,6 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Model\Content;
 
 use Hyva\CmsLiveviewEditor\Model\Provider as ContentProvider;
-use Magento\Backend\Model\UrlInterface as BackendUrl;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Store\Model\StoreManagerInterface;
 use Magebit\Mcp\Api\LoggerInterface;
@@ -27,7 +26,7 @@ class PreviewService
 {
     /**
      * @param ContentProvider $contentProvider
-     * @param BackendUrl $backendUrl
+     * @param AdminEditorUrl $adminEditorUrl
      * @param LoggerInterface $logger
      * @param StoreScopeGuard $storeScopeGuard
      * @param StoreManagerInterface $storeManager
@@ -35,7 +34,7 @@ class PreviewService
      */
     public function __construct(
         private readonly ContentProvider $contentProvider,
-        private readonly BackendUrl $backendUrl,
+        private readonly AdminEditorUrl $adminEditorUrl,
         private readonly LoggerInterface $logger,
         private readonly StoreScopeGuard $storeScopeGuard,
         private readonly StoreManagerInterface $storeManager,
@@ -97,21 +96,35 @@ class PreviewService
         }
 
         $preview = [
-            'admin_editor_url' => $this->backendUrl->getUrl(
-                'liveview/editor/index',
-                ['type' => $type, 'id' => $id, '_nosecret' => true]
-            ),
+            'admin_editor_url' => $this->adminEditorUrl->build($type, $id),
             'stores' => $stores,
             'error' => $error,
-            'note' => 'preview_url shows the current draft (or the given version) and needs no admin login. It is '
-                . 'an HMAC capability link: valid up to 7 days and only while the draft is unchanged; links issued '
-                . 'before Hyvä CMS 1.3 no longer work. published_url is the live address as Hyvä CMS reports it '
-                . '(null when the entity has no live URL in that store: inactive, or not assigned to it).',
+            'note' => $this->note($type),
         ];
         if ($hidden > 0) {
             $preview['stores_hidden_by_permissions'] = $hidden;
         }
         return $preview;
+    }
+
+    /**
+     * Reply note: what preview_url, published_url and admin_editor_url give for this entity type.
+     *
+     * @param string $type
+     * @return string
+     */
+    private function note(string $type): string
+    {
+        $note = 'preview_url shows the current draft (or the given version) and needs no admin login. It is '
+            . 'an HMAC capability link: valid up to 7 days and only while the draft is unchanged; links issued '
+            . 'before Hyvä CMS 1.3 no longer work. ';
+        $note .= $type === ContentLocator::TYPE_MENU
+            ? 'Menus have no URL of their own: published_url is the storefront page set as the menu\'s '
+                . 'preview_url_key (null when none is set, or the menu is inactive or not assigned to that store). '
+            : 'published_url is the live address as Hyvä CMS reports it (null when the entity has no live URL in '
+                . 'that store: inactive, or not assigned to it). ';
+        return $note . 'With Add Secret Key to URLs on, the admin link opens the dashboard; open the editor from '
+            . 'the grid.';
     }
 
     /**

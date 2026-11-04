@@ -10,10 +10,13 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content;
 
 use Hyva\CmsLiveviewEditor\Model\Provider as ContentProvider;
 use Magebit\Mcp\Api\LoggerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Content\AdminEditorUrl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magento\Backend\Model\UrlInterface as BackendUrl;
+use Magento\Framework\ObjectManager\ConfigLoaderInterface;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -135,6 +138,47 @@ class PreviewServiceLiveUrlTest extends TestCase
         $this->assertSame([1, 2], array_column($urls, 'store_id'));
     }
 
+    public function testNewsletterEditorUrlUsesRegistryRoute(): void
+    {
+        $url = $this->service([])->getPreview('newsletter_template', 1)['admin_editor_url'];
+
+        $this->assertStringContainsString('hyva_cms_email/liveview/newslettereditor', $url);
+        $this->assertStringContainsString('_nosecret=1', $url);
+    }
+
+    public function testEmailTemplateEditorUrlUsesRegistryRoute(): void
+    {
+        $this->assertStringStartsWith(
+            'hyva_cms_email/liveview/editor|',
+            $this->service([])->getPreview('email_template', 4)['admin_editor_url']
+        );
+    }
+
+    public function testPageEditorUrlUnchanged(): void
+    {
+        $this->assertSame(
+            'liveview/editor/index|type=cms_page,id=13,_nosecret=1',
+            $this->service([])->getPreview('cms_page', 13)['admin_editor_url']
+        );
+    }
+
+    public function testMenuNoteSaysNoLiveUrl(): void
+    {
+        $service = $this->service([]);
+        $secretKey = 'With Add Secret Key to URLs on, the admin link opens the dashboard; open the editor from '
+            . 'the grid.';
+
+        $menuNote = $service->getPreview(ContentLocator::TYPE_MENU, 2)['note'];
+        $this->assertStringContainsString('Menus have no URL of their own', $menuNote);
+        $this->assertStringContainsString($secretKey, $menuNote);
+
+        $pageNote = $service->getPreview('cms_page', 5)['note'];
+        $this->assertStringNotContainsString('Menus have no URL of their own', $pageNote);
+        $this->assertStringContainsString('(null when the entity has no live URL in that store: inactive, or not '
+            . 'assigned to it).', $pageNote);
+        $this->assertStringEndsWith($secretKey, $pageNote);
+    }
+
     /**
      * Two active Hyvä menu rows, both marked assigned (as Hyvä's menu provider does).
      *
@@ -175,11 +219,34 @@ class PreviewServiceLiveUrlTest extends TestCase
         $guard->method('restrictedStoreIds')->willReturn(null);
         return new PreviewService(
             $provider,
-            $this->createMock(BackendUrl::class),
+            $this->editorUrl(),
             $logger ?? $this->createMock(LoggerInterface::class),
             $guard,
             $this->createMock(StoreManagerInterface::class),
             $contentIndex
         );
+    }
+
+    /**
+     * Editor URL builder with Hyvä's email routes registered; the backend URL renders "route|key=value,...".
+     *
+     * @return AdminEditorUrl
+     */
+    private function editorUrl(): AdminEditorUrl
+    {
+        $backendUrl = $this->createMock(BackendUrl::class);
+        $backendUrl->method('getUrl')->willReturnCallback(static function (string $route, array $params): string {
+            $pairs = [];
+            foreach ($params as $key => $value) {
+                $pairs[] = $key . '=' . (is_bool($value) ? (int) $value : $value);
+            }
+            return $route . '|' . implode(',', $pairs);
+        });
+        $loader = $this->createMock(ConfigLoaderInterface::class);
+        $loader->method('load')->willReturn([AdminEditorUrl::REGISTRY_TYPE => ['arguments' => ['entityTypeRoutes' => [
+            'email_template' => 'hyva_cms_email/liveview/editor',
+            'newsletter_template' => 'hyva_cms_email/liveview/newslettereditor',
+        ]]]]);
+        return new AdminEditorUrl($backendUrl, $loader, $this->createMock(LoggerInterface::class));
     }
 }

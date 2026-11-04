@@ -10,10 +10,10 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content;
 
 use Hyva\CmsLiveviewEditor\Model\Provider as ContentProvider;
 use Magebit\Mcp\Api\LoggerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Content\AdminEditorUrl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
-use Magento\Backend\Model\UrlInterface as BackendUrl;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Store\Api\Data\StoreInterface;
 use Magento\Store\Model\StoreManagerInterface;
@@ -73,7 +73,7 @@ class PreviewServiceStoreCodeTest extends TestCase
         });
         return new PreviewService(
             $provider,
-            $this->createMock(BackendUrl::class),
+            $this->createMock(AdminEditorUrl::class),
             $this->createMock(LoggerInterface::class),
             $guard,
             $storeManager,

@@ -13,6 +13,8 @@ use Hyva\AdminDashboardApi\Api\V1\WidgetInstanceInterface;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Audit\McpActivityReader;
+use Magebit\McpHyvaCommerceTools\Model\Content\AdminEditorUrl;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
@@ -31,6 +33,7 @@ class MenuHealth extends AbstractHealthWidget
      * @param McpActivityReader $activityReader
      * @param UrlInterface $url
      * @param ContentScopeFilter $scopeFilter
+     * @param AdminEditorUrl $editorUrl
      */
     public function __construct(
         private readonly FeatureCheckerInterface $featureChecker,
@@ -38,7 +41,8 @@ class MenuHealth extends AbstractHealthWidget
         private readonly MenuService $menuService,
         private readonly McpActivityReader $activityReader,
         private readonly UrlInterface $url,
-        private readonly ContentScopeFilter $scopeFilter
+        private readonly ContentScopeFilter $scopeFilter,
+        private readonly AdminEditorUrl $editorUrl
     ) {
     }
 
@@ -79,7 +83,7 @@ class MenuHealth extends AbstractHealthWidget
                 ),
                 $result['counts']['error'] . ' errors / ' . $result['counts']['warning'] . ' warnings',
                 $result['counts']['error'] > 0 ? 'danger' : ($result['counts']['warning'] > 0 ? 'warning' : 'success'),
-                $this->url->getUrl('liveview/editor/index', ['type' => 'menu', 'id' => $menu['id']])
+                $this->editorUrl->build(ContentLocator::TYPE_MENU, Cast::int($menu['id']), true)
             );
         }
         $broken = ($codes['broken_category'] ?? 0)
