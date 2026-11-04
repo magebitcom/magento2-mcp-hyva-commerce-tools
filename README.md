@@ -486,27 +486,36 @@ Call `hyva_commerce.audit.overview`, `hyva_menu.status` or `hyva_media.status` f
 
 ## Hyvä Commerce 1.4 coverage
 
-Hyvä Commerce 1.4.0 (`hyva-themes/commerce` 1.4.0) and what this module offers for each part. Counts are tools.
+Hyvä Commerce 1.4.1 (`hyva-themes/commerce` 1.4.1) and what this module offers for each part. Counts are tools.
+Hyvä Commerce 1.4.0 (Store Credit 1.0.1, Linked Products 1.0.0) works as well.
 
 | Module (version) | Tools | Notes |
 |---|---|---|
-| Hyvä CMS 1.3.1 (Liveview editor, Connect, Admin Styles) | `hyva_cms.*` (29, without `translation.*` and `tailwind.status`) | Pages, blocks, drafts, versions, scheduling, components, export/import, PageBuilder migration, preview, `permission.check`; per-type verbs from `ContentTypeAuthorization` |
+| Hyvä CMS 1.3.3 (Liveview editor, Connect, Admin Styles) | `hyva_cms.*` (29, without `translation.*` and `tailwind.status`) | Pages, blocks, drafts, versions, scheduling, components, export/import, PageBuilder migration, preview, `permission.check`; per-type verbs from `ContentTypeAuthorization` |
 | CMS AI Translations 1.0.2 | `hyva_cms.translation.*` (2) | Status per store view; run returns proposals and can write the draft, never publishes |
-| Menu Builder 1.1.0 | `hyva_menu.*` (21) | Includes publish, delete, versions and schedules (1.1 per-verb permissions) |
+| Menu Builder 1.1.1 | `hyva_menu.*` (21) | Includes publish, delete, versions and schedules (1.1 per-verb permissions) |
 | Media Gallery 1.0.0 | `hyva_media.asset.*`, `trash.*`, `folder.create`, `sync.status`, `audit.literal_urls` (9) | Asset ids in content (`imageOptions.id`), move, trash/restore, sync drift, literal-URL audit |
 | Media Optimization 1.1.0 | `hyva_media.optimization.*` (5) | Unchanged in 1.4 |
 | Image usage and audits (CMS + Media Gallery) | `hyva_media.image.*`, `hyva_media.audit_*`, `hyva_media.status` (10) | Find, replace and fix images across CMS content and menus |
-| Form Builder 1.0.1 | `hyva_form.*` (9) | Forms, drafts, publish, versions, delivery audit (recipients, webhook) |
-| Email & Newsletter Templates 1.0.0 | `hyva_email.*` (16) | Transactional emails and newsletters: drafts, publish, render preview, test send, delete, coverage audit |
-| Store Credit 1.0.1 | `hyva_store_credit.*` (5) | Balances, history, credit/debit with preview and idempotency key. Its GraphQL API is for shoppers and has no admin use here |
-| Linked Products 1.0.0 | `hyva_linked.*` (4) | Groups, validation with storefront warnings, save with page cache refresh |
+| Form Builder 1.0.2 | `hyva_form.*` (9) | Forms, drafts, publish, versions, delivery audit (recipients, webhook) |
+| Email & Newsletter Templates 1.0.1 | `hyva_email.*` (16) | Transactional emails and newsletters: drafts, publish, render preview, test send, delete, coverage audit |
+| Store Credit 2.0.0 (1.0.1 works too) | `hyva_store_credit.*` (5) | Balances, history, credit/debit with preview and idempotency key. Its GraphQL API is for shoppers and has no admin use here. 2.0.0 only moves the storefront route to `store-credit/`; no tool builds a Store Credit URL |
+| Linked Products 1.0.2 | `hyva_linked.*` (4) | Groups, validation with storefront warnings, save with page cache refresh. See [Linked Products 1.0.1+ in the admin](#linked-products-101-in-the-admin) |
 | Category Merchandiser 1.0.0 | `hyva_merch.category.*` (2) | Reorder only. The Enterprise package is not installed. Reports when another module (ElasticSuite) owns storefront sorting |
 | AI Worker 1.0.0 and AI Worker CMS 1.0.0 | `hyva_ai.*` (5, without `provider.status`) | Monitoring only (status, jobs, usage, errors); AI Worker CMS jobs show in `hyva_ai.job.list`. No generation by design |
 | AI providers 1.3.0 (`magento2-module-ai` 1.3.1 with the Anthropic, DeepL, Gemini and OpenAI modules) | `hyva_ai.provider.status` (1) | Which providers are configured and their models, plus whether CMS AI Translation is ready to run. API keys are never read or shown |
 | CMS Tailwind compiler 1.0.x and JIT bridge 1.0.3 | `hyva_cms.tailwind.status` (1) | Compiler daemon health, daemon management, compilation strategy and compiler version, with a hint when new CMS content is not being compiled. Read only: no start, stop or restart |
-| Advanced Admin Permissions 1.0.0 | `hyva_admin_perm.*` (2) | Read only (effective permissions, audit log). Scope restrictions are applied by the module itself, see [Store scope](#store-scope) |
+| Advanced Admin Permissions 1.0.1 | `hyva_admin_perm.*` (2) | Read only (effective permissions, audit log). Scope restrictions are applied by the module itself, see [Store scope](#store-scope) |
 | Admin Dashboard 2.0.3 (+ API 3.0.1, CMS widgets, CrUX history widget) | `hyva_dashboard.*` (3) + [widgets](#dashboard-widgets) | Views and widget types as the caller sees them; MCP activity and content health widgets |
 | Audits | `hyva_commerce.audit.*` (4) | `audit.overview` adds one health line per 1.4 module |
+
+### Linked Products 1.0.1+ in the admin
+
+Linked Products 1.0.1 gates the *Linked Products* section of the admin Product Edit page by the same resources the
+MCP tools use: with `Hyva_LinkedProducts::group_save` it is editable, with only `group_view` it is read only, and
+without either it is hidden; a product save changes groups only with `group_save`. Admin users of an MCP role
+therefore see that section differently than before 1.0.1, where it did not check them. The MCP tools themselves
+are unchanged: `group_view` lists and reads, `group_save` saves (see [Role setup](#role-setup)).
 
 ### Not covered, on purpose
 
