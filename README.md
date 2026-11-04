@@ -913,7 +913,8 @@ vendor/bin/phpcs --standard=Magento2 --extensions=php,phtml app/code/Magebit/Mcp
 `Hyva\MediaOptimization\*`. Tools depend on the `Api/Adapter/*GatewayInterface` contracts, wired to generated proxies,
 so the real gateway is built only after the feature check.
 
-**CI** (`.github/workflows/ci.yml`) runs PHPStan and the unit tests. It needs four repository secrets:
+**CI** (`.github/workflows/ci.yml`) runs PHPStan and the unit tests, each twice: with Store Credit 1.0.1 (Hyvä
+Commerce 1.4.0) and 2.0.0 (1.4.1). It needs four repository secrets:
 
 | Secret | Value |
 |---|---|

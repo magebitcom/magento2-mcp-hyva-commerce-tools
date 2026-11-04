@@ -9,7 +9,7 @@
 - Store scope: menus and forms are scoped by their store views although the Hyvä admin does not scope them; stricter on purpose.
 - Store scope: email/newsletter templates, linked groups and category positions have no store view; restricted roles read them, never write.
 - `hyva_media.trash.restore` has no confirm: it never overwrites (skips taken paths, as Hyvä's `TrashRepository` does).
-- CI runs Magento 2.4.7-p3, PHP 8.3, PHPUnit 9.5 like the sibling Magebit MCP modules; local runs use 2.4.8 / PHPUnit 10.
+- CI runs Magento 2.4.7-p3, PHP 8.3, PHPUnit 9.5 like the sibling Magebit MCP modules; local runs use 2.4.8 / PHPUnit 10. Each job runs twice, Store Credit `^1.0.1` and `^2.0` (Commerce 1.4.0 / 1.4.1); the other suggest constraints already resolve the 1.4.1 versions.
 - Dev helpers (smoke script, test roles, absent-package env) live outside the repo on purpose; the module ships no test fixtures.
 - Store scope: a product in no website stays visible to restricted roles; mirrors Hyvä CatalogProductEntityGuard.
 - Store scope: catalog usages are judged by product website / category tree, not the description's store view (the usage index has no store_id).
