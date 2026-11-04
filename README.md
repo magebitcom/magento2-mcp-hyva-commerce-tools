@@ -445,7 +445,7 @@ each of them.
 | `hyva_email.template.list`, `hyva_email.newsletter.list` | Reply with `total`, `page`, `page_size` and `items`, as `hyva_cms.page.list`. |
 | `hyva_email.newsletter.create_draft` | Always saves a versioned draft (Hyvä's blank `email_wrapper` when no components are given) and returns `draft` with `version_id`, `version_uid` and `warnings`. |
 | `hyva_cms.tailwind.status` | `reason` is `daemon_not_responding` when `healthy` is false, else `null`. `hint` names the next step for the compilation strategy and daemon management mode. `daemon_management` honours Hyvä's legacy env.php flag `hyva_cms_tailwind/cron_daemon_manager_enabled`, as Hyvä does. |
-| `hyva_cms.component.schema` | Field `options` from a source model (e.g. the menu widget's `menu_identifier`) are read at request time, so a menu created after Hyvä cached its components is listed. |
+| `hyva_cms.component.schema` | Field `options` from a source model (e.g. the menu widget's `menu_identifier`) are read at request time, so a menu created after Hyvä cached its components is listed. The menu widget's options list only menus the role may view (`Hyva_MenuBuilder::menu_view`) in store views it may read, as `hyva_menu.list` does; `options_hidden_by_permissions` counts the rest. |
 | `hyva_media.trash.list`, `hyva_media.asset.search` | `trashed_at` and `updated_at` are UTC `Y-m-d H:i:s`, read from the database (seconds), as in every other media reply. |
 | Media audits (`hyva_media.audit_*`, `hyva_commerce.audit.media`) | `counts` is a JSON object, `{}` when no image has a problem. |
 
