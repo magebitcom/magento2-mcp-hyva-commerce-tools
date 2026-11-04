@@ -143,6 +143,18 @@ abstract class AbstractEmailTool extends AbstractTool
     }
 
     /**
+     * Description note naming the delete tool of the type (DELETE_TOOL_NOTE)
+     *
+     * @return string
+     */
+    protected function deleteToolNote(): string
+    {
+        return static::TEMPLATE_TYPE === EmailGatewayInterface::TYPE_NEWSLETTER
+            ? sprintf(self::DELETE_TOOL_NOTE, 'a newsletter template', 'hyva_email_newsletter_delete')
+            : sprintf(self::DELETE_TOOL_NOTE, 'an email template', 'hyva_email_template_delete');
+    }
+
+    /**
      * Schema properties that select one template.
      *
      * @param ObjectBuilder $object

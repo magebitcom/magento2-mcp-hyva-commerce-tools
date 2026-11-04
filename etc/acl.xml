@@ -246,6 +246,10 @@
                                           title="Tool: Update Hyvä Menu" sortOrder="232"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_delete"
                                           title="Tool: Delete Hyvä Menus via MCP" sortOrder="252"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_template_delete"
+                                          title="Tool: Delete Email Templates via MCP" sortOrder="253"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_newsletter_delete"
+                                          title="Tool: Delete Newsletter Templates via MCP" sortOrder="254"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_item_add"
                                           title="Tool: Add Hyvä Menu Item" sortOrder="233"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_item_update"

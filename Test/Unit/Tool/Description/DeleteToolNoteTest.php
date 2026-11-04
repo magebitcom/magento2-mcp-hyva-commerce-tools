@@ -15,6 +15,12 @@ use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockUpdate;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageDelete;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageList;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageUpdate;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterDelete;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterList;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterUpdateDraft;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateDelete;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateList;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateUpdateDraft;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuDelete;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuList;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuUpdate;
@@ -22,7 +28,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * T-22: the page, block and menu list / update descriptions name the delete tool. T-80: the delete descriptions
- * name their usage keys.
+ * name their usage keys. T-107: the same for email and newsletter templates.
  */
 class DeleteToolNoteTest extends TestCase
 {
@@ -38,6 +44,14 @@ class DeleteToolNoteTest extends TestCase
             'block update' => [BlockUpdate::class, 'To delete a CMS block use hyva_cms_block_delete'],
             'menu list' => [MenuList::class, 'To delete a menu use hyva_menu_delete'],
             'menu update' => [MenuUpdate::class, 'To delete a menu use hyva_menu_delete'],
+            'email template list' => [TemplateList::class,
+                'To delete an email template use hyva_email_template_delete'],
+            'email template update' => [TemplateUpdateDraft::class,
+                'To delete an email template use hyva_email_template_delete'],
+            'newsletter list' => [NewsletterList::class,
+                'To delete a newsletter template use hyva_email_newsletter_delete'],
+            'newsletter update' => [NewsletterUpdateDraft::class,
+                'To delete a newsletter template use hyva_email_newsletter_delete'],
         ];
     }
 
@@ -65,6 +79,8 @@ class DeleteToolNoteTest extends TestCase
             'block' => [BlockDelete::class, ['hyva_content', 'magento_content', 'widget_instances']],
             'menu' => [MenuDelete::class, ['design_config', 'hyva_cms_content', 'magento_cms_content',
                 'widget_instances', 'layout_and_templates']],
+            'email template' => [TemplateDelete::class, ['store_config']],
+            'newsletter template' => [NewsletterDelete::class, ['queue', 'queue_history']],
         ];
     }
 

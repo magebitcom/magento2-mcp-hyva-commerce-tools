@@ -379,6 +379,8 @@
                 <item name="hyva_email.newsletter.create_draft" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterCreateDraft</item>
                 <item name="hyva_email.newsletter.update_draft" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterUpdateDraft</item>
                 <item name="hyva_email.newsletter.publish" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterPublish</item>
+                <item name="hyva_email.template.delete" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateDelete</item>
+                <item name="hyva_email.newsletter.delete" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterDelete</item>
                 <item name="hyva_media.asset.search" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset\AssetSearch</item>
                 <item name="hyva_media.asset.resolve" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset\AssetResolve</item>
                 <item name="hyva_media.trash.list" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Trash\TrashList</item>

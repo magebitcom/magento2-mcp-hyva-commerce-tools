@@ -61,6 +61,13 @@ class EmailGateway implements EmailGatewayInterface
      * @var array<string, HyvaEmailTemplate|HyvaNewsletterTemplate|false>
      */
     private array $records = [];
+
+    /**
+     * Newsletter queue statuses that still send (Magento\Newsletter\Model\Queue::STATUS_NEVER, _SENDING, _PAUSE);
+     * sent (3) and cancelled (2) queues are history.
+     */
+    private const QUEUE_STATUSES = [0 => 'not_sent', 1 => 'sending', 4 => 'paused'];
+
     /**
      * @param OptionalServiceFactory $optionalServices
      * @param EmailCollectionFactory $emailCollectionFactory
@@ -415,6 +422,81 @@ class EmailGateway implements EmailGatewayInterface
             ];
         }
         return $usage;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function deletionUsage(string $type, int $id): array
+    {
+        $connection = $this->resourceConnection->getConnection();
+        if ($type === self::TYPE_NEWSLETTER) {
+            $rows = $connection->fetchAll($connection->select()
+                ->from(
+                    $this->resourceConnection->getTableName('newsletter_queue'),
+                    ['queue_id', 'queue_status', 'queue_start_at']
+                )
+                ->where('template_id = ?', $id)
+                ->order('queue_id ASC'));
+            $queue = [];
+            $history = 0;
+            foreach ($rows as $row) {
+                $status = self::QUEUE_STATUSES[Cast::int($row['queue_status'])] ?? null;
+                if ($status === null) {
+                    $history++;
+                    continue;
+                }
+                $startAt = $row['queue_start_at'] ?? null;
+                $queue[] = [
+                    'queue_id' => Cast::int($row['queue_id']),
+                    'status' => $status,
+                    'start_at' => is_string($startAt) && $startAt !== '' ? $startAt : null,
+                ];
+            }
+            return ['used' => $queue !== [], 'total' => count($queue), 'queue' => $queue, 'queue_history' => $history];
+        }
+        // Magento's own check (BackendTemplate::getSystemConfigPathsWhereCurrentlyUsed(), used by the admin delete
+        // action) reads the email template fields from the system.xml structure, which is empty outside the admin
+        // area, so the config rows are matched by path suffix instead: every email template field ends in "template".
+        $rows = $connection->fetchAll($connection->select()
+            ->from($this->resourceConnection->getTableName('core_config_data'), ['path', 'scope', 'scope_id'])
+            ->where('value = ?', (string) $id)
+            ->where('path LIKE ?', '%template')
+            ->order(['path ASC', 'scope ASC', 'scope_id ASC']));
+        $config = [];
+        foreach ($rows as $row) {
+            $path = Cast::string($row['path']);
+            if (str_ends_with($path, '/template') || str_ends_with($path, '_template')) {
+                $config[] = [
+                    'path' => $path,
+                    'scope' => Cast::string($row['scope']),
+                    'scope_id' => Cast::int($row['scope_id']),
+                ];
+            }
+        }
+        return ['used' => $config !== [], 'total' => count($config), 'store_config' => $config];
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function deleteTemplate(int $id): void
+    {
+        $template = $this->templateLoader()->byId($id)
+            ?? throw new LocalizedException(__('Email template #%1 does not exist.', $id));
+        // The model's delete(), as the admin delete action calls it: Hyvä's afterDelete plugin prunes the version
+        // history; its content row goes by the foreign key.
+        $template->delete();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function deleteNewsletter(int $id): void
+    {
+        $template = $this->newsletterLoader()->byId($id)
+            ?? throw new LocalizedException(__('Newsletter template #%1 does not exist.', $id));
+        $template->delete();
     }
 
     /**

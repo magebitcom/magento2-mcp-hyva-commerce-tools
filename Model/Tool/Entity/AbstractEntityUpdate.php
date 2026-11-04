@@ -75,7 +75,7 @@ abstract class AbstractEntityUpdate extends AbstractTool
                 . 'Magento fields (title, active flag, store views, meta) and applies IMMEDIATELY: a setting that '
                 . 'changes the live storefront (active flag, store views, URL key; any field of an active %1$s) needs '
                 . '"confirm": true. Without it nothing is written and the reply lists what would change. '
-                . sprintf(self::DELETE_TOOL_NOTE, 'CMS %1$s', 'hyva_cms_%1$s_delete'),
+                . sprintf(self::DELETE_TOOL_NOTE, 'a CMS %1$s', 'hyva_cms_%1$s_delete'),
             strtolower(static::ENTITY_LABEL)
         );
     }

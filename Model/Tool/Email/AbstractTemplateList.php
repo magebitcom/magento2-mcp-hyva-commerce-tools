@@ -25,7 +25,7 @@ abstract class AbstractTemplateList extends AbstractEmailTool
     {
         return sprintf(
             'List %ss (newest first): name, subject, whether Hyvä CMS designs them (hyva_enabled, draft, '
-            . 'published, preheader)%s. ' . ListPagination::DESCRIPTION_NOTE,
+            . 'published, preheader)%s. ' . ListPagination::DESCRIPTION_NOTE . ' ' . $this->deleteToolNote(),
             static::LABEL,
             static::TEMPLATE_TYPE === 'email_template' ? ' and which store emails send them (assigned_to)' : ''
         );

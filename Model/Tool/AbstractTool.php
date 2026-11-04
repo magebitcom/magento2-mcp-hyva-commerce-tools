@@ -33,9 +33,9 @@ abstract class AbstractTool implements ToolInterface, UnderlyingAclAwareInterfac
     public const IS_WRITE = false;
 
     /**
-     * Description note naming the delete tool (%1$s = what, e.g. "CMS page"; %2$s = tool); agents must not substitute.
+     * Description note naming the delete tool (%1$s = what, e.g. "a CMS page"; %2$s = tool); agents may not substitute.
      */
-    public const DELETE_TOOL_NOTE = 'To delete a %1$s use %2$s (it previews first and deletes only with "confirm": '
+    public const DELETE_TOOL_NOTE = 'To delete %1$s use %2$s (it previews first and deletes only with "confirm": '
         . 'true; it needs its own MCP permission, without it tell the user deletion is not allowed). Do not '
         . 'deactivate, empty or unassign it as a substitute.';
 

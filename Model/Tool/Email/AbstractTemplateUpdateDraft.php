@@ -55,7 +55,7 @@ abstract class AbstractTemplateUpdateDraft extends AbstractEmailTool
             . 'the get tool with include_document; email components: email_section, email_heading, email_text, '
             . 'email_button, email_image, email_order_* ...); the components reach sent emails only after the publish '
             . 'tool. subject and preheader%s are NOT drafted: they change the emails customers receive IMMEDIATELY, '
-            . 'so only pass them when the merchant asked for a live change.',
+            . 'so only pass them when the merchant asked for a live change. ' . $this->deleteToolNote(),
             static::LABEL,
             static::TEMPLATE_TYPE === EmailGatewayInterface::TYPE_NEWSLETTER ? ', sender_name and sender_email' : ''
         );
