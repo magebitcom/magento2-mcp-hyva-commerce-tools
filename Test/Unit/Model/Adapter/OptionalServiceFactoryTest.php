@@ -33,24 +33,4 @@ class OptionalServiceFactoryTest extends TestCase
 
         $this->assertSame($service, (new OptionalServiceFactory($objectManager))->get(\stdClass::class));
     }
-
-    public function testCreateReturnsANewInstance(): void
-    {
-        $service = new \stdClass();
-        $objectManager = $this->createMock(ObjectManagerInterface::class);
-        $objectManager->expects($this->never())->method('get');
-        $objectManager->expects($this->once())->method('create')->with(\stdClass::class)->willReturn($service);
-
-        $this->assertSame($service, (new OptionalServiceFactory($objectManager))->create(\stdClass::class));
-    }
-
-    public function testCreateOfAnAbsentPackageIsReported(): void
-    {
-        $objectManager = $this->createMock(ObjectManagerInterface::class);
-        $objectManager->expects($this->never())->method('create');
-        $this->expectException(LocalizedException::class);
-        /** @var class-string<object> $absent */
-        $absent = 'Hyva\\NotInstalled\\Model\\Service';
-        (new OptionalServiceFactory($objectManager))->create($absent);
-    }
 }

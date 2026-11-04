@@ -16,7 +16,9 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magento\Backend\Model\UrlInterface as BackendUrl;
+use Magento\Framework\Config\CacheInterface;
 use Magento\Framework\ObjectManager\ConfigLoaderInterface;
+use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -247,6 +249,8 @@ class PreviewServiceLiveUrlTest extends TestCase
             'email_template' => 'hyva_cms_email/liveview/editor',
             'newsletter_template' => 'hyva_cms_email/liveview/newslettereditor',
         ]]]]);
-        return new AdminEditorUrl($backendUrl, $loader, $this->createMock(LoggerInterface::class));
+        $cache = $this->createMock(CacheInterface::class);
+        $cache->method('load')->willReturn(false);
+        return new AdminEditorUrl($backendUrl, $loader, $this->createMock(LoggerInterface::class), $cache, new Json());
     }
 }

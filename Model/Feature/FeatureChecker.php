@@ -58,9 +58,7 @@ class FeatureChecker implements FeatureCheckerInterface
             return false;
         }
         foreach ($definition['modules'] ?? [] as $moduleName) {
-            if ($this->componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName) === null
-                || !$this->moduleManager->isEnabled($moduleName)
-            ) {
+            if (!$this->moduleState($moduleName)['enabled']) {
                 return false;
             }
         }
@@ -80,11 +78,9 @@ class FeatureChecker implements FeatureCheckerInterface
         $installed = $definition !== [];
         $enabled = $definition !== [];
         foreach ($definition['modules'] ?? [] as $moduleName) {
-            $moduleInstalled = $this->componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName) !== null;
-            $moduleEnabled = $moduleInstalled && $this->moduleManager->isEnabled($moduleName);
-            $modules[$moduleName] = ['installed' => $moduleInstalled, 'enabled' => $moduleEnabled];
-            $installed = $installed && $moduleInstalled;
-            $enabled = $enabled && $moduleEnabled;
+            $modules[$moduleName] = $this->moduleState($moduleName);
+            $installed = $installed && $modules[$moduleName]['installed'];
+            $enabled = $enabled && $modules[$moduleName]['enabled'];
         }
 
         // A missing or disabled feature gets no ACL verdict (null): its resource may not exist, or may belong to
@@ -145,6 +141,18 @@ class FeatureChecker implements FeatureCheckerInterface
         }
 
         return ['available' => false, 'feature' => $feature, 'reason' => $reason, 'hint' => $hint];
+    }
+
+    /**
+     * Whether a module is installed (registered) and enabled; the one definition both checks above use.
+     *
+     * @param string $moduleName
+     * @return array{installed: bool, enabled: bool}
+     */
+    private function moduleState(string $moduleName): array
+    {
+        $installed = $this->componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName) !== null;
+        return ['installed' => $installed, 'enabled' => $installed && $this->moduleManager->isEnabled($moduleName)];
     }
 
     /**

@@ -22,7 +22,6 @@ use Magento\Framework\Phrase;
  *  empty}], notice: string|null, links: [{label, route, params}], generated_at}
  * Links hold an admin route and its params, never a URL: Hyvä caches the display data, and a URL would carry the secret
  * key of the session that built it. The template builds the URL for the admin viewing the dashboard (T-118).
-
  */
 abstract class AbstractHealthWidget implements WidgetTypeInterface
 {

@@ -12,7 +12,9 @@ use Hyva\CmsLiveviewEditor\Model\Config\EditorRouteRegistry;
 use Magebit\Mcp\Api\LoggerInterface;
 use Magento\Backend\Model\UrlInterface as BackendUrl;
 use Magento\Framework\App\Area;
+use Magento\Framework\Config\CacheInterface;
 use Magento\Framework\ObjectManager\ConfigLoaderInterface;
+use Magento\Framework\Serialize\SerializerInterface;
 use Throwable;
 
 /**
@@ -21,12 +23,15 @@ use Throwable;
  * Hyvä keeps the route per entity type in EditorRouteRegistry (email and newsletter templates, attributes have their
  * own editor controllers), but fills it only in etc/adminhtml/di.xml, so the registry is empty in the area MCP calls
  * run in. The same map is therefore read from the adminhtml DI config; a type without an entry uses Hyvä's default
- * editor route.
+ * editor route. The adminhtml DI config is large, so the resolved map is kept in the config cache, next to Magento's
+ * own cached DI config, and the config is read only when a link is built and the cache has no map.
  */
 class AdminEditorUrl
 {
     public const REGISTRY_TYPE = EditorRouteRegistry::class;
     public const DEFAULT_ROUTE = 'liveview/editor/index';
+
+    public const CACHE_ID = 'magebit_mcp_hyva_editor_routes';
 
     private const ROUTES_ARGUMENT = 'entityTypeRoutes';
 
@@ -39,11 +44,15 @@ class AdminEditorUrl
      * @param BackendUrl $backendUrl
      * @param ConfigLoaderInterface $configLoader
      * @param LoggerInterface $logger
+     * @param CacheInterface $cache
+     * @param SerializerInterface $serializer
      */
     public function __construct(
         private readonly BackendUrl $backendUrl,
         private readonly ConfigLoaderInterface $configLoader,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly CacheInterface $cache,
+        private readonly SerializerInterface $serializer
     ) {
     }
 
@@ -96,7 +105,7 @@ class AdminEditorUrl
     }
 
     /**
-     * Entity type => route path from the adminhtml DI config, read once per instance.
+     * Entity type => route path, resolved once per instance (a shared instance: once per request).
      *
      * @return array<string, string>
      */
@@ -105,26 +114,102 @@ class AdminEditorUrl
         if ($this->routes !== null) {
             return $this->routes;
         }
-        $this->routes = [];
+        $this->routes = $this->cachedRoutes();
+        if ($this->routes !== null) {
+            return $this->routes;
+        }
+        $this->routes = $this->routesFromDiConfig();
+        $serialized = $this->routes !== [] ? $this->serializer->serialize($this->routes) : false;
+        if (is_string($serialized)) {
+            $this->cache->save($serialized, self::CACHE_ID);
+        }
+        return $this->routes;
+    }
+
+    /**
+     * Route map from the config cache; null when there is no readable entry.
+     *
+     * @return array<string, string>|null
+     */
+    private function cachedRoutes(): ?array
+    {
+        $cached = $this->cache->load(self::CACHE_ID);
+        if (!is_string($cached) || $cached === '') {
+            return null;
+        }
+        try {
+            $routes = $this->validRoutes($this->serializer->unserialize($cached));
+        } catch (Throwable) {
+            return null;
+        }
+        return $routes !== [] ? $routes : null;
+    }
+
+    /**
+     * Entity type => route path from the adminhtml DI config; empty (and logged) when it cannot be found.
+     *
+     * @return array<string, string>
+     */
+    private function routesFromDiConfig(): array
+    {
         try {
             $config = $this->configLoader->load(Area::AREA_ADMINHTML);
         } catch (Throwable $e) {
             $this->logger->error('Hyvä editor routes could not be read.', ['exception' => $e]);
-            return $this->routes;
+            return [];
         }
         // Compiled DI metadata keeps arguments under "arguments" and wraps plain values in "_v_"; the developer
         // mode reader keeps them under the type's own "arguments".
         $map = $config['arguments'][self::REGISTRY_TYPE][self::ROUTES_ARGUMENT]['_v_']
             ?? $config[self::REGISTRY_TYPE]['arguments'][self::ROUTES_ARGUMENT]
-            ?? [];
+            ?? null;
         if (!is_array($map)) {
-            return $this->routes;
+            $this->logger->warning(
+                'Hyvä editor route map not found in the adminhtml DI config; editor links use '
+                    . self::DEFAULT_ROUTE . '.',
+                ['shape' => $this->describeShape($config)]
+            );
+            return [];
         }
-        foreach ($map as $type => $route) {
+        return $this->validRoutes($map);
+    }
+
+    /**
+     * Keys seen where the route map was expected, for the log.
+     *
+     * @param array $config
+     * @return array
+     * @phpstan-param array<mixed> $config
+     * @phpstan-return array<string, mixed>
+     */
+    private function describeShape(array $config): array
+    {
+        $arguments = is_array($config['arguments'] ?? null) ? $config['arguments'] : [];
+        $compiled = $arguments[self::REGISTRY_TYPE] ?? null;
+        $developer = $config[self::REGISTRY_TYPE] ?? null;
+        $keys = static fn (mixed $value): ?array => is_array($value) ? array_keys($value) : null;
+        return [
+            'compiled' => $keys($compiled),
+            'compiled_argument' => is_array($compiled) ? $keys($compiled[self::ROUTES_ARGUMENT] ?? null) : null,
+            'developer' => $keys($developer),
+            'developer_arguments' => is_array($developer) ? $keys($developer['arguments'] ?? null) : null,
+        ];
+    }
+
+    /**
+     * Only non-empty string routes of the map.
+     *
+     * @param mixed $map
+     * @return array<string, string>
+     */
+    private function validRoutes(mixed $map): array
+    {
+        $routes = [];
+        foreach (is_array($map) ? $map : [] as $type => $route) {
             if (is_string($route) && $route !== '') {
-                $this->routes[(string) $type] = $route;
+                $routes[(string) $type] = $route;
             }
         }
-        return $this->routes;
+        return $routes;
     }
 }

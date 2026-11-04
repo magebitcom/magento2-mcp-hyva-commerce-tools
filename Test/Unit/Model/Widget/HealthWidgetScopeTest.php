@@ -37,8 +37,10 @@ use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content\ContentScopeStub;
 use Magento\Backend\Model\UrlInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\Config\CacheInterface;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\Framework\ObjectManager\ConfigLoaderInterface;
+use Magento\Framework\Serialize\Serializer\Json;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -348,7 +350,9 @@ class HealthWidgetScopeTest extends TestCase
         });
         $loader = $this->createMock(ConfigLoaderInterface::class);
         $loader->method('load')->willReturn([]);
-        return new AdminEditorUrl($url, $loader, $this->createMock(LoggerInterface::class));
+        $cache = $this->createMock(CacheInterface::class);
+        $cache->method('load')->willReturn(false);
+        return new AdminEditorUrl($url, $loader, $this->createMock(LoggerInterface::class), $cache, new Json());
     }
 
     /**

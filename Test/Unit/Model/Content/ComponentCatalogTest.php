@@ -9,8 +9,9 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content;
 
 use Hyva\CmsLiveviewEditor\Model\Component\Collector;
+use Hyva\CmsLiveviewEditor\Model\Component\CollectorFactory;
 use Hyva\CmsLiveviewEditor\Model\Component\Provider as ComponentProvider;
-use Magebit\McpHyvaCommerceTools\Model\Adapter\OptionalServiceFactory;
+use Magebit\Mcp\Api\LoggerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentCatalog;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\FieldValueFormat;
@@ -107,14 +108,69 @@ class ComponentCatalogTest extends TestCase
             'type' => 'select',
             'options' => [['value' => 'a', 'label' => 'A']],
         ]]]];
-        $factory = $this->createMock(OptionalServiceFactory::class);
-        $factory->method('create')->willThrowException(new \RuntimeException('Duplicate field names'));
+        $collector = $this->createMock(Collector::class);
+        $collector->method('execute')->willThrowException(new \RuntimeException('Duplicate field names'));
+        $factory = $this->createMock(CollectorFactory::class);
+        $factory->method('create')->willReturn($collector);
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('warning')->with(
+            $this->stringContains('Duplicate field names'),
+            $this->callback(static fn (array $context): bool => ($context['component'] ?? null) === 'picker')
+        );
         $provider = $this->provider($cached);
-        $catalog = new ComponentCatalog($provider, new ComponentTree($provider), new FieldValueFormat(), $factory);
+        $catalog = new ComponentCatalog(
+            $provider,
+            new ComponentTree($provider),
+            new FieldValueFormat(),
+            $factory,
+            $logger
+        );
 
         $options = $this->field($catalog->getSchema('picker'), 'choice')['options'];
 
         $this->assertSame([['value' => 'a', 'label' => 'A']], $options);
+    }
+
+    public function testComponentsWithoutOptionFieldsAreNotCollectedAgain(): void
+    {
+        $cached = ['card' => [
+            'content' => ['title' => ['type' => 'text'], 'note' => ['type' => 'text', 'options' => 'unresolved']],
+            'design' => ['align' => ['type' => 'text-align']],
+        ]];
+        $factory = $this->createMock(CollectorFactory::class);
+        $factory->expects($this->never())->method('create');
+        $provider = $this->provider($cached);
+        $catalog = new ComponentCatalog(
+            $provider,
+            new ComponentTree($provider),
+            new FieldValueFormat(),
+            $factory,
+            $this->createMock(LoggerInterface::class)
+        );
+
+        $fields = $catalog->getSchema('card')['fields'];
+        $this->assertIsArray($fields);
+        $this->assertCount(3, $fields);
+    }
+
+    public function testEachSchemaCallUsesAFreshCollector(): void
+    {
+        $cached = ['picker' => ['content' => ['choice' => ['type' => 'select', 'options' => []]]]];
+        $collector = $this->createMock(Collector::class);
+        $collector->method('execute')->willReturn($cached);
+        $factory = $this->createMock(CollectorFactory::class);
+        $factory->expects($this->exactly(2))->method('create')->willReturn($collector);
+        $provider = $this->provider($cached);
+        $catalog = new ComponentCatalog(
+            $provider,
+            new ComponentTree($provider),
+            new FieldValueFormat(),
+            $factory,
+            $this->createMock(LoggerInterface::class)
+        );
+
+        $catalog->getSchema('picker');
+        $catalog->getSchema('picker');
     }
 
     public function testLiveOptionsOnlyReplaceFieldsThatHaveOptions(): void
@@ -137,10 +193,16 @@ class ComponentCatalogTest extends TestCase
     public function testSummariesDoNotCollectComponentsAgain(): void
     {
         $cached = ['card' => ['content' => ['title' => ['type' => 'text']]]];
-        $factory = $this->createMock(OptionalServiceFactory::class);
+        $factory = $this->createMock(CollectorFactory::class);
         $factory->expects($this->never())->method('create');
         $provider = $this->provider($cached);
-        $catalog = new ComponentCatalog($provider, new ComponentTree($provider), new FieldValueFormat(), $factory);
+        $catalog = new ComponentCatalog(
+            $provider,
+            new ComponentTree($provider),
+            new FieldValueFormat(),
+            $factory,
+            $this->createMock(LoggerInterface::class)
+        );
 
         $this->assertCount(1, $catalog->getSummaries());
     }
@@ -168,9 +230,15 @@ class ComponentCatalogTest extends TestCase
     {
         $collector = $this->createMock(Collector::class);
         $collector->method('execute')->willReturn($liveComponents);
-        $factory = $this->createMock(OptionalServiceFactory::class);
-        $factory->method('create')->with(Collector::class)->willReturn($collector);
-        return new ComponentCatalog($provider, new ComponentTree($provider), new FieldValueFormat(), $factory);
+        $factory = $this->createMock(CollectorFactory::class);
+        $factory->method('create')->willReturn($collector);
+        return new ComponentCatalog(
+            $provider,
+            new ComponentTree($provider),
+            new FieldValueFormat(),
+            $factory,
+            $this->createMock(LoggerInterface::class)
+        );
     }
 
     /**

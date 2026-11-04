@@ -83,6 +83,28 @@ class MenuRenderCheckScopeTest extends TestCase
         $this->assertStringNotContainsString('not published', $message);
     }
 
+    public function testEmptyRenderExplainsAStoreViewTheMenuIsNotAssignedTo(): void
+    {
+        $check = $this->emptyCheck(['is_active' => true, 'is_published' => true], null, [1], 2);
+
+        $this->assertSame(2, $check['store_id'] ?? null);
+        $this->assertFalse($check['passed'] ?? null);
+        $this->assertSame(
+            'Nothing rendered: the menu is not assigned to store view 2.',
+            $check['message'] ?? null
+        );
+    }
+
+    public function testAnAllStoreViewsMenuIsNeverReportedAsNotAssigned(): void
+    {
+        $check = $this->emptyCheck(['is_active' => true, 'is_published' => true], null, [0], 2);
+
+        $message = Cast::string($check['message'] ?? '');
+        $this->assertSame(2, $check['store_id'] ?? null);
+        $this->assertStringNotContainsString('not assigned', $message);
+        $this->assertStringContainsString('rendered no content', $message);
+    }
+
     public function testTheRenderersOwnMessageIsKept(): void
     {
         $check = $this->emptyCheck(['is_active' => false, 'is_published' => false], 'Circular <b>reference</b>');
@@ -103,16 +125,24 @@ class MenuRenderCheckScopeTest extends TestCase
     }
 
     /**
-     * Check for menu 4 in store view 1 when Hyvä renders no HTML and no error.
+     * Check for menu 4 when Hyvä renders no HTML and no error (store view 1 unless $storeId is given).
      *
      * @param array<string, mixed> $state
      * @param string|null $rendererMessage
+     * @param list<int> $menuStoreIds
+     * @param int|null $storeId Explicit store_id argument.
      * @return array<string, mixed>
      */
-    private function emptyCheck(array $state, ?string $rendererMessage = null): array
-    {
+    private function emptyCheck(
+        array $state,
+        ?string $rendererMessage = null,
+        array $menuStoreIds = [1],
+        ?int $storeId = null
+    ): array {
         $render = ['html' => '', 'message' => $rendererMessage, 'error' => null];
-        $text = $this->tool(null, [1], null, $state, $render)->execute(['id' => 4])->getContent()[0]['text'] ?? '';
+        $arguments = $storeId === null ? ['id' => 4] : ['id' => 4, 'store_id' => $storeId];
+        $text = $this->tool(null, $menuStoreIds, null, $state, $render)->execute($arguments)
+            ->getContent()[0]['text'] ?? '';
         $payload = json_decode(Cast::string($text), true);
         $this->assertIsArray($payload);
         $check = $payload['checks'][0] ?? null;

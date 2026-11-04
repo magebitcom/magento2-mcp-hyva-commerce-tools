@@ -11,7 +11,9 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content;
 use Magebit\Mcp\Api\LoggerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\AdminEditorUrl;
 use Magento\Backend\Model\UrlInterface as BackendUrl;
+use Magento\Framework\Config\CacheInterface;
 use Magento\Framework\ObjectManager\ConfigLoaderInterface;
+use Magento\Framework\Serialize\Serializer\Json;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -80,13 +82,69 @@ class AdminEditorUrlTest extends TestCase
         $loader->expects($this->once())->method('load')->willThrowException(new RuntimeException('no config'));
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects($this->once())->method('error');
-        $url = new AdminEditorUrl($this->backendUrl(), $loader, $logger);
+        $url = new AdminEditorUrl($this->backendUrl(), $loader, $logger, $this->cache(), new Json());
 
         $this->assertSame(
             'liveview/editor/index|type=newsletter_template,id=1,_nosecret=1',
             $url->build('newsletter_template', 1)
         );
         $url->build('email_template', 1);
+    }
+
+    public function testAnUnknownConfigShapeFallsBackToTheDefaultRouteAndIsLoggedWithTheShape(): void
+    {
+        $loader = $this->createMock(ConfigLoaderInterface::class);
+        $loader->expects($this->once())->method('load')->willReturn(
+            ['arguments' => [AdminEditorUrl::REGISTRY_TYPE => ['entityTypeRoutes' => ['_vac_' => self::ROUTES]]]]
+        );
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('warning')->with(
+            $this->stringContains('route map'),
+            $this->callback(static fn (array $context): bool => str_contains(
+                (string) json_encode($context['shape'] ?? null),
+                '_vac_'
+            ))
+        );
+        $cache = $this->cache();
+        $cache->expects($this->never())->method('save');
+        $url = new AdminEditorUrl($this->backendUrl(), $loader, $logger, $cache, new Json());
+
+        $this->assertSame(
+            'liveview/editor/index|type=email_template,id=1,_nosecret=1',
+            $url->build('email_template', 1)
+        );
+        $url->build('newsletter_template', 1);
+    }
+
+    public function testAResolvedRouteMapIsCachedAndReusedWithoutTheAdminhtmlConfig(): void
+    {
+        /** @var array<string, string> $stored */
+        $stored = [];
+        $cache = $this->createMock(CacheInterface::class);
+        $cache->method('load')->willReturnCallback(
+            static function (string $id) use (&$stored): string|false {
+                return $stored[$id] ?? false;
+            }
+        );
+        $cache->expects($this->once())->method('save')->willReturnCallback(
+            static function (string $data, string $id) use (&$stored): bool {
+                $stored[$id] = $data;
+                return true;
+            }
+        );
+        $loader = $this->createMock(ConfigLoaderInterface::class);
+        $loader->expects($this->once())->method('load')->willReturn(self::DEVELOPER_CONFIG);
+        $logger = $this->createMock(LoggerInterface::class);
+        $first = new AdminEditorUrl($this->backendUrl(), $loader, $logger, $cache, new Json());
+        $first->build('email_template', 1);
+        $first->build('newsletter_template', 1);
+
+        $second = new AdminEditorUrl($this->backendUrl(), $loader, $logger, $cache, new Json());
+
+        $this->assertSame(
+            'hyva_cms_email/liveview/newslettereditor|type=newsletter_template,id=1,_nosecret=1',
+            $second->build('newsletter_template', 1)
+        );
     }
 
     public function testInvalidRouteValuesAreIgnored(): void
@@ -116,7 +174,25 @@ class AdminEditorUrlTest extends TestCase
     {
         $loader = $this->createMock(ConfigLoaderInterface::class);
         $loader->method('load')->with('adminhtml')->willReturn($config);
-        return new AdminEditorUrl($this->backendUrl(), $loader, $this->createMock(LoggerInterface::class));
+        return new AdminEditorUrl(
+            $this->backendUrl(),
+            $loader,
+            $this->createMock(LoggerInterface::class),
+            $this->cache(),
+            new Json()
+        );
+    }
+
+    /**
+     * Config cache that holds nothing yet.
+     *
+     * @return CacheInterface&\PHPUnit\Framework\MockObject\MockObject
+     */
+    private function cache(): CacheInterface
+    {
+        $cache = $this->createMock(CacheInterface::class);
+        $cache->method('load')->willReturn(false);
+        return $cache;
     }
 
     /**

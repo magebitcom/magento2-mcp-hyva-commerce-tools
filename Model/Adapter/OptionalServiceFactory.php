@@ -51,26 +51,4 @@ class OptionalServiceFactory
         }
         return $service;
     }
-
-    /**
-     * New, unshared instance of an optional package's service.
-     *
-     * @param string $class
-     * @return object
-     * @throws LocalizedException When the package is not installed.
-     * @phpstan-template T of object
-     * @phpstan-param class-string<T> $class
-     * @phpstan-return T
-     */
-    public function create(string $class): object
-    {
-        if (!class_exists($class)) {
-            throw new LocalizedException(__('The optional package providing %1 is not installed.', $class));
-        }
-        $service = $this->objectManager->create($class);
-        if (!$service instanceof $class) {
-            throw new LocalizedException(__('%1 could not be created.', $class));
-        }
-        return $service;
-    }
 }
