@@ -8,7 +8,9 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Content;
 
+use Magebit\McpHyvaCommerceTools\Model\Adapter\OptionalServiceFactory;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Hyva\CmsLiveviewEditor\Model\Component\Collector;
 use Hyva\CmsLiveviewEditor\Model\Component\Provider as ComponentProvider;
 use Magento\Framework\Exception\LocalizedException;
 
@@ -21,11 +23,13 @@ class ComponentCatalog
      * @param ComponentProvider $componentProvider
      * @param ComponentTree $componentTree
      * @param FieldValueFormat $fieldValueFormat
+     * @param OptionalServiceFactory $serviceFactory
      */
     public function __construct(
         private readonly ComponentProvider $componentProvider,
         private readonly ComponentTree $componentTree,
-        private readonly FieldValueFormat $fieldValueFormat
+        private readonly FieldValueFormat $fieldValueFormat,
+        private readonly OptionalServiceFactory $serviceFactory
     ) {
     }
 
@@ -79,6 +83,7 @@ class ComponentCatalog
                 $this->componentProvider->isComponentDisabled($name) ? 'disabled' : 'not registered'
             ));
         }
+        $liveDefinition = $this->collectLive($name);
         $fields = [];
         foreach (['content', 'design', 'advanced'] as $group) {
             foreach (is_array($definition[$group] ?? null) ? $definition[$group] : [] as $field => $fieldDefinition) {
@@ -87,6 +92,11 @@ class ComponentCatalog
                 }
                 $attributes = is_array($fieldDefinition['attributes'] ?? null) ? $fieldDefinition['attributes'] : [];
                 $options = $fieldDefinition['options'] ?? null;
+                $liveGroup = is_array($liveDefinition[$group] ?? null) ? $liveDefinition[$group] : [];
+                $liveOptions = is_array($liveGroup[$field] ?? null) ? ($liveGroup[$field]['options'] ?? null) : null;
+                if (is_array($options) && is_array($liveOptions)) {
+                    $options = $liveOptions;
+                }
                 $fields[] = array_filter([
                     'name' => (string) $field,
                     'group' => $group,
@@ -111,6 +121,27 @@ class ComponentCatalog
             'fields' => $fields,
             'example_node' => $this->componentTree->createNode($name),
         ];
+    }
+
+    /**
+     * Component definition with its option source models resolved now.
+     *
+     * Hyvä resolves `options` source models (e.g. the Menu Builder's menu list) once, when it builds the `hyva_cms`
+     * `components` cache entry, and does not clean that entry when a menu is saved. A fresh collector run reads the
+     * sources at request time; on any failure the cached definition stays the answer.
+     *
+     * @param string $name
+     * @return array
+     * @phpstan-return array<mixed>
+     */
+    private function collectLive(string $name): array
+    {
+        try {
+            $components = $this->serviceFactory->create(Collector::class)->execute();
+        } catch (\Throwable) {
+            return [];
+        }
+        return is_array($components[$name] ?? null) ? $components[$name] : [];
     }
 
     /**
