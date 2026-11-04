@@ -17,7 +17,7 @@ class FieldValueFormat
 {
     private const FORMATS = [
         'link' => [
-            'format' => 'object {type, value, label?, open_in_new_tab?, prefix?, suffix?, placeholder?}',
+            'format' => 'object {type, value, label?, open_in_new_tab?, prefix?, suffix?, placeholder?, aria_label?}',
             'example' => [
                 'type' => 'custom_url',
                 'value' => 'sale',
@@ -26,14 +26,18 @@ class FieldValueFormat
                 'prefix' => 'STORE_URL',
                 'suffix' => '',
                 'placeholder' => '',
+                'aria_label' => '',
             ],
             'notes' => 'type is one of category, product, cms_page, custom_url, magento. value: category = category id '
                 . '(int), product = SKU (not the id), cms_page = page identifier (not the id), custom_url = URL or '
                 . 'path, magento = route path for getUrl(). prefix only applies to custom_url: "" (absolute URL), '
                 . '"STORE_URL" (value is a store-relative path, no http), "mailto:" or "tel:". suffix is appended to '
-                . 'the final URL (e.g. "#reviews"). label is the link text: always set it, because Hyvä falls back to '
-                    . 'placeholder only when '
-                . 'the label key is missing - an empty "" label shows the URL. '
+                . 'the final URL (e.g. "#reviews"). label is the link text: always set it. When label is missing or '
+                . 'empty, Hyvä CMS 1.3.2+ shows placeholder, which the admin editor fills with the picked item\'s '
+                . 'name; with neither (as an MCP call that sets only type and value) the link text is the URL, also '
+                . 'for product, category and page links (CMS before 1.3.2 showed the URL for an empty "" label). '
+                . 'aria_label (CMS 1.3.2+) is the accessible name, rendered only by fields whose definition has '
+                . 'config.aria_label: true (e.g. Link Button, Banner call to action); elsewhere it is ignored. '
                 . 'Keys like "url" are ignored: {"url": "/sale"} renders an empty link.',
         ],
         'image' => [

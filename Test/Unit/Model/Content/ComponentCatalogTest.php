@@ -47,7 +47,7 @@ class ComponentCatalogTest extends TestCase
         $this->assertIsArray($link);
         $this->assertIsArray($link['example']);
         $this->assertSame(
-            ['type', 'value', 'label', 'open_in_new_tab', 'prefix', 'suffix', 'placeholder'],
+            ['type', 'value', 'label', 'open_in_new_tab', 'prefix', 'suffix', 'placeholder', 'aria_label'],
             array_keys($link['example'])
         );
         $this->assertStringContainsString('SKU', (string) $link['notes']);
