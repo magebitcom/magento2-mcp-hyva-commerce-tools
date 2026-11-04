@@ -186,7 +186,7 @@ A refused call is a soft error (`isError: true`) with a `status`, not a JSON-RPC
 | Status | When | What to do |
 |---|---|---|
 | 422 | A provider refuses content, or Hyvä's content guard rejects it (3 MB, 5000 components, depth 50). `field_errors` lists the problems per component uid and field. | Fix the fields and call again. |
-| 409 | The draft changed since you read it. Pass `base_version_uid` to the update tools to get this check. Also a confirmed delete of an entity still in use (`in_use`). | Reload and re-apply your change; never resubmit old content. For a delete, see [Confirm and force](#confirm-and-force). |
+| 409 | The draft changed since you read it. Pass `base_version_uid` to the update tools to get this check. Also a confirmed delete of an entity still in use (`in_use`), and a `hyva_linked.group.save` that Hyvä refuses after the check passed (another save took the name or the products; `issues` code `save_refused`, Hyvä's message). | Reload and re-apply your change; never resubmit old content. For a delete, see [Confirm and force](#confirm-and-force). For a linked group, validate again and save again. |
 | 403 | Hyvä refuses a permission, or the role's store scope excludes the entity (audit summary `{"error": "out_of_scope"}`; a missing permission is `status_403`). | Grant the permission (see [Role setup](#role-setup)), or work in the role's own store views (see [Store scope](#store-scope)). |
 | `transport_error` | `hyva_email.template.send_test` could not hand the mail to Magento's mail transport. The reply has `sent: false`, `message`, `id` and `recipient`. | Check the store's mail settings. Nothing was sent. |
 
@@ -831,12 +831,17 @@ Clients that parse replies:
 - **`hyva_email.template.send_test` sends the admin's sample order.** With Email & Newsletter Templates 1.0.1+ the
   mail is rendered inside Hyvä's test-send context, so order components show the preview fixture (items, totals,
   addresses) as the admin "Send test" does, and the fallbacks are Hyvä's `FixtureDefaults`. On 1.0.0 nothing changes.
+- **`hyva_linked.group.save` answers a Hyvä refusal softly.** A save that Linked Products refuses after the check (a
+  concurrent save took the name or the products; 1.0.2 says so in its own words) was a JSON-RPC error; it is now a
+  soft error with status 409 and `issues` code `save_refused`.
 - **Calls that write without confirm say `dry_run: false`.** Page/block update, image alt and replace, optimization
   clear and migration convert_to_draft replies gain the key; nothing else in them changed. See
   [Confirm and previews](#confirm-and-previews).
 
 Custom code:
 
+- **`Api\Adapter\LinkedProductsGatewayInterface::save()`** throws `ValidatorException` when Hyvä refuses the group;
+  `GroupSave` turns it into the soft 409.
 - **`Api\Adapter\EmailGatewayInterface`** gains `deletionUsage()`, `deleteTemplate()` and `deleteNewsletter()`. A
   project that replaces the module's preference for it must add them, or PHP stops with a fatal error.
 - **`Api\FeatureCheckerInterface`** gains `isInstalledAndEnabled(string $feature): bool`. A custom implementation must
