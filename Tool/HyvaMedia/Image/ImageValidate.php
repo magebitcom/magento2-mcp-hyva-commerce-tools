@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageChecker;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageContentEditor;
@@ -28,6 +29,7 @@ class ImageValidate extends AbstractMediaTool
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_media_image_validate';
 
     /**
+     * @param FeatureCheckerInterface $featureChecker
      * @param ImageChecker $checker
      * @param ImageUsageIndex $usageIndex
      * @param MediaService $mediaService
@@ -35,12 +37,14 @@ class ImageValidate extends AbstractMediaTool
      * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
+        FeatureCheckerInterface $featureChecker,
         private readonly ImageChecker $checker,
         private readonly ImageUsageIndex $usageIndex,
         private readonly MediaService $mediaService,
         private readonly ImageContentEditor $editor,
         private readonly ContentScopeFilter $scopeFilter
     ) {
+        parent::__construct($featureChecker);
     }
 
     /**

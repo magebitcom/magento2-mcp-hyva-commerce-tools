@@ -11,6 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Model\Widget;
 use Hyva\AdminDashboardApi\Api\V1\WidgetContextInterface;
 use Hyva\AdminDashboardApi\Api\V1\WidgetInstanceInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Content\AdminEditorUrl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
@@ -19,7 +20,6 @@ use Magebit\McpHyvaCommerceTools\Model\Media\ImageChecker;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaService;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuValidator;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
-use Magento\Backend\Model\UrlInterface;
 use Magento\Framework\App\ResourceConnection;
 
 /**
@@ -37,7 +37,7 @@ class CampaignAssetReadiness extends AbstractHealthWidget
      * @param FeatureCheckerInterface $featureChecker
      * @param MenuValidator $menuValidator
      * @param ResourceConnection $resourceConnection
-     * @param UrlInterface $url
+     * @param AdminEditorUrl $editorUrl
      * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
@@ -49,7 +49,7 @@ class CampaignAssetReadiness extends AbstractHealthWidget
         private readonly FeatureCheckerInterface $featureChecker,
         private readonly MenuValidator $menuValidator,
         private readonly ResourceConnection $resourceConnection,
-        private readonly UrlInterface $url,
+        private readonly AdminEditorUrl $editorUrl,
         private readonly ContentScopeFilter $scopeFilter
     ) {
     }
@@ -154,17 +154,18 @@ class CampaignAssetReadiness extends AbstractHealthWidget
                 $problems === [] ? (string) __('ready') : implode('; ', array_slice(array_unique($problems), 0, 3)),
                 $problems === [] ? 'ready' : count($problems) . ' issue(s)',
                 $problems === [] ? 'success' : (str_contains(implode(' ', $problems), 'broken') ? 'danger' : 'warning'),
-                $this->url->getUrl(
-                    'liveview/editor/index',
-                    ['type' => $item['entity_type'], 'id' => $item['entity_id']]
-                )
+                $this->editorUrl->link($item['entity_type'], $item['entity_id'])
             );
         }
         return [
             'stats' => [
                 $this->stat('Scheduled items', count($pending)),
                 $this->stat('Large images', $totals['large'], $this->level($totals['large'])),
-                $this->stat('Missing alt', $totals['missing_alt'], $this->level($totals['missing_alt'])),
+                $this->stat(
+                    'Missing alt (scheduled items)',
+                    $totals['missing_alt'],
+                    $this->level($totals['missing_alt'])
+                ),
                 $this->stat('Broken media', $totals['broken'], $this->level($totals['broken'], 'danger')),
                 $this->stat('Not optimized yet', $totals['unoptimized'], $this->level($totals['unoptimized'])),
                 $this->stat('Menu link problems', $totals['menu_links'], $this->level($totals['menu_links'], 'danger')),

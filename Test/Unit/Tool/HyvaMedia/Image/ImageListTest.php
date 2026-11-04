@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\Image;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaInventory;
@@ -71,7 +72,13 @@ class ImageListTest extends TestCase
             'extension' => strtolower(pathinfo($path, PATHINFO_EXTENSION)),
         ]);
         $this->usageIndex = $this->createMock(ImageUsageIndex::class);
-        $this->tool = new ImageList($inventory, $this->fileInfo, $this->usageIndex, $this->contentScope(null));
+        $this->tool = new ImageList(
+            $this->createMock(FeatureCheckerInterface::class),
+            $inventory,
+            $this->fileInfo,
+            $this->usageIndex,
+            $this->contentScope(null)
+        );
     }
 
     /**
@@ -252,6 +259,121 @@ class ImageListTest extends TestCase
     }
 
     /**
+     * An explicit folder keeps only gallery assets under it; a sibling folder sharing the prefix does not match.
+     *
+     * @return void
+     */
+    public function testFolderFilterKeepsOnlyAssetsUnderFolder(): void
+    {
+        $this->assertSame(['wysiwyg/giftcards/a.jpg'], $this->folderPaths(['folder' => 'wysiwyg/giftcards']));
+    }
+
+    /**
+     * A trailing (or leading) slash names the same folder.
+     *
+     * @return void
+     */
+    public function testFolderTrailingSlashIsSameFolder(): void
+    {
+        $this->assertSame(['wysiwyg/giftcards/a.jpg'], $this->folderPaths(['folder' => 'wysiwyg/giftcards/']));
+        $this->assertSame(['wysiwyg/giftcards/a.jpg'], $this->folderPaths(['folder' => '/wysiwyg/giftcards']));
+    }
+
+    /**
+     * Without folder every gallery asset is listed and wysiwyg is scanned.
+     *
+     * @return void
+     */
+    public function testDefaultFolderIsWysiwyg(): void
+    {
+        $this->assertSame(
+            ['wysiwyg/giftcards-old/c.jpg', 'wysiwyg/giftcards/a.jpg', 'wysiwyg/other/b.jpg'],
+            $this->folderPaths([], 'wysiwyg')
+        );
+    }
+
+    /**
+     * An empty folder lists the gallery only, unfiltered.
+     *
+     * @return void
+     */
+    public function testEmptyFolderListsTheWholeGalleryWithoutAScan(): void
+    {
+        $this->assertSame(
+            ['wysiwyg/giftcards-old/c.jpg', 'wysiwyg/giftcards/a.jpg', 'wysiwyg/other/b.jpg'],
+            $this->folderPaths(['folder' => ''], null)
+        );
+    }
+
+    /**
+     * T-136: a folder that does not exist under pub/media says so instead of reading like "no images".
+     *
+     * @return void
+     */
+    public function testAMissingFolderGivesAHint(): void
+    {
+        $this->fileInfo->method('folderExists')->willReturnMap([['giftcards', false]]);
+
+        $result = $this->tool->execute(['folder' => 'giftcards/', 'types' => ['gif']]);
+
+        $this->assertSame(0, $this->payloadAt($result, 'total'));
+        $this->assertSame('Folder "giftcards" does not exist under pub/media.', $this->payloadAt($result, 'hint'));
+    }
+
+    /**
+     * An existing folder, and the default one, give no hint.
+     *
+     * @return void
+     */
+    public function testAnExistingFolderGivesNoHint(): void
+    {
+        $this->fileInfo->method('folderExists')->willReturn(true);
+
+        foreach ([['folder' => 'wysiwyg'], []] as $arguments) {
+            $text = $this->tool->execute($arguments)->getContent()[0]['text'] ?? '';
+            $payload = json_decode(is_string($text) ? $text : '', true);
+            $this->assertIsArray($payload);
+            $this->assertArrayNotHasKey('hint', $payload);
+        }
+    }
+
+    /**
+     * Paths listed for the given arguments, with three gallery assets and an empty folder scan.
+     *
+     * @param array $arguments
+     * @phpstan-param array<string, mixed> $arguments
+     * @param string|null $scanned The folder scanFolder() must get, or null when it must not run.
+     * @return array
+     * @phpstan-return list<mixed>
+     */
+    private function folderPaths(array $arguments, ?string $scanned = 'wysiwyg/giftcards'): array
+    {
+        $asset = ['asset_id' => 1, 'title' => 'T', 'description' => null, 'width' => 10, 'height' => 10,
+            'size' => 1024, 'content_type' => 'image/jpeg', 'backup_image_path' => null];
+        $inventory = $this->createMock(MediaInventory::class);
+        $inventory->method('getGalleryAssets')->willReturn([
+            'wysiwyg/giftcards/a.jpg' => $asset,
+            'wysiwyg/other/b.jpg' => $asset,
+            'wysiwyg/giftcards-old/c.jpg' => $asset,
+        ]);
+        if ($scanned === null) {
+            $inventory->expects($this->never())->method('scanFolder');
+        } else {
+            $inventory->expects($this->once())->method('scanFolder')->with($scanned)->willReturn([]);
+        }
+        $this->usageIndex->method('usagesOfMany')->willReturn([]);
+        $tool = new ImageList(
+            $this->createMock(FeatureCheckerInterface::class),
+            $inventory,
+            $this->fileInfo,
+            $this->usageIndex,
+            $this->contentScope(null)
+        );
+
+        return array_column($this->arrayAt($tool->execute($arguments + ['sort' => 'path']), 'items'), 'path');
+    }
+
+    /**
      * Tool for a caller restricted to store view 1: page 1, menu 3 and product 5 are its own, page 2 is store
      * view 2's.
      *
@@ -259,12 +381,18 @@ class ImageListTest extends TestCase
      */
     private function restrictedTool(): ImageList
     {
-        return new ImageList($this->inventory, $this->fileInfo, $this->usageIndex, $this->contentScope(
-            [1],
-            ['cms_page' => [1 => [1], 2 => [2]], 'menu' => [3 => [0]]],
-            null,
-            ['product' => [5 => [1]]]
-        ));
+        return new ImageList(
+            $this->createMock(FeatureCheckerInterface::class),
+            $this->inventory,
+            $this->fileInfo,
+            $this->usageIndex,
+            $this->contentScope(
+                [1],
+                ['cms_page' => [1 => [1], 2 => [2]], 'menu' => [3 => [0]]],
+                null,
+                ['product' => [5 => [1]]]
+            )
+        );
     }
 
     /**

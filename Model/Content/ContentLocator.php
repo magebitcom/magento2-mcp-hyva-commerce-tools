@@ -221,9 +221,11 @@ class ContentLocator
             }
         }
         foreach ($missing as $type => $ids) {
-            // Without Hyvä Menu Builder no menu can be loaded, so none counts as existing.
+            // Without Hyvä Menu Builder installed and enabled no menu can be loaded, so none counts as existing. This
+            // answers existence and store views only, so in-use counting sees menus a caller may not view
+            // (DeletionUsage); ContentScopeFilter hides those menus from everything that shows content.
             $loadable = $type !== self::TYPE_MENU
-                || $this->featureChecker->isAvailable(FeatureCheckerInterface::MENU_BUILDER);
+                || $this->featureChecker->isInstalledAndEnabled(FeatureCheckerInterface::MENU_BUILDER);
             $found = $loadable ? $this->contentIndex->getStoreIds($type, array_values($ids)) : [];
             foreach ($ids as $id) {
                 $this->scopeStoreIds[$type][$id] = $found[$id] ?? null;

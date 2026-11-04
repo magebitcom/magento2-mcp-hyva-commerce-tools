@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaCms;
 
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ScheduleTime;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule\ScheduleList;
@@ -126,7 +127,7 @@ class ScheduleListHistoryCapTest extends TestCase
         $time = $this->createMock(ScheduleTime::class);
         $time->method('toLocal')->willReturnArgument(0);
 
-        $result = (new ScheduleList($service, $time, $locator, $acl))->execute($arguments);
+        $result = (new ScheduleList($service, $time, $locator, $acl, $this->viewableAll()))->execute($arguments);
         $text = $result->getContent()[0]['text'] ?? '';
         $payload = json_decode(is_string($text) ? $text : '', true);
         $this->assertIsArray($payload);
@@ -152,5 +153,17 @@ class ScheduleListHistoryCapTest extends TestCase
             'creation_time' => '2026-10-26 10:00:00', 'release_name' => 'R' . ($releaseId ?? $id),
             'release_status' => 'success', 'time_scheduled' => '2026-10-01 10:00:00',
         ];
+    }
+
+    /**
+     * Scope filter for a caller who may view every content type.
+     *
+     * @return ContentScopeFilter
+     */
+    private function viewableAll(): ContentScopeFilter
+    {
+        $filter = $this->createMock(ContentScopeFilter::class);
+        $filter->method('viewableTypes')->willReturnArgument(0);
+        return $filter;
     }
 }

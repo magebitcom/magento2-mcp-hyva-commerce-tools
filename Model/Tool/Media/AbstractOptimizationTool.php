@@ -23,9 +23,10 @@ abstract class AbstractOptimizationTool extends AbstractMediaTool
      * @param MediaOptimizationGatewayInterface $gateway
      */
     public function __construct(
-        protected readonly FeatureCheckerInterface $featureChecker,
+        FeatureCheckerInterface $featureChecker,
         protected readonly MediaOptimizationGatewayInterface $gateway
     ) {
+        parent::__construct($featureChecker);
     }
 
     /**
@@ -38,7 +39,7 @@ abstract class AbstractOptimizationTool extends AbstractMediaTool
     public function getUnderlyingAclResource(): ?string
     {
         return $this->featureChecker->getStatus(FeatureCheckerInterface::MEDIA_OPTIMIZATION)['enabled']
-            ? parent::getUnderlyingAclResource()
+            ? static::UNDERLYING_ACL_RESOURCE
             : ContentAcl::UNAVAILABLE_RESOURCE;
     }
 

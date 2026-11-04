@@ -79,6 +79,7 @@ class ImageUsageScopeTest extends TestCase
             }
         );
         $tool = new ImageValidate(
+            $this->createMock(FeatureCheckerInterface::class),
             $checker,
             $this->usageIndex(),
             $this->createMock(MediaService::class),
@@ -156,6 +157,7 @@ class ImageUsageScopeTest extends TestCase
     private function findUsage(ContentScopeFilter $scope): ImageFindUsage
     {
         return new ImageFindUsage(
+            $this->createMock(FeatureCheckerInterface::class),
             $this->usageIndex(),
             $this->createMock(MediaFileInfo::class),
             $this->editor(),

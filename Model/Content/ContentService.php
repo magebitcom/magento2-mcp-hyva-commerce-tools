@@ -133,6 +133,8 @@ class ContentService
      * @param array $document
      * @param string|null $versionName
      * @param string|null $baseVersionUid Draft version uid the caller edited; refused when the draft has moved on.
+     * @param bool $snapshotUnversionedDraft False when the caller just wrote the entity's blank draft (a create):
+     *     that blank draft is then not kept as an unnamed version of its own (T-121).
      * @return array
      * @throws LocalizedException When the document is invalid or saving fails.
      * @throws ConflictException When the stored draft is no longer $baseVersionUid.
@@ -144,12 +146,15 @@ class ContentService
         int $id,
         array $document,
         ?string $versionName = null,
-        ?string $baseVersionUid = null
+        ?string $baseVersionUid = null,
+        bool $snapshotUnversionedDraft = true
     ): array {
         $this->assertBaseVersion($type, $id, $baseVersionUid);
         ['document' => $document, 'validation' => $validation] = $this->prepareDraft($type, $id, $document);
 
-        $this->snapshotUnversionedDraft($type, $id);
+        if ($snapshotUnversionedDraft) {
+            $this->snapshotUnversionedDraft($type, $id);
+        }
 
         $document = $this->stamp($document, 'draft', $versionName);
         $json = $this->componentTree->encode($document);

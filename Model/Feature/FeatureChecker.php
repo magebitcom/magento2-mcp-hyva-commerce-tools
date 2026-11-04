@@ -51,6 +51,23 @@ class FeatureChecker implements FeatureCheckerInterface
     /**
      * @inheritDoc
      */
+    public function isInstalledAndEnabled(string $feature): bool
+    {
+        $definition = $this->features[$feature] ?? [];
+        if ($definition === []) {
+            return false;
+        }
+        foreach ($definition['modules'] ?? [] as $moduleName) {
+            if (!$this->moduleState($moduleName)['enabled']) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function getStatus(string $feature): array
     {
         $definition = $this->features[$feature] ?? [];
@@ -61,21 +78,26 @@ class FeatureChecker implements FeatureCheckerInterface
         $installed = $definition !== [];
         $enabled = $definition !== [];
         foreach ($definition['modules'] ?? [] as $moduleName) {
-            $moduleInstalled = $this->componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName) !== null;
-            $moduleEnabled = $moduleInstalled && $this->moduleManager->isEnabled($moduleName);
-            $modules[$moduleName] = ['installed' => $moduleInstalled, 'enabled' => $moduleEnabled];
-            $installed = $installed && $moduleInstalled;
-            $enabled = $enabled && $moduleEnabled;
+            $modules[$moduleName] = $this->moduleState($moduleName);
+            $installed = $installed && $modules[$moduleName]['installed'];
+            $enabled = $enabled && $modules[$moduleName]['enabled'];
         }
 
         // A missing or disabled feature gets no ACL verdict (null): its resource may not exist, or may belong to
         // another module that is still installed, so true or false would both mislead.
         $aclAllowed = $aclResource !== null && $installed && $enabled ? $this->isAclAllowed($aclResource) : null;
+        $unavailableReason = match (true) {
+            !$installed => 'not_installed',
+            !$enabled => 'disabled',
+            $aclAllowed === false => 'acl',
+            default => null,
+        };
 
         return [
             'feature' => $feature,
             'label' => (string) ($definition['label'] ?? $feature),
-            'available' => $installed && $enabled && $aclAllowed !== false,
+            'available' => $unavailableReason === null,
+            'unavailable_reason' => $unavailableReason,
             'installed' => $installed,
             'enabled' => $enabled,
             'version' => $this->getPackageVersion($package),
@@ -119,6 +141,18 @@ class FeatureChecker implements FeatureCheckerInterface
         }
 
         return ['available' => false, 'feature' => $feature, 'reason' => $reason, 'hint' => $hint];
+    }
+
+    /**
+     * Whether a module is installed (registered) and enabled; the one definition both checks above use.
+     *
+     * @param string $moduleName
+     * @return array{installed: bool, enabled: bool}
+     */
+    private function moduleState(string $moduleName): array
+    {
+        $installed = $this->componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName) !== null;
+        return ['installed' => $installed, 'enabled' => $installed && $this->moduleManager->isEnabled($moduleName)];
     }
 
     /**

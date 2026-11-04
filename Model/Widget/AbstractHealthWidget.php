@@ -18,8 +18,10 @@ use Magento\Framework\Phrase;
 /**
  * Base for the Magebit MCP dashboard widgets. Every widget returns the same display shape, rendered by
  * Magebit_McpHyvaCommerceTools::widget/health-summary.phtml:
- * {stats: [{label, value, severity}], sections: [{title, rows: [{label, detail, badge, severity, url}], empty}],
- *  notice: string|null, links: [{label, url}], generated_at}
+ * {stats: [{label, value, severity}], sections: [{title, rows: [{label, detail, badge, severity, route, params}],
+ *  empty}], notice: string|null, links: [{label, route, params}], generated_at}
+ * Links hold an admin route and its params, never a URL: Hyvä caches the display data, and a URL would carry the secret
+ * key of the session that built it. The template builds the URL for the admin viewing the dashboard (T-118).
  */
 abstract class AbstractHealthWidget implements WidgetTypeInterface
 {
@@ -174,19 +176,40 @@ abstract class AbstractHealthWidget implements WidgetTypeInterface
      * @param string|null $detail
      * @param string|null $badge
      * @param string|null $severity
-     * @param string|null $url
+     * @param array|null $link Admin route and params (AdminEditorUrl::link()), or null for no link.
      * @return array
+     * @phpstan-param array{route: string, params: array<string, mixed>}|null $link
      * @phpstan-return array{label: string, detail: string|null, badge: string|null, severity: string|null,
-     *     url: string|null}
+     *     route: string|null, params: array<string, mixed>}
      */
     protected function row(
         string $label,
         ?string $detail = null,
         ?string $badge = null,
         ?string $severity = null,
-        ?string $url = null
+        ?array $link = null
     ): array {
-        return ['label' => $label, 'detail' => $detail, 'badge' => $badge, 'severity' => $severity, 'url' => $url];
+        return [
+            'label' => $label,
+            'detail' => $detail,
+            'badge' => $badge,
+            'severity' => $severity,
+            'route' => $link['route'] ?? null,
+            'params' => $link['params'] ?? [],
+        ];
+    }
+
+    /**
+     * Footer link to an admin page.
+     *
+     * @param string $label
+     * @param string $route
+     * @return array
+     * @phpstan-return array{label: string, route: string, params: array<string, mixed>}
+     */
+    protected function link(string $label, string $route): array
+    {
+        return ['label' => $label, 'route' => $route, 'params' => []];
     }
 
     /**

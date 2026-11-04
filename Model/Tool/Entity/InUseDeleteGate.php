@@ -18,7 +18,8 @@ use Magento\Framework\Exception\LocalizedException;
  * Delete tools: an entity still in use is deleted only with "force": true next to "confirm": true (T-73), and the
  * result of such a delete says so ("forced": true) and lists the usages that broke (T-79).
  *
- * Used by AbstractEntityDelete (CMS pages and blocks) and MenuDelete, which both extend AbstractTool.
+ * Used by AbstractEntityDelete (CMS pages and blocks), MenuDelete and AbstractTemplateDelete (email and newsletter
+ * templates), which all extend AbstractTool.
  */
 trait InUseDeleteGate
 {
@@ -85,19 +86,22 @@ trait InUseDeleteGate
      * The usages are the DeletionUsage report of the preview, so the caller sees which references broke.
      *
      * @param array $usage
+     * @param string $aftermath What the caller should know or do now, after the usage list.
      * @return array
      * @phpstan-param array<string, mixed> $usage
      * @phpstan-return array{forced: true, usage: array<string, mixed>, hint: string}
      */
-    private function forcedDeleteDetails(array $usage): array
-    {
+    private function forcedDeleteDetails(
+        array $usage,
+        string $aftermath = 'Those references are now broken: remove or replace them.'
+    ): array {
         return [
             'forced' => true,
             'usage' => $usage,
             'hint' => sprintf(
-                'Deleted with "force": true while it was still in use (%s). Those references are now broken: '
-                    . 'remove or replace them.',
-                $this->usagePlaces($usage)
+                'Deleted with "force": true while it was still in use (%s). %s',
+                $this->usagePlaces($usage),
+                $aftermath
             ),
         ];
     }

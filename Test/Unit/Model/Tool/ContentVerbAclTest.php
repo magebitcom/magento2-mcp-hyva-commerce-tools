@@ -136,7 +136,7 @@ class ContentVerbAclTest extends TestCase
 
         $menu = $this->withAcl(MenuScheduleCreate::class, ScheduleCreate::class);
         $this->assertSame(
-            ['Hyva::menu_schedule_save', 'Hyva::menu_version_history'],
+            ['Hyva::menu_schedule_save', 'Hyva::menu_version_history', 'Hyva::menu_view'],
             $menu->getContextualAclResources(['id' => 2, 'version_id' => 4])
         );
     }

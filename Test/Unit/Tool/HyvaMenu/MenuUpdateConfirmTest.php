@@ -268,21 +268,46 @@ class MenuUpdateConfirmTest extends TestCase
     }
 
     /**
+     * T-139: activating an unpublished menu uses the same wording as hyva_menu_create (T-134).
+     */
+    public function testActivatingAnUnpublishedMenuPreviewsTheMenuCreateWording(): void
+    {
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->expects($this->never())->method('update');
+
+        $result = $this->tool($gateway, $this->createMock(ContentService::class), null, [], [
+            'is_active' => false,
+            'is_published' => false,
+        ])->execute(['id' => 3, 'settings' => ['is_active' => true]]);
+        $text = $result->getContent()[0]['text'] ?? '';
+        $this->assertIsString($text);
+        $payload = json_decode($text, true);
+
+        $this->assertIsArray($payload);
+        $this->assertTrue($payload['confirmation_required'] ?? null);
+        $this->assertSame('is_active', $payload['affected'][0]['field'] ?? null);
+        $this->assertSame(LiveSettings::MENU_ACTIVATION_EFFECT, $payload['affected'][0]['effect'] ?? null);
+    }
+
+    /**
      * Menu update over an active menu.
      *
      * @param MenuGatewayInterface $gateway
      * @param ContentService $contentService
      * @param array|null $allowedStoreIds Store views of a restricted caller; null = unrestricted.
      * @param array $dropped Nodes the draft operations discard with their children.
+     * @param array $menuFields Menu row fields that replace the defaults (an active, published menu).
      * @return MenuUpdate
      * @phpstan-param list<int>|null $allowedStoreIds
      * @phpstan-param list<array<string, mixed>> $dropped
+     * @phpstan-param array<string, mixed> $menuFields
      */
     private function tool(
         MenuGatewayInterface $gateway,
         ContentService $contentService,
         ?array $allowedStoreIds = null,
-        array $dropped = []
+        array $dropped = [],
+        array $menuFields = []
     ): MenuUpdate {
         $editor = $this->createMock(DraftEditor::class);
         $editor->method('apply')->willReturn(['document' => [], 'applied' => [], 'dropped' => $dropped]);
@@ -293,8 +318,8 @@ class MenuUpdateConfirmTest extends TestCase
         );
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn(true);
-        $menu = ['id' => 3, 'identifier' => 'main', 'title' => 'Main menu', 'is_active' => true, 'store_ids' => [0],
-            'preview_url_key' => null];
+        $menu = array_replace(['id' => 3, 'identifier' => 'main', 'title' => 'Main menu', 'is_active' => true,
+            'is_published' => true, 'store_ids' => [0], 'preview_url_key' => null], $menuFields);
         $guard = $this->storeScope($allowedStoreIds);
         $menus = $this->createMock(MenuService::class);
         // The locator's write check, over the real guard.
@@ -302,7 +327,7 @@ class MenuUpdateConfirmTest extends TestCase
             static function (array $arguments, ?array $newStoreIds = null) use ($guard, $menu): array {
                 $guard->assertChangeable(
                     'menu #3',
-                    $menu['store_ids'],
+                    Cast::intList($menu['store_ids']),
                     $newStoreIds === null ? null : Cast::intList($newStoreIds)
                 );
                 return $menu;
@@ -311,7 +336,7 @@ class MenuUpdateConfirmTest extends TestCase
         $menus->method('changesOnlyAfterReassignment')->willReturnCallback(
             static fn (array $row, ?array $newStoreIds): bool
                 => $guard->changesOnlyAfterReassignment(
-                    $menu['store_ids'],
+                    Cast::intList($menu['store_ids']),
                     $newStoreIds === null ? null : Cast::intList($newStoreIds)
                 )
         );

@@ -18,6 +18,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuItemBuilder;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
+use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Content\Publish;
@@ -110,7 +111,7 @@ class PublishInactiveNoteTest extends TestCase
     {
         $this->assertFalse($this->menuCreatePayload([])['is_active'] ?? null);
         $this->assertFalse($this->menuCreatePayload(['is_active' => false])['is_active'] ?? null);
-        $this->assertTrue($this->menuCreatePayload(['is_active' => true])['is_active'] ?? null);
+        $this->assertTrue($this->menuCreatePayload(['is_active' => true, 'confirm' => true])['is_active'] ?? null);
     }
 
     /**
@@ -136,7 +137,8 @@ class PublishInactiveNoteTest extends TestCase
             $this->createMock(MenuItemBuilder::class),
             $this->createMock(DraftEditor::class),
             $this->createMock(PreviewService::class),
-            $this->storeScope(null)
+            $this->storeScope(null),
+            new LiveSettings()
         );
 
         $text = $tool->execute(

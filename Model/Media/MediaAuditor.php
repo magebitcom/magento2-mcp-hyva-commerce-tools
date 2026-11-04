@@ -41,11 +41,13 @@ class MediaAuditor
     /**
      * Audit.
      *
+     * The counts are a stdClass when no image has a problem, so it encodes as a JSON object ({}) like the other audits.
+     *
      * @param string $scope all|cms|menu
      * @param int $maxKb
      * @param int $limit Max images listed (all images are counted).
      * @return array
-     * @phpstan-return array{scope: string, images_checked: int, counts: array<string, int>,
+     * @phpstan-return array{scope: string, images_checked: int, counts: array<string, int>|\stdClass,
      *     config_issues: list<array{severity: string, code: string, message: string}>, images: list<array<string,
      *     mixed>>, usages_hidden_by_permissions?: int}
      */
@@ -112,7 +114,7 @@ class MediaAuditor
         $report = [
             'scope' => $scope,
             'images_checked' => $checked,
-            'counts' => $counts,
+            'counts' => $counts === [] ? new \stdClass() : $counts,
             'config_issues' => $this->configIssues(),
             'images' => array_slice($images, 0, $limit),
         ];

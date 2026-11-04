@@ -19,12 +19,17 @@ use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Filesystem;
+use Magento\Framework\Locale\ResolverInterface;
+use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use Magento\MediaGalleryApi\Api\CreateDirectoriesByPathsInterface;
 use Magento\MediaGalleryApi\Api\Data\AssetInterface;
 use Magento\MediaGalleryApi\Api\GetAssetsByIdsInterface;
 use Magento\MediaGalleryApi\Api\GetAssetsByPathsInterface;
 use Magento\MediaGalleryApi\Api\GetAssetsKeywordsInterface;
 use Magento\MediaGalleryApi\Api\IsPathExcludedInterface;
+use DateTimeImmutable;
+use DateTimeZone;
+use IntlDateFormatter;
 use Throwable;
 
 /**
@@ -37,6 +42,8 @@ class MediaGalleryGateway implements MediaGalleryGatewayInterface
     private const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg'];
     private const SYNC_TOPICS = ['media.gallery.synchronization', 'media.content.synchronization'];
     private const MQ_STATUSES = [2 => 'new', 3 => 'in_progress', 4 => 'complete', 5 => 'retry', 6 => 'error'];
+    private const DATE_KEYS = ['trashed_at', 'updated_at', 'created_at'];
+    private const SQL_DATE_PATTERN = '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/';
 
     /**
      * @param SearchAssetsList $searchAssetsList
@@ -51,6 +58,8 @@ class MediaGalleryGateway implements MediaGalleryGatewayInterface
      * @param ScopeConfigInterface $scopeConfig
      * @param Filesystem $filesystem
      * @param LoggerInterface $logger
+     * @param TimezoneInterface $timezone
+     * @param ResolverInterface $localeResolver
      * @SuppressWarnings("PHPMD.CouplingBetweenObjects")
      */
     public function __construct(
@@ -65,7 +74,9 @@ class MediaGalleryGateway implements MediaGalleryGatewayInterface
         private readonly ResourceConnection $resourceConnection,
         private readonly ScopeConfigInterface $scopeConfig,
         private readonly Filesystem $filesystem,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly TimezoneInterface $timezone,
+        private readonly ResolverInterface $localeResolver
     ) {
     }
 
@@ -91,9 +102,10 @@ class MediaGalleryGateway implements MediaGalleryGatewayInterface
         foreach (is_array($result['items'] ?? null) ? $result['items'] : [] as $item) {
             if (is_array($item)) {
                 unset($item['thumbnail_url']);
-                $items[] = $item;
+                $items[] = $this->normalizeDates($item);
             }
         }
+        $items = $this->withExactDates('media_gallery_asset', ['updated_at'], $items);
         return ['total' => Cast::int($result['total_count'] ?? 0), 'items' => $items];
     }
 
@@ -192,15 +204,20 @@ class MediaGalleryGateway implements MediaGalleryGatewayInterface
             $rows = $connection->fetchAll($connection->select()
                 ->from($this->resourceConnection->getTableName('hyva_media_gallery_trash'))
                 ->where('id IN (?)', $ids));
-            return ['total' => count($rows), 'retention_days' => $retention, 'items' => array_values($rows)];
+            return [
+                'total' => count($rows),
+                'retention_days' => $retention,
+                'items' => array_values(array_map(fn (array $row): array => $this->normalizeDates($row), $rows)),
+            ];
         }
         $list = $this->trashRepository->getList($search ?? '', max(1, $page), max(1, min(200, $pageSize)));
         $items = [];
         foreach (is_array($list['items'] ?? null) ? $list['items'] : [] as $item) {
             if (is_array($item)) {
-                $items[] = $item;
+                $items[] = $this->normalizeDates($item);
             }
         }
+        $items = $this->withExactDates('hyva_media_gallery_trash', ['trashed_at'], $items);
         return [
             'total' => Cast::int($list['total_count'] ?? $this->trashRepository->count()),
             'retention_days' => $retention,
@@ -336,7 +353,110 @@ class MediaGalleryGateway implements MediaGalleryGatewayInterface
             'width' => $asset->getWidth(),
             'height' => $asset->getHeight(),
             'size' => $asset->getSize(),
-            'updated_at' => (string) $asset->getUpdatedAt(),
+            'updated_at' => (string) $this->normalizeDate((string) $asset->getUpdatedAt()),
         ];
+    }
+
+    /**
+     * A media date as UTC "Y-m-d H:i:s", or null when empty.
+     *
+     * DB values pass as they are; Hyvä's locale strings (store locale and timezone, minute precision) are parsed
+     * and converted. Unparsable input is returned unchanged.
+     *
+     * @param string|null $value
+     * @return string|null
+     */
+    public function normalizeDate(?string $value): ?string
+    {
+        $value = $value === null ? '' : trim($value);
+        if ($value === '') {
+            return null;
+        }
+        if (preg_match(self::SQL_DATE_PATTERN, $value) === 1) {
+            return $value;
+        }
+        try {
+            $timezone = $this->timezone->getConfigTimezone() ?: 'UTC';
+            $formatter = new IntlDateFormatter(
+                $this->localeResolver->getLocale(),
+                IntlDateFormatter::MEDIUM,
+                IntlDateFormatter::SHORT,
+                $timezone
+            );
+            // Magento swaps ICU's narrow no-break space for a plain one; accept both spellings.
+            foreach (array_unique([$value, str_replace(' ', "\u{202F}", $value)]) as $candidate) {
+                $timestamp = $formatter->parse($candidate);
+                if (is_int($timestamp)) {
+                    return (new DateTimeImmutable('@' . $timestamp))
+                        ->setTimezone(new DateTimeZone('UTC'))
+                        ->format('Y-m-d H:i:s');
+                }
+            }
+        } catch (Throwable $e) {
+            // An unparsable date is returned as it is; the reply goes on.
+            $this->logger->warning('Hyvä Media Gallery: could not parse a date.', [
+                'value' => $value,
+                'exception' => $e,
+            ]);
+        }
+        return $value;
+    }
+
+    /**
+     * Replace the minute-precision dates Hyvä's lists format with the DB values (seconds) of the same rows.
+     *
+     * One query by id, so the lists agree with the trash preview / restore, which read the table (T-116). A row the
+     * table no longer has keeps its parsed value.
+     *
+     * @param string $table
+     * @param list<string> $columns
+     * @param array $items
+     * @return array
+     * @phpstan-param list<array<mixed>> $items
+     * @phpstan-return list<array<mixed>>
+     */
+    private function withExactDates(string $table, array $columns, array $items): array
+    {
+        $ids = array_values(array_filter(array_map(
+            static fn (array $item): int => Cast::int($item['id'] ?? 0),
+            $items
+        )));
+        if ($ids === []) {
+            return $items;
+        }
+        $connection = $this->resourceConnection->getConnection();
+        $exact = $connection->fetchAssoc($connection->select()
+            ->from($this->resourceConnection->getTableName($table), array_merge(['id'], $columns))
+            ->where('id IN (?)', $ids));
+        foreach ($items as $index => $item) {
+            $row = $exact[Cast::int($item['id'] ?? 0)] ?? null;
+            if (!is_array($row)) {
+                continue;
+            }
+            foreach ($columns as $column) {
+                if (array_key_exists($column, $item) && is_string($row[$column] ?? null) && $row[$column] !== '') {
+                    $items[$index][$column] = $row[$column];
+                }
+            }
+        }
+        return $items;
+    }
+
+    /**
+     * Normalise the date keys of one row.
+     *
+     * @param array $row
+     * @return array
+     * @phpstan-param array<mixed> $row
+     * @phpstan-return array<mixed>
+     */
+    private function normalizeDates(array $row): array
+    {
+        foreach (self::DATE_KEYS as $key) {
+            if (array_key_exists($key, $row) && (is_string($row[$key]) || $row[$key] === null)) {
+                $row[$key] = $this->normalizeDate($row[$key]);
+            }
+        }
+        return $row;
     }
 }

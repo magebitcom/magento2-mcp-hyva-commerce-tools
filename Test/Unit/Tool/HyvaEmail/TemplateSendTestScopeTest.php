@@ -14,6 +14,8 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateSendTest;
+use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Exception\MailException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -43,6 +45,37 @@ class TemplateSendTestScopeTest extends TestCase
 
         $this->assertTrue($result->isError());
         $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+    }
+
+    public function testTransportFailureIsSoftError(): void
+    {
+        $gateway = $this->gateway();
+        $gateway->method('sendTest')
+            ->willThrowException(new MailException(__('Unable to send mail at this time.')));
+
+        $result = $this->tool($gateway)->execute(['id' => 4, 'recipient' => 'a@b.co', 'store_id' => 1]);
+
+        $this->assertTrue($result->isError());
+        $text = $result->getContent()[0]['text'] ?? '';
+        $reply = json_decode(is_string($text) ? $text : '', true);
+        $this->assertIsArray($reply);
+        $this->assertFalse($reply['sent']);
+        $this->assertSame('transport_error', $reply['status']);
+        $this->assertSame(4, $reply['id']);
+        $this->assertStringContainsString('Unable to send mail at this time.', (string) $reply['message']);
+        $this->assertSame($reply['message'], $reply['error']);
+    }
+
+    public function testOtherFailuresStillPropagate(): void
+    {
+        $gateway = $this->gateway();
+        $gateway->method('sendTest')
+            ->willThrowException(new LocalizedException(__('Email template #4 has no published Hyvä content.')));
+
+        $this->expectException(LocalizedException::class);
+        $this->expectExceptionMessage('no published Hyvä content');
+
+        $this->tool($gateway)->execute(['id' => 4, 'recipient' => 'a@b.co', 'store_id' => 1]);
     }
 
     /**

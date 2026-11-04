@@ -12,7 +12,6 @@ use Hyva\AdminDashboardApi\Api\V1\WidgetContextInterface;
 use Hyva\AdminDashboardApi\Api\V1\WidgetInstanceInterface;
 use Magebit\McpHyvaCommerceTools\Model\Audit\McpActivityReader;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
-use Magento\Backend\Model\UrlInterface;
 
 /**
  * magebit_mcp_activity_widget: recent MCP tool calls, failures, AI drafts and publish, live and destructive actions.
@@ -21,11 +20,9 @@ class McpActivity extends AbstractHealthWidget
 {
     /**
      * @param McpActivityReader $activityReader
-     * @param UrlInterface $url
      */
     public function __construct(
-        private readonly McpActivityReader $activityReader,
-        private readonly UrlInterface $url
+        private readonly McpActivityReader $activityReader
     ) {
     }
 
@@ -128,10 +125,7 @@ class McpActivity extends AbstractHealthWidget
             ],
             'notice' => $notice,
             'links' => [
-                [
-                    'label' => (string) __('Open MCP audit log'),
-                    'url' => $this->url->getUrl('magebit_mcp/auditlog/index'),
-                ]
+                $this->link((string) __('Open MCP audit log'), 'magebit_mcp/auditlog/index'),
             ],
         ];
     }

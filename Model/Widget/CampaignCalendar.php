@@ -10,13 +10,14 @@ namespace Magebit\McpHyvaCommerceTools\Model\Widget;
 
 use Hyva\AdminDashboardApi\Api\V1\WidgetContextInterface;
 use Hyva\AdminDashboardApi\Api\V1\WidgetInstanceInterface;
+use Magebit\McpHyvaCommerceTools\Model\Content\AdminEditorUrl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ScheduleTime;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
-use Magento\Backend\Model\UrlInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 
 /**
@@ -31,7 +32,7 @@ class CampaignCalendar extends AbstractHealthWidget
      * @param ScheduleTime $scheduleTime
      * @param ScopeConfigInterface $scopeConfig
      * @param ContentIndex $contentIndex
-     * @param UrlInterface $url
+     * @param AdminEditorUrl $editorUrl
      * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
@@ -40,7 +41,7 @@ class CampaignCalendar extends AbstractHealthWidget
         private readonly ScheduleTime $scheduleTime,
         private readonly ScopeConfigInterface $scopeConfig,
         private readonly ContentIndex $contentIndex,
-        private readonly UrlInterface $url,
+        private readonly AdminEditorUrl $editorUrl,
         private readonly ContentScopeFilter $scopeFilter
     ) {
     }
@@ -71,6 +72,7 @@ class CampaignCalendar extends AbstractHealthWidget
             }
         }
         $now = time();
+        // The scope filter also drops menus the caller may not view (rows, counts and conflicts alike).
         $items = $this->scopeFilter->filter(
             $this->scheduleService->getItems(
                 [
@@ -106,10 +108,7 @@ class CampaignCalendar extends AbstractHealthWidget
                 $detail,
                 $item['status'],
                 $severity,
-                $this->url->getUrl(
-                    'liveview/editor/index',
-                    ['type' => $item['entity_type'], 'id' => $item['entity_id']]
-                )
+                $this->editorUrl->link($item['entity_type'], $item['entity_id'])
             );
             if ($item['status'] === 'pending' && strtotime($item['time_scheduled'] . ' UTC') >= $now - 900) {
                 $upcoming[] = $row;
@@ -119,7 +118,14 @@ class CampaignCalendar extends AbstractHealthWidget
         }
         $conflictRows = [];
         $errors = 0;
-        foreach ($this->conflictReport->getConflictsWithinCallerScope()['conflicts'] as $conflict) {
+        $viewable = $this->scopeFilter->viewableTypes(ContentLocator::TYPES);
+        $conflicts = $this->conflictReport->getConflictsWithinCallerScope(
+            60,
+            null,
+            null,
+            count($viewable) < count(ContentLocator::TYPES) ? $viewable : null
+        )['conflicts'];
+        foreach ($conflicts as $conflict) {
             if ($conflict['severity'] === 'info') {
                 continue;
             }

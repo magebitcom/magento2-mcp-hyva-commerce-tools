@@ -15,7 +15,6 @@ use Magebit\McpHyvaCommerceTools\Model\Media\ImageEngineInfo;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaService;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
-use Magento\Backend\Model\UrlInterface;
 
 /**
  * magebit_media_health_widget: media problems and Media Optimization state. The MCP activity section and the audit
@@ -28,14 +27,12 @@ class MediaHealth extends AbstractHealthWidget
      * @param MediaService $mediaService
      * @param ImageEngineInfo $engineInfo
      * @param McpActivityReader $activityReader
-     * @param UrlInterface $url
      */
     public function __construct(
         private readonly MediaAuditor $mediaAuditor,
         private readonly MediaService $mediaService,
         private readonly ImageEngineInfo $engineInfo,
-        private readonly McpActivityReader $activityReader,
-        private readonly UrlInterface $url
+        private readonly McpActivityReader $activityReader
     ) {
     }
 
@@ -60,7 +57,7 @@ class MediaHealth extends AbstractHealthWidget
             $this->intProperty($widgetInstance, 'max_kb', 500),
             $this->intProperty($widgetInstance, 'row_count', 6)
         );
-        $counts = $report['counts'];
+        $counts = (array) $report['counts'];
         $settings = $this->mediaService->getSettings();
         $engines = $this->engineInfo->getEngines();
         $rows = [];
@@ -96,10 +93,7 @@ class MediaHealth extends AbstractHealthWidget
                 'rows' => $recent,
                 'empty' => (string) __('None.'),
             ];
-            $links[] = [
-                'label' => (string) __('MCP audit log'),
-                'url' => $this->url->getUrl('magebit_mcp/auditlog/index'),
-            ];
+            $links[] = $this->link((string) __('MCP audit log'), 'magebit_mcp/auditlog/index');
         }
         $missingVariants = ($counts['not_optimized'] ?? 0)
             + ($counts['missing_webp'] ?? 0)
@@ -111,7 +105,11 @@ class MediaHealth extends AbstractHealthWidget
                     ($counts['oversized_file'] ?? 0) + ($counts['oversized_dimensions'] ?? 0),
                     $this->level(($counts['oversized_file'] ?? 0) + ($counts['oversized_dimensions'] ?? 0))
                 ),
-                $this->stat('Missing alt', $counts['missing_alt'] ?? 0, $this->level($counts['missing_alt'] ?? 0)),
+                $this->stat(
+                    'Missing alt (all image usages)',
+                    $counts['missing_alt'] ?? 0,
+                    $this->level($counts['missing_alt'] ?? 0)
+                ),
                 $this->stat(
                     'Broken references',
                     $counts['broken_reference'] ?? 0,

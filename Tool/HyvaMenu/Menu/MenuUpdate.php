@@ -81,7 +81,7 @@ class MenuUpdate extends AbstractMenuTool
             . 'edits (operations, same as hyva_cms_draft_update: '
             . 'add/remove/move/set_field/set_fields/replace_node/replace_text) are saved as a DRAFT; removing or '
             . 'replacing an item with children also needs "confirm": true (the reply lists those items). Prefer '
-            . 'hyva_menu_item_* for single items. ' . sprintf(self::DELETE_TOOL_NOTE, 'menu', 'hyva_menu_delete')
+            . 'hyva_menu_item_* for single items. ' . sprintf(self::DELETE_TOOL_NOTE, 'a menu', 'hyva_menu_delete')
             . ' Single items can be removed with hyva_menu_item_remove.';
     }
 
@@ -124,7 +124,7 @@ class MenuUpdate extends AbstractMenuTool
         if ($settings === [] && $operations === []) {
             return $this->softError('Nothing to update: pass settings and/or operations.');
         }
-        $live = $this->liveSettings->changes($menu, $settings);
+        $live = $this->liveSettings->menuChanges($menu, $settings);
         $applied = null;
         $removed = [];
         if ($operations !== []) {

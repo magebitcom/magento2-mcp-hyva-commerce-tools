@@ -10,9 +10,11 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Widget;
 
 use Hyva\AdminDashboardApi\Api\V1\WidgetContextInterface;
 use Hyva\AdminDashboardApi\Api\V1\WidgetInstanceInterface;
+use Magebit\Mcp\Api\LoggerInterface;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Audit\McpActivityReader;
+use Magebit\McpHyvaCommerceTools\Model\Content\AdminEditorUrl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
@@ -35,7 +37,11 @@ use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content\ContentScopeStub;
 use Magento\Backend\Model\UrlInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\ResourceConnection;
+use Magento\Framework\Config\CacheInterface;
 use Magento\Framework\DB\Adapter\AdapterInterface;
+use Magento\Framework\DB\Select;
+use Magento\Framework\ObjectManager\ConfigLoaderInterface;
+use Magento\Framework\Serialize\Serializer\Json;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -51,11 +57,11 @@ class HealthWidgetScopeTest extends TestCase
     public function testMenuHealthLinksTheAuditLogOnlyWithTheAuditPermission(): void
     {
         $denied = $this->menuHealth(null, false)->getDisplayData($this->ctx(), $this->instance());
-        $this->assertNotContains(self::AUDIT_LOG, array_column($this->list($denied, 'links'), 'url'));
+        $this->assertNotContains(self::AUDIT_LOG, array_column($this->list($denied, 'links'), 'route'));
         $this->assertSame(['Menus'], array_column($this->list($denied, 'sections'), 'title'));
 
         $allowed = $this->menuHealth(null, true)->getDisplayData($this->ctx(), $this->instance());
-        $this->assertContains(self::AUDIT_LOG, array_column($this->list($allowed, 'links'), 'url'));
+        $this->assertContains(self::AUDIT_LOG, array_column($this->list($allowed, 'links'), 'route'));
         $this->assertSame(['Menus', 'Last MCP menu actions'], array_column($this->list($allowed, 'sections'), 'title'));
     }
 
@@ -73,7 +79,7 @@ class HealthWidgetScopeTest extends TestCase
     {
         foreach ([false, true] as $allowed) {
             $data = $this->mediaHealth($allowed)->getDisplayData($this->ctx(), $this->instance());
-            $links = array_column($this->list($data, 'links'), 'url');
+            $links = array_column($this->list($data, 'links'), 'route');
             $this->assertSame($allowed, in_array(self::AUDIT_LOG, $links, true));
             $this->assertSame($allowed ? 2 : 1, count($this->list($data, 'sections')));
         }
@@ -90,6 +96,14 @@ class HealthWidgetScopeTest extends TestCase
         $data = $this->mediaHealth(false)->getDisplayData($this->ctx(), $this->instance());
         $notice = $this->notice($data);
         $this->assertStringNotContainsString('shared by all websites', $notice);
+    }
+
+    public function testMediaWidgetsSayTheAltCountCoversAllImageUsages(): void
+    {
+        // T-108: Hyvä's Content Health "Missing alt text" counts Hyvä CMS images only; this one counts every usage.
+        $data = $this->mediaHealth(true)->getDisplayData($this->ctx(), $this->instance());
+
+        $this->assertContains('Missing alt (all image usages)', array_column($this->list($data, 'stats'), 'label'));
     }
 
     public function testMigrationStatusCountsOnlyTheAdminsPages(): void
@@ -125,6 +139,70 @@ class HealthWidgetScopeTest extends TestCase
         $this->assertCount(2, $this->rows($data));
     }
 
+    /**
+     * PR #3 review: an admin without Hyva_MenuBuilder::menu_view sees no scheduled menu (rows, menu count, conflicts),
+     * whether restricted to some store views or not.
+     */
+    public function testCampaignCalendarHidesMenusFromAnAdminWhoMayNotViewThem(): void
+    {
+        foreach ([[1], null] as $allowedStoreIds) {
+            $data = $this->campaignCalendar($allowedStoreIds, false, ['cms_page', 'cms_block'])
+                ->getDisplayData($this->ctx(), $this->instance());
+
+            $labels = array_column($this->rows($data), 'label');
+            $this->assertNotContains('Spring: Main menu', $labels);
+            $this->assertStringNotContainsString('menu', (string) json_encode($this->rows($data)));
+            $this->assertSame(0, $this->stat($data, 'Menu changes'));
+        }
+    }
+
+    public function testCampaignCalendarShowsMenusToAnAdminWhoMayViewThem(): void
+    {
+        $data = $this->campaignCalendar([1], true, null)->getDisplayData($this->ctx(), $this->instance());
+
+        $this->assertSame(['Spring: Own', 'Spring: Main menu'], array_column($this->rows($data), 'label'));
+        $this->assertSame(1, $this->stat($data, 'Menu changes'));
+    }
+
+    /**
+     * T-118: Hyvä caches the display data, so links hold the route and params, never a URL with the secret key of the
+     * session that built them; health-summary.phtml builds the URL for the admin viewing the dashboard.
+     */
+    public function testWidgetLinksAreCachedAsRoutesWithoutAUrl(): void
+    {
+        $data = $this->campaignCalendar([1])->getDisplayData($this->ctx(), $this->instance());
+        $rows = $this->rows($data);
+        $this->assertSame(['liveview/editor/index'], array_column($rows, 'route'));
+        $this->assertSame([['type' => 'cms_page', 'id' => 1]], array_column($rows, 'params'));
+
+        $data = $this->menuHealth([1], true)->getDisplayData($this->ctx(), $this->instance());
+        $this->assertSame([['type' => 'menu', 'id' => 1]], array_column($this->rows($data), 'params'));
+        $this->assertSame(
+            ['hyva_menu_builder/menu/index', self::AUDIT_LOG],
+            array_column($this->list($data, 'links'), 'route')
+        );
+        $this->assertStringNotContainsString('"url"', (string) json_encode($data));
+    }
+
+    /**
+     * PR #3 review: a scheduled menu in the admin's store view is checked only for an admin allowed to view menus.
+     */
+    public function testCampaignAssetReadinessHidesMenusFromAnAdminWhoMayNotViewThem(): void
+    {
+        $data = $this->assetReadinessOverAMenu(false)->getDisplayData($this->ctx(), $this->instance());
+
+        $this->assertSame(0, $this->stat($data, 'Scheduled items'));
+        $this->assertSame([], $this->rows($data));
+    }
+
+    public function testCampaignAssetReadinessChecksMenusForAnAdminWhoMayViewThem(): void
+    {
+        $data = $this->assetReadinessOverAMenu(true)->getDisplayData($this->ctx(), $this->instance());
+
+        $this->assertSame(1, $this->stat($data, 'Scheduled items'));
+        $this->assertSame(['Spring: Main menu'], array_column($this->rows($data), 'label'));
+    }
+
     public function testCampaignAssetReadinessChecksOnlyTheAdminsScheduledContent(): void
     {
         $schedule = $this->createMock(ScheduleService::class);
@@ -142,13 +220,17 @@ class HealthWidgetScopeTest extends TestCase
             $this->createMock(FeatureCheckerInterface::class),
             $this->createMock(MenuValidator::class),
             $resource,
-            $this->createMock(UrlInterface::class),
+            $this->editorUrl(),
             $this->contentScope([1], ['cms_page' => [1 => [1], 2 => [2]]])
         );
 
         $data = $widget->getDisplayData($this->ctx(), $this->instance());
 
         $this->assertSame(0, $this->list($data, 'stats')[0]['value']);
+        // T-133: this widget checks only the images in pending scheduled items, not every image usage.
+        $labels = array_column($this->list($data, 'stats'), 'label');
+        $this->assertContains('Missing alt (scheduled items)', $labels);
+        $this->assertNotContains('Missing alt (all image usages)', $labels);
     }
 
     /**
@@ -176,8 +258,8 @@ class HealthWidgetScopeTest extends TestCase
             $gateway,
             $menus,
             $this->activity($auditAllowed),
-            $this->url(),
-            $this->contentScope($allowedStoreIds)
+            $this->contentScope($allowedStoreIds),
+            $this->editorUrl()
         );
     }
 
@@ -190,7 +272,9 @@ class HealthWidgetScopeTest extends TestCase
      */
     private function mediaHealth(bool $auditAllowed, ?int $hiddenUsages = null): MediaHealth
     {
-        $report = ['scope' => 'all', 'images_checked' => 0, 'counts' => [], 'config_issues' => [], 'images' => []];
+        // No image problems: counts is the empty object MediaAuditor returns (T-115).
+        $report = ['scope' => 'all', 'images_checked' => 0, 'counts' => new \stdClass(), 'config_issues' => [],
+            'images' => []];
         if ($hiddenUsages !== null) {
             $report['usages_hidden_by_permissions'] = $hiddenUsages;
         }
@@ -204,8 +288,7 @@ class HealthWidgetScopeTest extends TestCase
             $auditor,
             $this->createMock(MediaService::class),
             $engines,
-            $this->activity($auditAllowed),
-            $this->url()
+            $this->activity($auditAllowed)
         );
     }
 
@@ -231,25 +314,43 @@ class HealthWidgetScopeTest extends TestCase
                 return [];
             }
         );
-        return new MigrationStatus($migration, $contentIndex, $this->url(), $this->contentScope($allowedStoreIds));
+        return new MigrationStatus(
+            $migration,
+            $contentIndex,
+            $this->editorUrl(),
+            $this->contentScope($allowedStoreIds)
+        );
     }
 
     /**
      * Campaign Calendar over an upcoming item of page 1 (store view 1) and one of page 2 (store view 2).
      *
+     * With $menuView set, also over an upcoming item of menu 4 (store view 1), the admin allowed to view menus or
+     * not, and conflicts expected to be asked for the content types in $conflictTypes (null: all).
+     *
      * @param array|null $allowedStoreIds
+     * @param bool|null $menuView
+     * @param array|null $conflictTypes
      * @return CampaignCalendar
      * @phpstan-param list<int>|null $allowedStoreIds
+     * @phpstan-param list<string>|null $conflictTypes
      */
-    private function campaignCalendar(?array $allowedStoreIds): CampaignCalendar
-    {
+    private function campaignCalendar(
+        ?array $allowedStoreIds,
+        ?bool $menuView = null,
+        ?array $conflictTypes = null
+    ): CampaignCalendar {
+        $items = [$this->item(1, 'Own', '+1 day'), $this->item(2, 'Foreign', '+2 days')];
+        if ($menuView !== null) {
+            $items[] = ['entity_type' => 'menu', 'entity_id' => 4, 'item_id' => 4, 'name' => 'Main menu']
+                + $this->item(4, 'Main menu', '+3 days');
+        }
         $schedule = $this->createMock(ScheduleService::class);
-        $schedule->method('getItems')->willReturn([
-            $this->item(1, 'Own', '+1 day'),
-            $this->item(2, 'Foreign', '+2 days'),
-        ]);
+        $schedule->method('getItems')->willReturn($items);
         $conflicts = $this->createMock(ConflictReport::class);
-        $conflicts->method('getConflictsWithinCallerScope')->willReturn(['conflicts' => [], 'hidden' => 0]);
+        $conflicts->method('getConflictsWithinCallerScope')
+            ->with(60, null, null, $conflictTypes)
+            ->willReturn(['conflicts' => [], 'hidden' => 0]);
         $contentIndex = $this->createMock(ContentIndex::class);
         $contentIndex->method('getRows')->willReturn([]);
         return new CampaignCalendar(
@@ -258,9 +359,87 @@ class HealthWidgetScopeTest extends TestCase
             $this->createMock(ScheduleTime::class),
             $this->createMock(ScopeConfigInterface::class),
             $contentIndex,
-            $this->url(),
-            $this->contentScope($allowedStoreIds, ['cms_page' => [1 => [1], 2 => [2]]])
+            $this->editorUrl(),
+            $this->contentScope(
+                $allowedStoreIds,
+                ['cms_page' => [1 => [1], 2 => [2]], 'menu' => [4 => [1]]],
+                null,
+                [],
+                null,
+                $menuView === null ? null : $this->menuFeatures($menuView)
+            )
         );
+    }
+
+    /**
+     * Campaign Asset Readiness for an admin of store view 1 over a pending item of menu 4 (store view 1).
+     *
+     * @param bool $menuView Whether the admin may view menus.
+     * @return CampaignAssetReadiness
+     */
+    private function assetReadinessOverAMenu(bool $menuView): CampaignAssetReadiness
+    {
+        $schedule = $this->createMock(ScheduleService::class);
+        $schedule->method('getItems')->willReturn([
+            ['entity_type' => 'menu', 'entity_id' => 4, 'item_id' => 4] + $this->item(4, 'Main menu', '+1 day'),
+        ]);
+        $adapter = $this->createMock(AdapterInterface::class);
+        $select = $this->createMock(Select::class);
+        $select->method('from')->willReturnSelf();
+        $select->method('where')->willReturnSelf();
+        $adapter->method('select')->willReturn($select);
+        $adapter->expects($menuView ? $this->once() : $this->never())->method('fetchPairs')
+            ->willReturn([4 => '{"components":[]}']);
+        $resource = $this->createMock(ResourceConnection::class);
+        $resource->method('getConnection')->willReturn($adapter);
+        $tree = $this->createMock(ComponentTree::class);
+        $tree->method('normalizeDocument')->willReturn([]);
+        $extractor = $this->createMock(ImageReferenceExtractor::class);
+        $extractor->method('fromDocument')->willReturn([]);
+        $features = $this->menuFeatures($menuView);
+        return new CampaignAssetReadiness(
+            $schedule,
+            $tree,
+            $extractor,
+            $this->createMock(ImageChecker::class),
+            $this->createMock(MediaService::class),
+            $features,
+            $this->createMock(MenuValidator::class),
+            $resource,
+            $this->editorUrl(),
+            $this->contentScope([1], ['menu' => [4 => [1]]], null, [], null, $features)
+        );
+    }
+
+    /**
+     * Menu Builder installed and enabled, the admin allowed to view menus or not.
+     *
+     * @param bool $menuView
+     * @return FeatureCheckerInterface
+     */
+    private function menuFeatures(bool $menuView): FeatureCheckerInterface
+    {
+        $features = $this->createMock(FeatureCheckerInterface::class);
+        $features->method('isAvailable')->willReturn($menuView);
+        $features->method('isInstalledAndEnabled')->willReturn(true);
+        return $features;
+    }
+
+    /**
+     * Value of a widget stat by its label.
+     *
+     * @param mixed $data
+     * @param string $label
+     * @return mixed
+     */
+    private function stat(mixed $data, string $label): mixed
+    {
+        foreach ($this->list($data, 'stats') as $stat) {
+            if (is_array($stat) && ($stat['label'] ?? null) === $label) {
+                return $stat['value'] ?? null;
+            }
+        }
+        $this->fail('No stat ' . $label);
     }
 
     /**
@@ -294,15 +473,25 @@ class HealthWidgetScopeTest extends TestCase
     }
 
     /**
-     * URL builder returning the route.
+     * Editor URL builder without registered routes; the backend URL renders "route|key=value,...".
      *
-     * @return UrlInterface
+     * @return AdminEditorUrl
      */
-    private function url(): UrlInterface
+    private function editorUrl(): AdminEditorUrl
     {
         $url = $this->createMock(UrlInterface::class);
-        $url->method('getUrl')->willReturnCallback(static fn (string $route): string => $route);
-        return $url;
+        $url->method('getUrl')->willReturnCallback(static function (string $route, array $params): string {
+            $pairs = [];
+            foreach ($params as $key => $value) {
+                $pairs[] = $key . '=' . (is_bool($value) ? (int) $value : $value);
+            }
+            return $route . '|' . implode(',', $pairs);
+        });
+        $loader = $this->createMock(ConfigLoaderInterface::class);
+        $loader->method('load')->willReturn([]);
+        $cache = $this->createMock(CacheInterface::class);
+        $cache->method('load')->willReturn(false);
+        return new AdminEditorUrl($url, $loader, $this->createMock(LoggerInterface::class), $cache, new Json());
     }
 
     /**

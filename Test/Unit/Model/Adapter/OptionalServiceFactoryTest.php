@@ -27,10 +27,10 @@ class OptionalServiceFactoryTest extends TestCase
 
     public function testAnInstalledServiceIsTheSharedInstance(): void
     {
-        $service = new \ArrayObject();
+        $service = new \stdClass();
         $objectManager = $this->createMock(ObjectManagerInterface::class);
-        $objectManager->expects($this->once())->method('get')->with(\ArrayObject::class)->willReturn($service);
+        $objectManager->expects($this->once())->method('get')->with(\stdClass::class)->willReturn($service);
 
-        $this->assertSame($service, (new OptionalServiceFactory($objectManager))->get(\ArrayObject::class));
+        $this->assertSame($service, (new OptionalServiceFactory($objectManager))->get(\stdClass::class));
     }
 }

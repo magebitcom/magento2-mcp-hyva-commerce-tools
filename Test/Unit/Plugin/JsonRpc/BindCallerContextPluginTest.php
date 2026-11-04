@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Plugin\JsonRpc;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Model\Tool\Media\AbstractMediaTool;
 use Hyva\CmsLiveviewEditor\Model\Security\ContentTypeAuthorization;
 use Magebit\Mcp\Api\Data\TokenInterface;
 use Magebit\Mcp\Api\LoggerInterface;
@@ -180,6 +182,11 @@ class BindCallerContextPluginTest extends TestCase
             }
             $tool = $reflection->newInstanceWithoutConstructor();
             $property->setValue($tool, $contentAcl);
+            if ($tool instanceof AbstractMediaTool) {
+                // Media Gallery installed and enabled, so the image write tools keep their content-type rule (T-56).
+                (new \ReflectionProperty(AbstractMediaTool::class, 'featureChecker'))
+                    ->setValue($tool, $this->enabledFeatures());
+            }
             try {
                 $tool->getDescription();
                 $tool->getInputSchema();
@@ -193,6 +200,29 @@ class BindCallerContextPluginTest extends TestCase
         }
         $this->assertGreaterThanOrEqual(15, count($tools));
         return $tools;
+    }
+
+    /**
+     * Feature checker reporting every optional Hyvä feature as installed and enabled.
+     *
+     * @return FeatureCheckerInterface
+     */
+    private function enabledFeatures(): FeatureCheckerInterface
+    {
+        $features = $this->createMock(FeatureCheckerInterface::class);
+        $features->method('getStatus')->willReturnCallback(static fn (string $feature): array => [
+            'feature' => $feature,
+            'label' => $feature,
+            'available' => true,
+            'installed' => true,
+            'enabled' => true,
+            'version' => null,
+            'package' => '',
+            'acl_resource' => null,
+            'acl_allowed' => null,
+            'modules' => [],
+        ]);
+        return $features;
     }
 
     /**

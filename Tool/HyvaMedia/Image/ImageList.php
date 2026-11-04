@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
@@ -31,17 +32,20 @@ class ImageList extends AbstractMediaTool
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_media_image_list';
 
     /**
+     * @param FeatureCheckerInterface $featureChecker
      * @param MediaInventory $inventory
      * @param MediaFileInfo $fileInfo
      * @param ImageUsageIndex $usageIndex
      * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
+        FeatureCheckerInterface $featureChecker,
         private readonly MediaInventory $inventory,
         private readonly MediaFileInfo $fileInfo,
         private readonly ImageUsageIndex $usageIndex,
         private readonly ContentScopeFilter $scopeFilter
     ) {
+        parent::__construct($featureChecker);
     }
 
     /**
@@ -74,7 +78,9 @@ class ImageList extends AbstractMediaTool
     {
         return Schema::object()
             ->string('folder', fn (StringBuilder $s) => $s
-                ->description('Folder under pub/media; default wysiwyg. Use "" for the gallery only.'))
+                ->description('Folder under pub/media, e.g. "wysiwyg/giftcards": only images in it and its '
+                    . 'subfolders. Without folder: every Media Gallery image plus a scan of wysiwyg. Use "" for the '
+                    . 'whole gallery without a scan. A folder that does not exist gives a hint.'))
             ->array('types', fn (ArrayBuilder $a) => $a->ofStrings()->description('Extensions, e.g. ["png","jpg"].'))
             ->integer('min_size_kb', fn (IntegerBuilder $i) => $i->minimum(0))
             ->integer('max_size_kb', fn (IntegerBuilder $i) => $i->minimum(0))
@@ -96,10 +102,20 @@ class ImageList extends AbstractMediaTool
      */
     protected function run(array $arguments): ToolResultInterface
     {
-        $folder = array_key_exists('folder', $arguments) ? Cast::string($arguments['folder']) : 'wysiwyg';
+        $explicitFolder = array_key_exists('folder', $arguments);
+        $folder = trim($explicitFolder ? Cast::string($arguments['folder']) : 'wysiwyg', '/');
         $assets = $this->inventory->getGalleryAssets();
+        $galleryPaths = array_map('strval', array_keys($assets));
+        if ($explicitFolder && $folder !== '') {
+            // Prefix with the separator, so "wysiwyg/gift" does not match "wysiwyg/giftcards/...".
+            $prefix = $folder . '/';
+            $galleryPaths = array_filter(
+                $galleryPaths,
+                static fn (string $path): bool => str_starts_with(ltrim($path, '/'), $prefix)
+            );
+        }
         $paths = array_map('strval', array_values(
-            array_unique(array_merge(array_keys($assets), $folder !== '' ? $this->inventory->scanFolder($folder) : []))
+            array_unique(array_merge($galleryPaths, $folder !== '' ? $this->inventory->scanFolder($folder) : []))
         ));
         $types = array_map('strtolower', $this->stringListArg($arguments, 'types'));
         if ($types !== []) {
@@ -188,7 +204,12 @@ class ImageList extends AbstractMediaTool
                 'usages_missing_alt' => $this->missingAlt($usages),
             ], 'usages_hidden_by_permissions', $hidden);
         }
-        return $this->jsonResult(['total' => $total, 'items' => $items], ['total' => $total]);
+        $payload = ['total' => $total, 'items' => $items];
+        if ($explicitFolder && $folder !== '' && !$this->fileInfo->folderExists($folder)) {
+            // T-136: an unknown folder (a typo, or no wysiwyg/ prefix) should not read like "no images".
+            $payload['hint'] = sprintf('Folder "%s" does not exist under pub/media.', $folder);
+        }
+        return $this->jsonResult($payload, ['total' => $total]);
     }
 
     /**

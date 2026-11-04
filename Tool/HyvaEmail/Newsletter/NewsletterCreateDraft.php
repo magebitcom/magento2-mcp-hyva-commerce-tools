@@ -115,15 +115,17 @@ class NewsletterCreateDraft extends AbstractEmailTool
             }
         }
         $id = $this->emailGateway->createNewsletter($arguments);
-        $saved = null;
+        // Always save through ContentService, also without components: Hyvä's blank email_wrapper becomes a
+        // versioned draft, so the reply has a draft version like page, menu and form creates. No snapshot of the blank
+        // draft createNewsletter() just wrote: the new newsletter gets one version-history entry (T-121).
+        $document = $this->contentService->getWorkingDocument(self::TEMPLATE_TYPE, $id);
         if ($components !== []) {
-            $document = $this->contentService->getWorkingDocument(self::TEMPLATE_TYPE, $id);
             $rootUid = Cast::string($this->componentTree->getRootNodes($document)[0]['uid'] ?? '');
             foreach ($components as $node) {
                 $document = $this->componentTree->insertNode($document, $node, $rootUid !== '' ? $rootUid : null);
             }
-            $saved = $this->contentService->saveDraft(self::TEMPLATE_TYPE, $id, $document, 'Created by MCP');
         }
+        $saved = $this->contentService->saveDraft(self::TEMPLATE_TYPE, $id, $document, 'Created by MCP', null, false);
         return $this->jsonResult([
             'created' => true,
             'id' => $id,

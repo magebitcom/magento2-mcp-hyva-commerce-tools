@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Audit;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Media\AbstractMediaTool;
 use Magebit\Mcp\Api\ToolResultInterface;
@@ -23,11 +24,14 @@ class AuditMenu extends AbstractMediaTool
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_media_audit_menu';
 
     /**
+     * @param FeatureCheckerInterface $featureChecker
      * @param MediaAuditor $auditor
      */
     public function __construct(
+        FeatureCheckerInterface $featureChecker,
         private readonly MediaAuditor $auditor
     ) {
+        parent::__construct($featureChecker);
     }
 
     /**
@@ -76,6 +80,6 @@ class AuditMenu extends AbstractMediaTool
             $this->intArg($arguments, 'max_kb', 500) ?? 500,
             $this->intArg($arguments, 'limit', 100) ?? 100
         );
-        return $this->jsonResult($report, ['images_checked' => $report['images_checked']] + $report['counts']);
+        return $this->jsonResult($report, ['images_checked' => $report['images_checked']] + (array) $report['counts']);
     }
 }

@@ -10,10 +10,12 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule;
 
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ScheduleTime;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractContentTool;
+use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
@@ -36,13 +38,15 @@ class ScheduleCreate extends AbstractContentTool
      * @param ScheduleTime $scheduleTime
      * @param ConflictReport $conflictReport
      * @param ContentAcl $contentAcl
+     * @param ContentScopeFilter $contentScopeFilter
      */
     public function __construct(
         private readonly ContentLocator $contentLocator,
         private readonly ScheduleService $scheduleService,
         private readonly ScheduleTime $scheduleTime,
         private readonly ConflictReport $conflictReport,
-        private readonly ContentAcl $contentAcl
+        private readonly ContentAcl $contentAcl,
+        private readonly ContentScopeFilter $contentScopeFilter
     ) {
     }
 
@@ -62,7 +66,9 @@ class ScheduleCreate extends AbstractContentTool
         return 'Schedule the current draft (or version_id) of a page, block or menu to be published automatically by '
             . 'the Hyvä scheduling cron. Add it to an existing pending release (release_id) or create a new release '
             . '(release_name + scheduled_at in store time, YYYY-MM-DD HH:MM). Hyvä releases have no end date: to end '
-            . 'a campaign, schedule the previous content in a later release. Returns conflicts for this entity.';
+            . 'a campaign, schedule the previous content in a later release. A scheduled menu is also activated '
+            . '(is_active) when the release fires; the reply\'s warnings say so for an inactive menu. Returns '
+            . 'conflicts for this entity.';
     }
 
     /**
@@ -128,6 +134,9 @@ class ScheduleCreate extends AbstractContentTool
             $stringKeyed !== [] ? $stringKeyed : null
         );
 
+        // Conflicts naming menus stay hidden from a role without menu_view.
+        $viewable = $this->contentScopeFilter->viewableTypes(ContentLocator::TYPES);
+
         return $this->jsonResult([
             'scheduled' => true,
             'entity_type' => $entity['type'],
@@ -135,16 +144,37 @@ class ScheduleCreate extends AbstractContentTool
             'published_now' => false,
             'note' => 'JIT Tailwind CSS is not generated server-side; classes not already compiled for the theme may '
                 . 'be missing when this release publishes.',
+            'warnings' => $this->warnings($entity),
             'conflicts' => $this->conflictReport->getConflictsWithinCallerScope(
                 60,
                 $entity['type'],
-                $entity['id']
+                $entity['id'],
+                count($viewable) < count(ContentLocator::TYPES) ? $viewable : null
             )['conflicts'],
         ] + $result, ['entity_type' => $entity['type'], 'id' => $entity['id'], 'release_id' => $result['release_id']]);
     }
 
     /**
-     * Schedule save; scheduling a version_id also reads version history.
+     * Warnings about what the release does beyond publishing the content.
+     *
+     * Hyvä Menu Builder activates a menu when its release fires (checked live, T-93), so an inactive menu goes live.
+     *
+     * @param array $entity
+     * @return array
+     * @phpstan-param array{type: string, is_active: bool} $entity
+     * @phpstan-return list<string>
+     */
+    private function warnings(array $entity): array
+    {
+        if ($entity['type'] !== ContentLocator::TYPE_MENU || $entity['is_active']) {
+            return [];
+        }
+        return ['The menu is inactive: when this release fires it activates the menu (is_active true), so it goes '
+            . 'live wherever ' . LiveSettings::MENU_PLACEMENT . ' places it.'];
+    }
+
+    /**
+     * Schedule save; scheduling a version_id also reads version history, scheduling a menu needs menu view.
      *
      * @inheritDoc
      */
@@ -154,7 +184,7 @@ class ScheduleCreate extends AbstractContentTool
         if (($arguments['version_id'] ?? null) !== null) {
             $verbs[] = ContentAcl::VERB_VERSION_HISTORY;
         }
-        return $verbs;
+        return array_values(array_merge($verbs, $this->menuViewVerbs($arguments)));
     }
 
     /**

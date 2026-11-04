@@ -36,6 +36,7 @@ trait ContentScopeStub
      * @param ContentIndex|null $contentIndex Replaces the lookup over $storeIds (e.g. to count queries).
      * @param array $catalog Websites per product id and paths per category id; others do not exist.
      * @param CatalogScopeReader|null $catalogReader Replaces the lookup over $catalog (e.g. to count queries).
+     * @param FeatureCheckerInterface|null $features Replaces a Menu Builder that is installed, enabled and allowed.
      * @return ContentScopeFilter
      * @phpstan-param list<int>|null $allowedStoreIds
      * @phpstan-param array<string, array<int, list<int>>> $storeIds
@@ -46,7 +47,8 @@ trait ContentScopeStub
         array $storeIds = [],
         ?ContentIndex $contentIndex = null,
         array $catalog = [],
-        ?CatalogScopeReader $catalogReader = null
+        ?CatalogScopeReader $catalogReader = null,
+        ?FeatureCheckerInterface $features = null
     ): ContentScopeFilter {
         if ($catalogReader === null) {
             $catalogReader = $this->createMock(CatalogScopeReader::class);
@@ -66,8 +68,11 @@ trait ContentScopeStub
                 )
             );
         }
-        $features = $this->createMock(FeatureCheckerInterface::class);
-        $features->method('isAvailable')->willReturn(true);
+        if ($features === null) {
+            $features = $this->createMock(FeatureCheckerInterface::class);
+            $features->method('isAvailable')->willReturn(true);
+            $features->method('isInstalledAndEnabled')->willReturn(true);
+        }
         $guard = $this->storeScope($allowedStoreIds);
         $locator = new ContentLocator(
             $this->createMock(PageRepositoryInterface::class),
@@ -79,6 +84,6 @@ trait ContentScopeStub
             $guard,
             $contentIndex
         );
-        return new ContentScopeFilter($locator, $guard, $catalogReader);
+        return new ContentScopeFilter($locator, $guard, $catalogReader, $features);
     }
 }

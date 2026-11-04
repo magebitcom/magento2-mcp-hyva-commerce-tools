@@ -72,6 +72,17 @@ class TemplatePreviewScopeTest extends TestCase
         $this->assertSame([0, 1], array_column($this->arrayAt($result, 'preview.stores'), 'store_id'));
     }
 
+    public function testEachToolAsksForTheEditorLinkOfItsOwnType(): void
+    {
+        $types = [TemplatePreview::class => 'email_template', NewsletterPreview::class => 'newsletter_template'];
+        foreach ($types as $class => $type) {
+            $previews = $this->previews();
+            $previews->expects($this->once())->method('getPreview')->with($type, 4);
+
+            $this->tool($class, $this->gateway(), $previews)->execute(['id' => 4]);
+        }
+    }
+
     /**
      * Gateway knowing template 4.
      *
@@ -89,16 +100,35 @@ class TemplatePreviewScopeTest extends TestCase
      *
      * @param class-string<TemplatePreview|NewsletterPreview> $class
      * @param EmailGatewayInterface $gateway
+     * @param PreviewService|null $previews
      * @return TemplatePreview|NewsletterPreview
      */
-    private function tool(string $class, EmailGatewayInterface $gateway): TemplatePreview|NewsletterPreview
-    {
+    private function tool(
+        string $class,
+        EmailGatewayInterface $gateway,
+        ?PreviewService $previews = null
+    ): TemplatePreview|NewsletterPreview {
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn(true);
+        return new $class(
+            $features,
+            $gateway,
+            $this->createMock(ContentService::class),
+            $previews ?? $this->previews(),
+            $this->storeScope([1])
+        );
+    }
+
+    /**
+     * Preview service with rows for store views 0, 1 and 2.
+     *
+     * @return PreviewService&MockObject
+     */
+    private function previews(): PreviewService&MockObject
+    {
         $previews = $this->createMock(PreviewService::class);
         $previews->method('getPreview')->willReturn(['admin_editor_url' => 'u', 'error' => null, 'note' => '',
             'stores' => [['store_id' => 0], ['store_id' => 1], ['store_id' => 2]]]);
-        return new $class($features, $gateway, $this->createMock(ContentService::class), $previews,
-            $this->storeScope([1]));
+        return $previews;
     }
 }

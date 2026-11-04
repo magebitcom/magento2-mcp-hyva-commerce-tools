@@ -39,14 +39,24 @@ interface FeatureCheckerInterface
     public function isAvailable(string $feature): bool;
 
     /**
+     * Installed and enabled, whatever the caller's ACL: whether the feature's data exists at all.
+     *
+     * @param string $feature
+     * @return bool
+     */
+    public function isInstalledAndEnabled(string $feature): bool;
+
+    /**
      * Get status.
      *
      * The acl_allowed key is null when the feature has no ACL resource, is not installed or disabled, or no admin
-     * context exists; otherwise whether the caller's role holds acl_resource.
+     * context exists; otherwise whether the caller's role holds acl_resource. The unavailable_reason key says why
+     * available is false (not_installed, disabled or acl, in that order) and is null when available is true.
      *
      * @param string $feature
      * @return array
-     * @phpstan-return array{ feature: string, label: string, available: bool, installed: bool, enabled: bool,
+     * @phpstan-return array{ feature: string, label: string, available: bool,
+     *     unavailable_reason: 'not_installed'|'disabled'|'acl'|null, installed: bool, enabled: bool,
      *     version: string|null, package: string, acl_resource: string|null, acl_allowed: bool|null,
      *     modules: array<string, array{installed: bool, enabled: bool}> }
      */

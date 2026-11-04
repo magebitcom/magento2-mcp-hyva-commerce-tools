@@ -44,16 +44,31 @@ class LiteralUrlAuditorScopeTest extends TestCase
     }
 
     /**
+     * With no documents, counts is still a JSON object with every category at 0 (T-115).
+     */
+    public function testEmptyCountsEncodeAsObject(): void
+    {
+        $report = $this->auditor(null, false)->audit();
+
+        $this->assertSame(0, $report['documents_checked']);
+        $this->assertSame(
+            '{"id_backed":0,"literal_fixable":0,"literal_not_in_gallery":0,"stale_asset_id":0,"richtext_literal":0}',
+            json_encode($report['counts'])
+        );
+    }
+
+    /**
      * Auditor over one literal image in page 1 (store view 1) and one in page 2 (store view 2).
      *
      * @param array|null $allowedStoreIds
+     * @param bool $withDocuments
      * @return LiteralUrlAuditor
      * @phpstan-param list<int>|null $allowedStoreIds
      */
-    private function auditor(?array $allowedStoreIds): LiteralUrlAuditor
+    private function auditor(?array $allowedStoreIds, bool $withDocuments = true): LiteralUrlAuditor
     {
         $documents = [];
-        foreach ([1, 2] as $id) {
+        foreach ($withDocuments ? [1, 2] : [] as $id) {
             $documents[] = ['entity_type' => 'cms_page', 'id' => $id, 'identifier' => 'p' . $id, 'title' => '',
                 'edition' => 'draft', 'error' => null,
                 'document' => ['nodes' => [['uid' => 'u' . $id, 'component' => 'image',

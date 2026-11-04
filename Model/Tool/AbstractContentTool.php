@@ -121,6 +121,24 @@ abstract class AbstractContentTool extends AbstractTool implements ContextualAcl
     }
 
     /**
+     * View on menus when the call targets a menu (T-145): menus stay out of reach of a role without menu_view.
+     *
+     * For tools whose verbs do not include view (e.g. scheduling); Hyvä keeps menu_view and menu_scheduling as
+     * siblings, so a role can hold one without the other.
+     *
+     * @param array $arguments
+     * @return array
+     * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-return list<string>
+     */
+    protected function menuViewVerbs(array $arguments): array
+    {
+        return in_array(ContentLocator::TYPE_MENU, $this->targetContentTypes($arguments), true)
+            ? [ContentAcl::VERB_VIEW]
+            : [];
+    }
+
+    /**
      * Extra resources the call needs (EXTRA_ACL_RESOURCES).
      *
      * A tool whose extra resource belongs to an optional module leaves it out while that module is off: the

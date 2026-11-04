@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content;
 
+use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Security\CatalogScopeReader;
@@ -238,5 +239,79 @@ class ContentScopeFilterTest extends TestCase
             $items[] = ['entity_type' => $type, 'id' => $id];
         }
         return $items;
+    }
+
+    /**
+     * PR #3 review: menus are hidden from a caller who may not view them, restricted to some store views or not.
+     */
+    public function testMenusAreHiddenFromACallerWhoMayNotViewThem(): void
+    {
+        $items = [
+            ['entity_type' => ContentLocator::TYPE_MENU, 'id' => 4],
+            ['entity_type' => ContentLocator::TYPE_PAGE, 'id' => 2],
+            ['entity_type' => 'media', 'id' => 0],
+        ];
+        $storeIds = [ContentLocator::TYPE_MENU => [4 => [1]], ContentLocator::TYPE_PAGE => [2 => [1]]];
+        foreach ([null, [1]] as $allowedStoreIds) {
+            $filter = $this->contentScope($allowedStoreIds, $storeIds, null, [], null, $this->menuFeatures(false));
+
+            $result = $filter->filter($items);
+            $this->assertSame([ContentLocator::TYPE_PAGE, 'media'], array_column($result['visible'], 'entity_type'));
+            $this->assertSame(1, $result['hidden']);
+
+            $usages = $filter->filterAssetUsages(['a.jpg' => ['hyva_and_catalog' => $items, 'magento_tracked' => []]]);
+            $this->assertCount(2, $usages['visible']['a.jpg']['hyva_and_catalog']);
+            $this->assertSame(1, $usages['hidden']['a.jpg']);
+
+            $report = $filter->filterUsageReport(
+                ['used' => true, 'total' => 3, 'hyva_content' => $items],
+                ['hyva_content']
+            );
+            $this->assertTrue($report['used']);
+            $this->assertSame(2, $report['total']);
+            $this->assertSame(1, $report['usages_hidden_by_permissions']);
+
+            $this->assertSame(
+                [ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK],
+                $filter->viewableTypes(ContentLocator::TYPES)
+            );
+        }
+    }
+
+    public function testACallerWhoMayViewMenusSeesThemAsBefore(): void
+    {
+        $items = [['entity_type' => ContentLocator::TYPE_MENU, 'id' => 4]];
+        $filter = $this->contentScope(null, [], null, [], null, $this->menuFeatures(true));
+
+        $this->assertSame(['visible' => $items, 'hidden' => 0], $filter->filter($items));
+        $report = ['used' => true, 'total' => 1, 'hyva_content' => $items];
+        $this->assertSame($report, $filter->filterUsageReport($report, ['hyva_content']));
+        $this->assertSame(ContentLocator::TYPES, $filter->viewableTypes(ContentLocator::TYPES));
+    }
+
+    public function testAnUnrestrictedCallerWithoutMenuViewGetsNoHiddenCounterWhenNothingIsHidden(): void
+    {
+        $filter = $this->contentScope(null, [], null, [], null, $this->menuFeatures(false));
+        $report = [
+            'used' => true,
+            'total' => 1,
+            'hyva_content' => [['entity_type' => ContentLocator::TYPE_PAGE, 'id' => 2]],
+        ];
+
+        $this->assertSame($report, $filter->filterUsageReport($report, ['hyva_content']));
+    }
+
+    /**
+     * Menu Builder installed and enabled, the caller allowed to view menus or not.
+     *
+     * @param bool $menuView
+     * @return FeatureCheckerInterface
+     */
+    private function menuFeatures(bool $menuView): FeatureCheckerInterface
+    {
+        $features = $this->createMock(FeatureCheckerInterface::class);
+        $features->method('isAvailable')->willReturn($menuView);
+        $features->method('isInstalledAndEnabled')->willReturn(true);
+        return $features;
     }
 }

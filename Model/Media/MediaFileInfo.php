@@ -42,7 +42,36 @@ class MediaFileInfo
      */
     public function exists(string $path): bool
     {
-        return $path !== '' && !str_contains($path, '..') && $this->media()->isFile($path);
+        if ($path === '' || str_contains($path, '..')) {
+            return false;
+        }
+        try {
+            return $this->media()->isFile($path);
+        } catch (Throwable) {
+            // Magento's path validator refuses the path (e.g. "-x", "a -b", control characters); its message names
+            // the absolute media path, so it never reaches the client (M1, review lap 3).
+            return false;
+        }
+    }
+
+    /**
+     * Whether a folder exists under pub/media.
+     *
+     * @param string $folder Relative to pub/media.
+     * @return bool
+     */
+    public function folderExists(string $folder): bool
+    {
+        $folder = trim($folder, '/');
+        if ($folder === '' || str_contains($folder, '..')) {
+            return false;
+        }
+        try {
+            return $this->media()->isDirectory($folder);
+        } catch (Throwable) {
+            // As exists(): a path the validator refuses is a folder that does not exist, never an error.
+            return false;
+        }
     }
 
     /**

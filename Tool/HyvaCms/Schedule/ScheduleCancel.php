@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule;
 
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractContentTool;
 use Magebit\Mcp\Api\ToolResultInterface;
@@ -31,11 +32,13 @@ class ScheduleCancel extends AbstractContentTool
      * @param ScheduleService $scheduleService
      * @param ContentAcl $contentAcl
      * @param ContentLocator $contentLocator
+     * @param ContentScopeFilter $contentScopeFilter
      */
     public function __construct(
         private readonly ScheduleService $scheduleService,
         private readonly ContentAcl $contentAcl,
-        private readonly ContentLocator $contentLocator
+        private readonly ContentLocator $contentLocator,
+        private readonly ContentScopeFilter $contentScopeFilter
     ) {
     }
 
@@ -97,10 +100,12 @@ class ScheduleCancel extends AbstractContentTool
             $itemIds,
             $releaseId,
             // A variant bound to one content type (hyva_menu.schedule.cancel) cancels nothing else; a role restricted
-            // to some websites or store views cancels only releases of content it may change.
+            // to some websites or store views cancels only releases of content it may change; a role without
+            // menu_view cancels no menu.
             fn (string $type, int $entityId): bool => (static::FIXED_CONTENT_TYPE === ''
                     || $type === static::FIXED_CONTENT_TYPE)
                 && $this->contentAcl->isAllowed($type, ContentAcl::VERB_SCHEDULE_CANCEL)
+                && $this->contentScopeFilter->viewableTypes([$type]) !== []
                 && $this->contentLocator->allowsWrite($type, $entityId)
         );
         return $this->jsonResult($result + ['content_changed' => false], [
@@ -115,6 +120,19 @@ class ScheduleCancel extends AbstractContentTool
     protected function contentAcl(): ContentAcl
     {
         return $this->contentAcl;
+    }
+
+    /**
+     * Schedule cancel; the menu variant also needs menu view (the generic tool checks it per item in run()).
+     *
+     * @param array $arguments
+     * @return array
+     * @phpstan-param array<string, mixed> $arguments
+     * @phpstan-return list<string>
+     */
+    protected function contentVerbs(array $arguments): array
+    {
+        return array_values(array_merge(parent::contentVerbs($arguments), $this->menuViewVerbs($arguments)));
     }
 
     /**

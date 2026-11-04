@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuItemBuilder;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
+use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Menu\AbstractMenuTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ContentSchema;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
@@ -55,6 +56,7 @@ class MenuCreate extends AbstractMenuTool
      * @param DraftEditor $draftEditor
      * @param PreviewService $previewService
      * @param StoreScopeGuard $storeScopeGuard
+     * @param LiveSettings $liveSettings
      */
     public function __construct(
         FeatureCheckerInterface $featureChecker,
@@ -65,7 +67,8 @@ class MenuCreate extends AbstractMenuTool
         private readonly MenuItemBuilder $menuItemBuilder,
         private readonly DraftEditor $draftEditor,
         private readonly PreviewService $previewService,
-        private readonly StoreScopeGuard $storeScopeGuard
+        private readonly StoreScopeGuard $storeScopeGuard,
+        private readonly LiveSettings $liveSettings
     ) {
         parent::__construct($featureChecker, $menuService);
     }
@@ -84,7 +87,9 @@ class MenuCreate extends AbstractMenuTool
     public function getDescription(): string
     {
         return 'Create a menu with its first content saved as a DRAFT (nothing renders until hyva_menu_publish). '
-            . 'The menu is inactive unless is_active=true; hyva_menu_publish also activates it. template picks the '
+            . 'The menu is inactive unless is_active=true; hyva_menu_publish also activates it. is_active=true '
+            . 'needs "confirm": true; without it nothing is created and the reply shows what would go live. '
+            . 'template picks the '
             . 'root components: header (mega menu columns + mobile), drilldown (drilldown + mobile), mobile, footer '
             . '(footer columns) or empty. items are added to every root '
             . '({label, type: category|product|cms_page|custom_url|text|category_tree|content, value, children}).';
@@ -103,9 +108,11 @@ class MenuCreate extends AbstractMenuTool
                 ->minItems(1)
                 ->required()
                 ->description('0 = all store views.'))
-            ->boolean('is_active', fn (BooleanBuilder $b) => $b->description('Default false.'))
+            ->boolean('is_active', fn (BooleanBuilder $b) => $b
+                ->description('Default false. true makes the menu active at once and needs confirm.'))
             ->string('preview_url_key', fn (StringBuilder $s) => $s
-                ->description('Page used for previews, e.g. "/" for the home page.'))
+                ->description('URL key of a page that shows this menu (the preview fails on a page without it). '
+                    . 'It is also the page the published_url points to.'))
             ->string('template', fn (StringBuilder $s) => $s
                 ->enum(array_keys(self::TEMPLATES))
                 ->description('Default header.'))
@@ -118,6 +125,8 @@ class MenuCreate extends AbstractMenuTool
                 ]
             )
             ->rawProperty('components', ContentSchema::COMPONENTS)
+            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description('Create with is_active=true, after '
+                . 'reviewing the preview.'))
             ->toArray();
     }
 
@@ -151,6 +160,17 @@ class MenuCreate extends AbstractMenuTool
         }
 
         $isActive = $this->boolArg($arguments, 'is_active');
+        $live = $this->liveSettings->menuChanges(['is_active' => false], ['is_active' => $isActive]);
+        if ($live !== [] && !$this->boolArg($arguments, 'confirm')) {
+            return $this->confirmationRequired('create_active', [[
+                'entity_type' => ContentLocator::TYPE_MENU,
+                'identifier' => $this->requireString($arguments, 'identifier'),
+                'title' => $this->requireString($arguments, 'title'),
+                'store_ids' => $this->intListArg($arguments, 'store_ids'),
+                'components' => count($roots),
+                'changes' => $live,
+            ]]);
+        }
         $menuId = $this->menuGateway->create([
             'title' => $this->requireString($arguments, 'title'),
             'identifier' => $this->requireString($arguments, 'identifier'),

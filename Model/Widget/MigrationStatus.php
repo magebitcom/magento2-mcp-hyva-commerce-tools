@@ -10,12 +10,12 @@ namespace Magebit\McpHyvaCommerceTools\Model\Widget;
 
 use Hyva\AdminDashboardApi\Api\V1\WidgetContextInterface;
 use Hyva\AdminDashboardApi\Api\V1\WidgetInstanceInterface;
+use Magebit\McpHyvaCommerceTools\Model\Content\AdminEditorUrl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Migration\MigrationService;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
-use Magento\Backend\Model\UrlInterface;
 
 /**
  * magebit_migration_status_widget: Page Builder/WYSIWYG to Hyvä CMS migration progress of the pages and blocks of the
@@ -26,13 +26,13 @@ class MigrationStatus extends AbstractHealthWidget
     /**
      * @param MigrationService $migrationService
      * @param ContentIndex $contentIndex
-     * @param UrlInterface $url
+     * @param AdminEditorUrl $editorUrl
      * @param ContentScopeFilter $scopeFilter
      */
     public function __construct(
         private readonly MigrationService $migrationService,
         private readonly ContentIndex $contentIndex,
-        private readonly UrlInterface $url,
+        private readonly AdminEditorUrl $editorUrl,
         private readonly ContentScopeFilter $scopeFilter
     ) {
     }
@@ -78,7 +78,7 @@ class MigrationStatus extends AbstractHealthWidget
                     . Cast::string($item['element_count']) . ' elements',
                 $item['converted_draft_waiting'] ? 'draft ready' : Cast::string($item['complexity']),
                 $item['converted_draft_waiting'] ? 'success' : ($item['complexity'] === 'high' ? 'danger' : 'warning'),
-                $this->url->getUrl('liveview/editor/index', ['type' => $item['entity_type'], 'id' => $item['id']])
+                $this->editorUrl->link(Cast::string($item['entity_type']), Cast::int($item['id']))
             );
         }
         $total = count($pages);

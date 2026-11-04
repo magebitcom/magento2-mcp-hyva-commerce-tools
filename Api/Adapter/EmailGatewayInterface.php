@@ -120,6 +120,45 @@ interface EmailGatewayInterface
     public function configUsage(): array;
 
     /**
+     * What still uses a template, for a delete preview
+     *
+     * Email template: the store config values that send it (core_config_data rows of an email template field, any
+     * scope, whose value is the template id), as "store_config". Newsletter template: the newsletters queued from it
+     * that are not sent yet (not sent, sending or paused), as "queue"; sent and cancelled queues are history and only
+     * counted ("queue_history"), but Magento deletes them with the template as well.
+     *
+     * @param string $type
+     * @param int $id
+     * @return array
+     * @phpstan-return array{used: bool, total: int,
+     *     store_config?: list<array{path: string, scope: string, scope_id: int}>,
+     *     queue?: list<array{queue_id: int, status: string, start_at: string|null}>, queue_history?: int}
+     */
+    public function deletionUsage(string $type, int $id): array;
+
+    /**
+     * Delete an email template through Magento's resource model, then prune Hyvä's version history.
+     *
+     * Hyvä's content row goes by the foreign key; the pruning is what Hyvä's delete plugin on the model does.
+     *
+     * @param int $id
+     * @return void
+     * @throws LocalizedException When it does not exist.
+     */
+    public function deleteTemplate(int $id): void;
+
+    /**
+     * Delete a newsletter template through Magento's resource model, then prune Hyvä's version history.
+     *
+     * Its Hyvä row and queues go by the foreign keys; the pruning is what Hyvä's delete plugin on the model does.
+     *
+     * @param int $id
+     * @return void
+     * @throws LocalizedException When it does not exist.
+     */
+    public function deleteNewsletter(int $id): void;
+
+    /**
      * Whether Hyvä replaces sent emails with its published designs (hyva_email_templates/email_template/enabled)
      *
      * @return bool

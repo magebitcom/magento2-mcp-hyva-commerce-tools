@@ -92,6 +92,31 @@ class ContentServiceTest extends TestCase
         $this->service->saveDraft('cms_page', 5, $document);
     }
 
+    public function testAnUnversionedDraftIsKeptAsAVersionBeforeTheSave(): void
+    {
+        $this->storedDraft = '{"uid":"imported"}';
+        $document = $this->tree->insertNode($this->tree->newDocument('cms_page', 5), $this->tree->createNode('row'));
+        $this->provider->method('saveContent')->willReturn(new DataObject());
+        $this->provider->expects($this->exactly(2))->method('saveVersionHistoryItem');
+
+        $this->service->saveDraft('cms_page', 5, $document);
+    }
+
+    /**
+     * T-121: a create that just wrote the entity's blank draft asks for no snapshot of it, so the new entity gets
+     * one version-history entry, not an unnamed blank copy before the named draft.
+     */
+    public function testACreateSkipsTheSnapshotOfItsOwnBlankDraft(): void
+    {
+        $this->storedDraft = '{"uid":"blank"}';
+        $document = $this->tree->insertNode($this->tree->newDocument('newsletter', 5), $this->tree->createNode('row'));
+        $this->provider->method('saveContent')->willReturn(new DataObject());
+        $this->provider->expects($this->once())->method('saveVersionHistoryItem')
+            ->with('newsletter', 5, $this->stringContains('"version_state":"draft"'), false);
+
+        $this->service->saveDraft('newsletter', 5, $document, 'Created by MCP', null, false);
+    }
+
     public function testInvalidDocumentIsNeverSaved(): void
     {
         $document = $this->tree->insertNode(

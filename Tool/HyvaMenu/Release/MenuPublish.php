@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release;
 
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Content\Publish;
 
 /**
@@ -36,7 +37,7 @@ class MenuPublish extends Publish
         return 'Make a menu LIVE: publish its current draft (or a version_id from hyva_menu_version_list). Same as '
             . 'hyva_cms_publish with entity_type=menu; needs Hyva_MenuBuilder::menu_publish. Publishing also '
             . 'activates the menu (Hyvä Menu Builder sets is_active true), so an inactive one goes live too; the '
-            . 'storefront shows it where design config (header/footer) or a widget places it.';
+            . 'storefront shows it where ' . LiveSettings::MENU_PLACEMENT . ' places it.';
     }
 
     /**

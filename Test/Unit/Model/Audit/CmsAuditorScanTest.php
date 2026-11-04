@@ -82,6 +82,24 @@ class CmsAuditorScanTest extends TestCase
         $this->assertSame(8, $report['content_issues']['broken_images']);
     }
 
+    /**
+     * With no content at all, counts is still a JSON object keyed by content type (T-115).
+     */
+    public function testEmptyCountsEncodeAsObject(): void
+    {
+        $this->contentIndex->method('getRows')->willReturn([]);
+        $this->conflictReport->method('getConflictsWithinCallerScope')->willReturn(['conflicts' => [], 'hidden' => 0]);
+
+        $report = $this->auditor()->audit(100);
+
+        $counts = json_decode((string) json_encode($report['counts']));
+        $this->assertInstanceOf(\stdClass::class, $counts);
+        $this->assertSame(
+            [ContentLocator::TYPE_PAGE, ContentLocator::TYPE_BLOCK],
+            array_keys(get_object_vars($counts))
+        );
+    }
+
     public function testTheIssueListIsBoundedAndErrorsComeFirstWhileCountsStayComplete(): void
     {
         $this->contentIndex->method('getRows')->willReturnCallback(

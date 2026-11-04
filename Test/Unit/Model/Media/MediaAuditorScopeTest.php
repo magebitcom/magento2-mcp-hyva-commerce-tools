@@ -44,18 +44,38 @@ class MediaAuditorScopeTest extends TestCase
     }
 
     /**
+     * With no image problems, counts is a JSON object as in the other audits, not an empty list (T-115).
+     */
+    public function testEmptyCountsEncodeAsObject(): void
+    {
+        $report = $this->auditor(null, [])->audit('menu');
+
+        $this->assertSame(0, $report['images_checked']);
+        $this->assertSame('{}', json_encode($report['counts']));
+    }
+
+    public function testCountsWithFindingsKeepTheirKeys(): void
+    {
+        $report = $this->auditor(null)->audit();
+
+        $this->assertSame('{"missing_alt":3}', json_encode($report['counts']));
+    }
+
+    /**
      * Auditor over three images: one used only by store view 2's page, one by both pages, one by a product.
      *
      * @param array|null $allowedStoreIds
+     * @param array|null $usages Usage index; null = the three images above.
      * @return MediaAuditor
      * @phpstan-param list<int>|null $allowedStoreIds
+     * @phpstan-param array<string, list<array<string, mixed>>>|null $usages
      */
-    private function auditor(?array $allowedStoreIds): MediaAuditor
+    private function auditor(?array $allowedStoreIds, ?array $usages = null): MediaAuditor
     {
         $own = $this->usage('cms_page', 1, 'own');
         $foreign = $this->usage('cms_page', 2, 'foreign');
         $usageIndex = $this->createMock(ImageUsageIndex::class);
-        $usageIndex->method('all')->willReturn([
+        $usageIndex->method('all')->willReturn($usages ?? [
             'wysiwyg/foreign.jpg' => [$foreign],
             'wysiwyg/mixed.jpg' => [$own, $foreign],
             'wysiwyg/product.jpg' => [['source' => 'product', 'entity_type' => 'product', 'id' => 5,
