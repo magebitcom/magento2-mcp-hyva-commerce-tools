@@ -69,6 +69,22 @@ class AdminEditorUrl
     }
 
     /**
+     * Editor route and params of an entity, for a link built later inside an admin page.
+     *
+     * Cached admin data (dashboard widgets) keeps this instead of a URL: a URL carries the secret key of the session
+     * that built it, which a later session does not accept (T-118).
+     *
+     * @param string $type Hyvä entity type.
+     * @param int $id
+     * @return array
+     * @phpstan-return array{route: string, params: array{type: string, id: int}}
+     */
+    public function link(string $type, int $id): array
+    {
+        return ['route' => $this->routePath($type), 'params' => ['type' => $type, 'id' => $id]];
+    }
+
+    /**
      * Route path registered for the type, or the default editor route.
      *
      * @param string $type

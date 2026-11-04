@@ -30,6 +30,11 @@ $badgeClass = static fn ($severity): string => in_array(
 $stats = is_array($data['stats'] ?? null) ? $data['stats'] : [];
 $sections = is_array($data['sections'] ?? null) ? $data['sections'] : [];
 $links = is_array($data['links'] ?? null) ? $data['links'] : [];
+// Links are cached as route + params and built here, so the secret key is the viewing admin's (T-118). A `url` is
+// what display data cached before that change holds.
+$href = static fn (array $item): string => is_string($item['route'] ?? null) && $item['route'] !== ''
+    ? $block->getUrl($item['route'], is_array($item['params'] ?? null) ? $item['params'] : [])
+    : (is_string($item['url'] ?? null) ? $item['url'] : '');
 ?>
 <div class="magebit-mcp-widget flex flex-col gap-sm w-full">
     <?php if ($stats): ?>
@@ -61,8 +66,8 @@ $links = is_array($data['links'] ?? null) ? $data['links'] : [];
                         <?php foreach ($section['rows'] as $row): ?>
                             <tr>
                                 <td class="text-sm">
-                                    <?php if (!empty($row['url'])): ?>
-                                        <a href="<?= $escaper->escapeUrl($row['url']) ?>">
+                                    <?php if ($rowUrl = $href($row)): ?>
+                                        <a href="<?= $escaper->escapeUrl($rowUrl) ?>">
                                             <?= $escaper->escapeHtml($row['label'] ?? '') ?>
                                         </a>
                                     <?php else: ?>
@@ -95,7 +100,7 @@ $links = is_array($data['links'] ?? null) ? $data['links'] : [];
     <div class="flex flex-wrap items-center justify-between gap-sm text-xs">
         <span>
             <?php foreach ($links as $link): ?>
-                <a href="<?= $escaper->escapeUrl($link['url'] ?? '') ?>">
+                <a href="<?= $escaper->escapeUrl($href($link)) ?>">
                     <?= $escaper->escapeHtml($link['label'] ?? '') ?>
                 </a>
             <?php endforeach; ?>

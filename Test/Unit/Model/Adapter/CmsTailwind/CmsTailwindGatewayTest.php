@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Adapter\CmsTailwind;
 
+use Hyva\CmsTailwindCompiler\Model\Config as TailwindConfig;
 use Hyva\CmsTailwindCompiler\Model\DaemonStatusReporter;
 use Magebit\McpHyvaCommerceTools\Model\Adapter\CmsTailwind\CmsTailwindGateway;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Adapter\OptionalServicesStub;
@@ -30,12 +31,13 @@ class CmsTailwindGatewayTest extends TestCase
         ]);
         $config = $this->createMock(ScopeConfigInterface::class);
         $config->method('getValue')->willReturnMap([
-            ['hyva_cms_tailwind/general/daemon_management', 'default', null, 'cron'],
             ['hyva_cms_tailwind/hyva_cms_bridge/compilation_strategy', 'default', null, null],
             ['hyva_cms_tailwind_jit/general/compiler_version', 'default', null, 'v4'],
         ]);
-        $status = (new CmsTailwindGateway($this->optionalServices([DaemonStatusReporter::class => $reporter]), $config))
-            ->status();
+        $status = (new CmsTailwindGateway($this->optionalServices([
+            DaemonStatusReporter::class => $reporter,
+            TailwindConfig::class => $this->tailwindConfig('cron'),
+        ]), $config))->status();
 
         $this->assertSame([
             'healthy' => false, 'daemon_management' => 'cron', 'compilation_strategy' => 'in-browser',
@@ -49,10 +51,44 @@ class CmsTailwindGatewayTest extends TestCase
         $reporter = $this->createMock(DaemonStatusReporter::class);
         $reporter->method('getStatusPayload')->willReturn(['is_healthy' => true, 'daemon_state' => null]);
         $config = $this->createMock(ScopeConfigInterface::class);
-        $status = (new CmsTailwindGateway($this->optionalServices([DaemonStatusReporter::class => $reporter]), $config))
-            ->status();
+        $status = (new CmsTailwindGateway($this->optionalServices([
+            DaemonStatusReporter::class => $reporter,
+            TailwindConfig::class => $this->tailwindConfig('off'),
+        ]), $config))->status();
         $this->assertNull($status['daemon']);
         $this->assertSame('off', $status['daemon_management']);
         $this->assertSame([], $status['non_writable_files']);
+    }
+
+    /**
+     * T-123: Hyvä's Config getter wins (the legacy env.php `cron_daemon_manager_enabled` flag makes it `cron` while
+     * the store config still says `off`), so the tool reports what Hyvä actually runs.
+     */
+    public function testDaemonManagementComesFromHyvaConfigNotTheStoreConfig(): void
+    {
+        $reporter = $this->createMock(DaemonStatusReporter::class);
+        $reporter->method('getStatusPayload')->willReturn(['is_healthy' => true]);
+        $config = $this->createMock(ScopeConfigInterface::class);
+        $config->method('getValue')->willReturnMap([
+            ['hyva_cms_tailwind/general/daemon_management', 'default', null, 'off'],
+        ]);
+        $status = (new CmsTailwindGateway($this->optionalServices([
+            DaemonStatusReporter::class => $reporter,
+            TailwindConfig::class => $this->tailwindConfig('cron'),
+        ]), $config))->status();
+        $this->assertSame('cron', $status['daemon_management']);
+    }
+
+    /**
+     * Hyvä's Config stub answering getDaemonManagement().
+     *
+     * @param string $mode
+     * @return TailwindConfig
+     */
+    private function tailwindConfig(string $mode): TailwindConfig
+    {
+        $tailwindConfig = $this->createMock(TailwindConfig::class);
+        $tailwindConfig->method('getDaemonManagement')->willReturn($mode);
+        return $tailwindConfig;
     }
 }

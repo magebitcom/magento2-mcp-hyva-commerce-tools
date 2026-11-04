@@ -14,7 +14,6 @@ use Magebit\McpHyvaCommerceTools\Model\Audit\CmsAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\AdminEditorUrl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
-use Magento\Backend\Model\UrlInterface;
 
 /**
  * magebit_content_health_widget: Hyvä CMS content problems found by the CMS audit.
@@ -23,12 +22,10 @@ class ContentHealth extends AbstractHealthWidget
 {
     /**
      * @param CmsAuditor $cmsAuditor
-     * @param UrlInterface $url
      * @param AdminEditorUrl $editorUrl
      */
     public function __construct(
         private readonly CmsAuditor $cmsAuditor,
-        private readonly UrlInterface $url,
         private readonly AdminEditorUrl $editorUrl
     ) {
     }
@@ -65,15 +62,15 @@ class ContentHealth extends AbstractHealthWidget
                 $where = Cast::string($issue['entity_type']) . ' ' . Cast::string($issue['identifier'] ?? '')
                     . ' (' . Cast::string($issue['edition'] ?? '') . ')';
             }
-            $url = isset($issue['entity_type'], $issue['id'])
-                ? $this->editorUrl->build(Cast::string($issue['entity_type']), Cast::int($issue['id']), true)
+            $link = isset($issue['entity_type'], $issue['id'])
+                ? $this->editorUrl->link(Cast::string($issue['entity_type']), Cast::int($issue['id']))
                 : null;
             $rows[] = $this->row(
                 Cast::string($issue['message'] ?? ''),
                 $where,
                 Cast::string($issue['code'] ?? ''),
                 $this->badgeSeverity($issue['severity'] ?? ''),
-                $url
+                $link
             );
         }
         return [
@@ -113,7 +110,7 @@ class ContentHealth extends AbstractHealthWidget
                 ]
             ],
             'notice' => (string) __('Translation coverage per store view is not checked yet.'),
-            'links' => [['label' => (string) __('Hyvä CMS pages'), 'url' => $this->url->getUrl('cms/page/index')]],
+            'links' => [$this->link((string) __('Hyvä CMS pages'), 'cms/page/index')],
         ];
     }
 }

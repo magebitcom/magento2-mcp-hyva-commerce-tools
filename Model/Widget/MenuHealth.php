@@ -18,7 +18,6 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
-use Magento\Backend\Model\UrlInterface;
 
 /**
  * magebit_menu_health_widget: Hyvä Menu Builder health from the menu validator, over the menus of the admin's
@@ -31,7 +30,6 @@ class MenuHealth extends AbstractHealthWidget
      * @param MenuGatewayInterface $menuGateway
      * @param MenuService $menuService
      * @param McpActivityReader $activityReader
-     * @param UrlInterface $url
      * @param ContentScopeFilter $scopeFilter
      * @param AdminEditorUrl $editorUrl
      */
@@ -40,7 +38,6 @@ class MenuHealth extends AbstractHealthWidget
         private readonly MenuGatewayInterface $menuGateway,
         private readonly MenuService $menuService,
         private readonly McpActivityReader $activityReader,
-        private readonly UrlInterface $url,
         private readonly ContentScopeFilter $scopeFilter,
         private readonly AdminEditorUrl $editorUrl
     ) {
@@ -83,7 +80,7 @@ class MenuHealth extends AbstractHealthWidget
                 ),
                 $result['counts']['error'] . ' errors / ' . $result['counts']['warning'] . ' warnings',
                 $result['counts']['error'] > 0 ? 'danger' : ($result['counts']['warning'] > 0 ? 'warning' : 'success'),
-                $this->editorUrl->build(ContentLocator::TYPE_MENU, Cast::int($menu['id']), true)
+                $this->editorUrl->link(ContentLocator::TYPE_MENU, Cast::int($menu['id']))
             );
         }
         $broken = ($codes['broken_category'] ?? 0)
@@ -95,7 +92,7 @@ class MenuHealth extends AbstractHealthWidget
             + ($codes['inactive_cms_page'] ?? 0);
         $sections = [['title' => (string) __('Menus'), 'rows' => $rows, 'empty' => (string) __('No menus yet.')]];
         $links = [
-            ['label' => (string) __('Menu Builder'), 'url' => $this->url->getUrl('hyva_menu_builder/menu/index')],
+            $this->link((string) __('Menu Builder'), 'hyva_menu_builder/menu/index'),
         ];
         if ($this->activityReader->isAllowed()) {
             $recent = [];
@@ -112,10 +109,7 @@ class MenuHealth extends AbstractHealthWidget
                 'rows' => $recent,
                 'empty' => (string) __('None.'),
             ];
-            $links[] = [
-                'label' => (string) __('MCP audit log'),
-                'url' => $this->url->getUrl('magebit_mcp/auditlog/index'),
-            ];
+            $links[] = $this->link((string) __('MCP audit log'), 'magebit_mcp/auditlog/index');
         }
         return [
             'stats' => [

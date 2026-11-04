@@ -54,11 +54,11 @@ class HealthWidgetScopeTest extends TestCase
     public function testMenuHealthLinksTheAuditLogOnlyWithTheAuditPermission(): void
     {
         $denied = $this->menuHealth(null, false)->getDisplayData($this->ctx(), $this->instance());
-        $this->assertNotContains(self::AUDIT_LOG, array_column($this->list($denied, 'links'), 'url'));
+        $this->assertNotContains(self::AUDIT_LOG, array_column($this->list($denied, 'links'), 'route'));
         $this->assertSame(['Menus'], array_column($this->list($denied, 'sections'), 'title'));
 
         $allowed = $this->menuHealth(null, true)->getDisplayData($this->ctx(), $this->instance());
-        $this->assertContains(self::AUDIT_LOG, array_column($this->list($allowed, 'links'), 'url'));
+        $this->assertContains(self::AUDIT_LOG, array_column($this->list($allowed, 'links'), 'route'));
         $this->assertSame(['Menus', 'Last MCP menu actions'], array_column($this->list($allowed, 'sections'), 'title'));
     }
 
@@ -76,7 +76,7 @@ class HealthWidgetScopeTest extends TestCase
     {
         foreach ([false, true] as $allowed) {
             $data = $this->mediaHealth($allowed)->getDisplayData($this->ctx(), $this->instance());
-            $links = array_column($this->list($data, 'links'), 'url');
+            $links = array_column($this->list($data, 'links'), 'route');
             $this->assertSame($allowed, in_array(self::AUDIT_LOG, $links, true));
             $this->assertSame($allowed ? 2 : 1, count($this->list($data, 'sections')));
         }
@@ -128,13 +128,24 @@ class HealthWidgetScopeTest extends TestCase
         $this->assertCount(2, $this->rows($data));
     }
 
-    public function testWidgetEditorLinksKeepTheAdminSecretKey(): void
+    /**
+     * T-118: Hyvä caches the display data, so links hold the route and params, never a URL with the secret key of the
+     * session that built them; health-summary.phtml builds the URL for the admin viewing the dashboard.
+     */
+    public function testWidgetLinksAreCachedAsRoutesWithoutAUrl(): void
     {
         $data = $this->campaignCalendar([1])->getDisplayData($this->ctx(), $this->instance());
-        $this->assertSame(['liveview/editor/index|type=cms_page,id=1'], array_column($this->rows($data), 'url'));
+        $rows = $this->rows($data);
+        $this->assertSame(['liveview/editor/index'], array_column($rows, 'route'));
+        $this->assertSame([['type' => 'cms_page', 'id' => 1]], array_column($rows, 'params'));
 
-        $data = $this->menuHealth([1], false)->getDisplayData($this->ctx(), $this->instance());
-        $this->assertSame(['liveview/editor/index|type=menu,id=1'], array_column($this->rows($data), 'url'));
+        $data = $this->menuHealth([1], true)->getDisplayData($this->ctx(), $this->instance());
+        $this->assertSame([['type' => 'menu', 'id' => 1]], array_column($this->rows($data), 'params'));
+        $this->assertSame(
+            ['hyva_menu_builder/menu/index', self::AUDIT_LOG],
+            array_column($this->list($data, 'links'), 'route')
+        );
+        $this->assertStringNotContainsString('"url"', (string) json_encode($data));
     }
 
     public function testCampaignAssetReadinessChecksOnlyTheAdminsScheduledContent(): void
@@ -188,7 +199,6 @@ class HealthWidgetScopeTest extends TestCase
             $gateway,
             $menus,
             $this->activity($auditAllowed),
-            $this->url(),
             $this->contentScope($allowedStoreIds),
             $this->editorUrl()
         );
@@ -219,8 +229,7 @@ class HealthWidgetScopeTest extends TestCase
             $auditor,
             $this->createMock(MediaService::class),
             $engines,
-            $this->activity($auditAllowed),
-            $this->url()
+            $this->activity($auditAllowed)
         );
     }
 
@@ -311,18 +320,6 @@ class HealthWidgetScopeTest extends TestCase
         $reader->method('isAllowed')->willReturn($allowed);
         $reader->method('getRows')->willReturn([]);
         return $reader;
-    }
-
-    /**
-     * URL builder returning the route.
-     *
-     * @return UrlInterface
-     */
-    private function url(): UrlInterface
-    {
-        $url = $this->createMock(UrlInterface::class);
-        $url->method('getUrl')->willReturnCallback(static fn (string $route): string => $route);
-        return $url;
     }
 
     /**

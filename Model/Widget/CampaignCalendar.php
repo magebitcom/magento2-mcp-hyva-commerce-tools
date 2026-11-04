@@ -106,7 +106,7 @@ class CampaignCalendar extends AbstractHealthWidget
                 $detail,
                 $item['status'],
                 $severity,
-                $this->editorUrl->build($item['entity_type'], $item['entity_id'], true)
+                $this->editorUrl->link($item['entity_type'], $item['entity_id'])
             );
             if ($item['status'] === 'pending' && strtotime($item['time_scheduled'] . ' UTC') >= $now - 900) {
                 $upcoming[] = $row;

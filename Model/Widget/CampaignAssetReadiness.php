@@ -154,7 +154,7 @@ class CampaignAssetReadiness extends AbstractHealthWidget
                 $problems === [] ? (string) __('ready') : implode('; ', array_slice(array_unique($problems), 0, 3)),
                 $problems === [] ? 'ready' : count($problems) . ' issue(s)',
                 $problems === [] ? 'success' : (str_contains(implode(' ', $problems), 'broken') ? 'danger' : 'warning'),
-                $this->editorUrl->build($item['entity_type'], $item['entity_id'], true)
+                $this->editorUrl->link($item['entity_type'], $item['entity_id'])
             );
         }
         return [

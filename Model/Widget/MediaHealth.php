@@ -15,7 +15,6 @@ use Magebit\McpHyvaCommerceTools\Model\Media\ImageEngineInfo;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaAuditor;
 use Magebit\McpHyvaCommerceTools\Model\Media\MediaService;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
-use Magento\Backend\Model\UrlInterface;
 
 /**
  * magebit_media_health_widget: media problems and Media Optimization state. The MCP activity section and the audit
@@ -28,14 +27,12 @@ class MediaHealth extends AbstractHealthWidget
      * @param MediaService $mediaService
      * @param ImageEngineInfo $engineInfo
      * @param McpActivityReader $activityReader
-     * @param UrlInterface $url
      */
     public function __construct(
         private readonly MediaAuditor $mediaAuditor,
         private readonly MediaService $mediaService,
         private readonly ImageEngineInfo $engineInfo,
-        private readonly McpActivityReader $activityReader,
-        private readonly UrlInterface $url
+        private readonly McpActivityReader $activityReader
     ) {
     }
 
@@ -96,10 +93,7 @@ class MediaHealth extends AbstractHealthWidget
                 'rows' => $recent,
                 'empty' => (string) __('None.'),
             ];
-            $links[] = [
-                'label' => (string) __('MCP audit log'),
-                'url' => $this->url->getUrl('magebit_mcp/auditlog/index'),
-            ];
+            $links[] = $this->link((string) __('MCP audit log'), 'magebit_mcp/auditlog/index');
         }
         $missingVariants = ($counts['not_optimized'] ?? 0)
             + ($counts['missing_webp'] ?? 0)

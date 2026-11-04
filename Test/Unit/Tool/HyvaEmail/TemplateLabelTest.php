@@ -64,6 +64,52 @@ class TemplateLabelTest extends TestCase
         ))->execute(['code' => 'welcome']);
     }
 
+    /**
+     * @return array<string, array{0: class-string<TemplateGet|NewsletterGet>, 1: array<string, mixed>, 2: string}>
+     */
+    public static function unknownTemplateProvider(): array
+    {
+        return [
+            'email template id' => [TemplateGet::class, ['id' => 3], 'Email template #3 does not exist.'],
+            'email template code' => [TemplateGet::class, ['code' => 'gone'], 'Email template "gone" does not exist.'],
+            'newsletter id' => [NewsletterGet::class, ['id' => 3], 'Newsletter template #3 does not exist.'],
+            'newsletter code' => [
+                NewsletterGet::class,
+                ['code' => 'gone'],
+                'Newsletter template "gone" does not exist.',
+            ],
+        ];
+    }
+
+    /**
+     * T-128: an unknown id or code answers like the page and menu tools: the same tool error, capitalised label.
+     *
+     * @dataProvider unknownTemplateProvider
+     * @param class-string<TemplateGet|NewsletterGet> $class
+     * @param array<string, mixed> $arguments
+     * @param string $expected
+     */
+    public function testAnUnknownTemplateAnswersLikeThePageAndMenuTools(
+        string $class,
+        array $arguments,
+        string $expected
+    ): void {
+        $gateway = $this->createMock(EmailGatewayInterface::class);
+        $gateway->method('get')->willReturn(null);
+        $gateway->method('getList')->willReturn(['total' => 0, 'items' => []]);
+
+        $this->expectException(LocalizedException::class);
+        $this->expectExceptionMessage($expected);
+
+        (new $class(
+            $this->features(),
+            $gateway,
+            $this->createMock(ContentService::class),
+            $this->createMock(PreviewService::class),
+            $this->storeScope(null)
+        ))->execute($arguments);
+    }
+
     public function testTheScopeRefusalNamesNewsletterTemplatesInThePlural(): void
     {
         $result = (new NewsletterPublish(

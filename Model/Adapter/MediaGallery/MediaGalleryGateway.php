@@ -105,6 +105,7 @@ class MediaGalleryGateway implements MediaGalleryGatewayInterface
                 $items[] = $this->normalizeDates($item);
             }
         }
+        $items = $this->withExactDates('media_gallery_asset', ['updated_at'], $items);
         return ['total' => Cast::int($result['total_count'] ?? 0), 'items' => $items];
     }
 
@@ -216,6 +217,7 @@ class MediaGalleryGateway implements MediaGalleryGatewayInterface
                 $items[] = $this->normalizeDates($item);
             }
         }
+        $items = $this->withExactDates('hyva_media_gallery_trash', ['trashed_at'], $items);
         return [
             'total' => Cast::int($list['total_count'] ?? $this->trashRepository->count()),
             'retention_days' => $retention,
@@ -398,6 +400,46 @@ class MediaGalleryGateway implements MediaGalleryGatewayInterface
             ]);
         }
         return $value;
+    }
+
+    /**
+     * Replace the minute-precision dates Hyvä's lists format with the DB values (seconds) of the same rows.
+     *
+     * One query by id, so the lists agree with the trash preview / restore, which read the table (T-116). A row the
+     * table no longer has keeps its parsed value.
+     *
+     * @param string $table
+     * @param list<string> $columns
+     * @param array $items
+     * @return array
+     * @phpstan-param list<array<mixed>> $items
+     * @phpstan-return list<array<mixed>>
+     */
+    private function withExactDates(string $table, array $columns, array $items): array
+    {
+        $ids = array_values(array_filter(array_map(
+            static fn (array $item): int => Cast::int($item['id'] ?? 0),
+            $items
+        )));
+        if ($ids === []) {
+            return $items;
+        }
+        $connection = $this->resourceConnection->getConnection();
+        $exact = $connection->fetchAssoc($connection->select()
+            ->from($this->resourceConnection->getTableName($table), array_merge(['id'], $columns))
+            ->where('id IN (?)', $ids));
+        foreach ($items as $index => $item) {
+            $row = $exact[Cast::int($item['id'] ?? 0)] ?? null;
+            if (!is_array($row)) {
+                continue;
+            }
+            foreach ($columns as $column) {
+                if (array_key_exists($column, $item) && is_string($row[$column] ?? null) && $row[$column] !== '') {
+                    $items[$index][$column] = $row[$column];
+                }
+            }
+        }
+        return $items;
     }
 
     /**

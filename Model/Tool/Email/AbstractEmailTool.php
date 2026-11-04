@@ -130,16 +130,18 @@ abstract class AbstractEmailTool extends AbstractTool
             ));
             if (count($matches) !== 1) {
                 throw new LocalizedException(__(
-                    $matches === [] ? '%1 "%2" does not exist.' : 'Several %3 are named "%2"; pass id.',
+                    $matches === [] ? '%4 "%2" does not exist.' : 'Several %3 are named "%2"; pass id.',
                     static::LABEL,
                     $code,
-                    static::LABEL_PLURAL
+                    static::LABEL_PLURAL,
+                    ucfirst(static::LABEL)
                 ));
             }
             return $matches[0];
         }
         return $this->emailGateway->get(static::TEMPLATE_TYPE, $id)
-            ?? throw new LocalizedException(__('%1 #%2 does not exist.', static::LABEL, $id));
+            // Capitalised like the page and menu tools' "CMS page #3 does not exist." (T-128).
+            ?? throw new LocalizedException(__('%1 #%2 does not exist.', ucfirst(static::LABEL), $id));
     }
 
     /**

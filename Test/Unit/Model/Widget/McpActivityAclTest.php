@@ -14,7 +14,6 @@ use Magebit\Mcp\Api\ToolRegistryInterface;
 use Magebit\McpHyvaCommerceTools\Model\Audit\McpActivityReader;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Widget\McpActivity;
-use Magento\Backend\Model\UrlInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\AuthorizationInterface;
 use PHPUnit\Framework\TestCase;
@@ -44,7 +43,7 @@ class McpActivityAclTest extends TestCase
     {
         $ctx = $this->createMock(WidgetContextInterface::class);
         $ctx->method('isAllowed')->willReturn($widget);
-        $widgetModel = new McpActivity($this->reader($audit), $this->createMock(UrlInterface::class));
+        $widgetModel = new McpActivity($this->reader($audit));
 
         $this->assertSame($expected, $widgetModel->isAllowed($ctx, null));
     }
@@ -79,7 +78,7 @@ class McpActivityAclTest extends TestCase
             return [];
         });
 
-        (new McpActivity($reader, $this->createMock(UrlInterface::class)))->getDisplayData(
+        (new McpActivity($reader))->getDisplayData(
             $this->createMock(WidgetContextInterface::class),
             $this->createMock(WidgetInstanceInterface::class)
         );

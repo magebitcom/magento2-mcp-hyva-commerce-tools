@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Adapter\CmsTailwind;
 
+use Hyva\CmsTailwindCompiler\Model\Config as TailwindConfig;
 use Hyva\CmsTailwindCompiler\Model\DaemonStatusReporter;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\CmsTailwindGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Model\Adapter\OptionalServiceFactory;
@@ -40,7 +41,8 @@ class CmsTailwindGateway implements CmsTailwindGatewayInterface
         $lastLine = $payload['last_log_line'] ?? null;
         return [
             'healthy' => !empty($payload['is_healthy']),
-            'daemon_management' => $this->setting('hyva_cms_tailwind/general/daemon_management', 'off'),
+            // Hyvä's own getter: the legacy env.php flag `cron_daemon_manager_enabled` forces `cron` (T-123).
+            'daemon_management' => $this->optionalServices->get(TailwindConfig::class)->getDaemonManagement(),
             'compilation_strategy' => $this->setting(
                 'hyva_cms_tailwind/hyva_cms_bridge/compilation_strategy',
                 'in-browser'

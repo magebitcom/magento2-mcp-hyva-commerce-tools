@@ -64,7 +64,14 @@ class NewsletterCreateDraftTest extends TestCase
         $this->editor->method('buildNodes')->willReturn([]);
         $this->tree->expects($this->never())->method('insertNode');
         $this->content->expects($this->once())->method('saveDraft')
-            ->with(EmailGatewayInterface::TYPE_NEWSLETTER, 12, ['root' => [['uid' => 'wrapper']]], 'Created by MCP')
+            ->with(
+                EmailGatewayInterface::TYPE_NEWSLETTER,
+                12,
+                ['root' => [['uid' => 'wrapper']]],
+                'Created by MCP',
+                null,
+                false
+            )
             ->willReturn(self::SAVED);
 
         $reply = $this->create(self::ARGS);
@@ -88,7 +95,9 @@ class NewsletterCreateDraftTest extends TestCase
                 EmailGatewayInterface::TYPE_NEWSLETTER,
                 12,
                 ['root' => [['uid' => 'wrapper', 'children' => [$node]]]],
-                'Created by MCP'
+                'Created by MCP',
+                null,
+                false
             )
             ->willReturn(self::SAVED);
 

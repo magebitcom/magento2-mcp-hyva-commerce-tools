@@ -78,7 +78,7 @@ class MigrationStatus extends AbstractHealthWidget
                     . Cast::string($item['element_count']) . ' elements',
                 $item['converted_draft_waiting'] ? 'draft ready' : Cast::string($item['complexity']),
                 $item['converted_draft_waiting'] ? 'success' : ($item['complexity'] === 'high' ? 'danger' : 'warning'),
-                $this->editorUrl->build(Cast::string($item['entity_type']), Cast::int($item['id']), true)
+                $this->editorUrl->link(Cast::string($item['entity_type']), Cast::int($item['id']))
             );
         }
         $total = count($pages);

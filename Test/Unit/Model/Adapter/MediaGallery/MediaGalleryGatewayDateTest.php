@@ -75,6 +75,7 @@ class MediaGalleryGatewayDateTest extends TestCase
         $timezone->method('getConfigTimezone')->willReturn('America/Los_Angeles');
         $locale = $this->createMock(ResolverInterface::class);
         $locale->method('getLocale')->willReturn('en_US');
+        $this->stubSelect();
         $this->gateway = new MediaGalleryGateway(
             $this->searchAssetsList,
             $this->createMock(MediaMover::class),
@@ -120,10 +121,6 @@ class MediaGalleryGatewayDateTest extends TestCase
      */
     public function testTrashRowsByIdKeepTheDbValue(): void
     {
-        $select = $this->createMock(Select::class);
-        $select->method('from')->willReturnSelf();
-        $select->method('where')->willReturnSelf();
-        $this->connection->method('select')->willReturn($select);
         $this->connection->method('fetchAll')->willReturn([['id' => '4', 'trashed_at' => '2026-11-03 20:11:09']]);
 
         $items = $this->gateway->trashList(null, 1, 20, [4])['items'];
@@ -146,6 +143,52 @@ class MediaGalleryGatewayDateTest extends TestCase
         $items = $this->gateway->search([])['items'];
 
         $this->assertSame('2026-11-03 20:10:00', $items[0]['updated_at'] ?? null);
+    }
+
+    /**
+     * T-116: list rows carry the DB value by id (seconds), the same value the trash preview / restore give.
+     *
+     * @return void
+     */
+    public function testListsTakeTheExactDbDatesById(): void
+    {
+        $this->connection->method('fetchAssoc')->willReturnCallback(
+            static fn ($select, array $bind = []): array => [
+                1 => ['id' => '1', 'trashed_at' => '2026-11-03 20:10:41'],
+                3 => ['id' => '3', 'updated_at' => '2026-11-03 20:11:09'],
+            ]
+        );
+        $this->trashRepository->method('getList')->willReturn([
+            'total_count' => 2,
+            'items' => [
+                ['id' => 1, 'trashed_at' => 'Nov 3, 2026, 12:10 PM'],
+                ['id' => 2, 'trashed_at' => 'Nov 3, 2026, 12:10 PM'],
+            ],
+        ]);
+        $this->searchAssetsList->method('execute')->willReturn([
+            'total_count' => 1,
+            'items' => [['id' => 3, 'path' => 'wysiwyg/a.jpg', 'updated_at' => 'Nov 3, 2026, 12:10 PM']],
+        ]);
+
+        $trash = $this->gateway->trashList(null, 1, 20)['items'];
+        $search = $this->gateway->search([])['items'];
+
+        // Row 2 has no DB row (gone meanwhile): the parsed minute value stays.
+        $this->assertSame(['2026-11-03 20:10:41', '2026-11-03 20:10:00'], array_column($trash, 'trashed_at'));
+        $this->assertSame('2026-11-03 20:11:09', $search[0]['updated_at'] ?? null);
+    }
+
+    /**
+     * Select mock that returns itself for every builder call.
+     *
+     * @return void
+     */
+    private function stubSelect(): void
+    {
+        $select = $this->createMock(Select::class);
+        $select->method('from')->willReturnSelf();
+        $select->method('where')->willReturnSelf();
+        $this->connection->method('select')->willReturn($select);
     }
 
     /**
