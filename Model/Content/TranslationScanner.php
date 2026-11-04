@@ -14,9 +14,11 @@ use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
  * Translatable texts of a Hyvä CMS document and their per-store translations.
  *
  * Mirrors the editor's translation panel (liveview-editor translations/handler.phtml): every `content` field
- * declared `translate: true` with a non-empty string value, plus the alt text of image fields and the label of link
- * fields. Translations live inline on the component: `translations[<field>][<store id>] = text`, where <field> is
- * the field name, or "image.alt" / "link.label" for the nested ones.
+ * declared `translate: true` with a non-empty string value, plus the alt text of image fields, the label of link
+ * fields and, for an `option_list` field declared `translate: true` (CMS 1.3.2+, e.g. Form Builder 1.0.2 choice
+ * options), the label of each row. Translations live inline on the component: `translations[<field>][<store id>] =
+ * text`, where <field> is the field name, "image.alt" / "link.label" for the nested ones, or "<field>.<row
+ * index>.label" for an option row (the dotted path Hyvä's TranslationProcessor resolves).
  *
  * @phpstan-type TextRow array{uid: string, component: string, field: string, text: string,
  *     translations: array<int, string>}
@@ -54,7 +56,9 @@ class TranslationScanner
             foreach ($this->componentTree->contentFields($component) as $name => $field) {
                 $value = $node[$name] ?? null;
                 $candidates = [];
-                if ($field['translate']) {
+                if ($field['type'] === 'option_list') {
+                    $candidates = $field['translate'] ? $this->optionLabels($name, $value) : [];
+                } elseif ($field['translate']) {
                     $candidates[$name] = $value;
                 }
                 if (isset(self::NESTED[$field['type']]) && is_array($value)) {
@@ -155,6 +159,24 @@ class TranslationScanner
             $node['translations'] = $existing;
             return $node;
         });
+    }
+
+    /**
+     * Label of each option row, keyed "<field>.<row index>.label" as the editor's translation panel keys them.
+     *
+     * @param string $name
+     * @param mixed $value
+     * @return array<string, mixed>
+     */
+    private function optionLabels(string $name, mixed $value): array
+    {
+        $labels = [];
+        foreach (is_array($value) && array_is_list($value) ? $value : [] as $index => $row) {
+            if (is_array($row)) {
+                $labels[$name . '.' . $index . '.label'] = $row['label'] ?? null;
+            }
+        }
+        return $labels;
     }
 
     /**

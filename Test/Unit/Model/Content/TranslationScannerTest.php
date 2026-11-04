@@ -32,6 +32,10 @@ class TranslationScannerTest extends TestCase
                 'link' => ['type' => 'link'],
                 'note' => ['type' => 'text'],
             ]],
+            'choice' => ['content' => [
+                'options' => ['type' => 'option_list', 'translate' => true],
+                'keys' => ['type' => 'option_list'],
+            ]],
         ];
         $provider = $this->createMock(ComponentProvider::class);
         $provider->method('getComponent')->willReturnCallback(
@@ -49,6 +53,25 @@ class TranslationScannerTest extends TestCase
             'translate:true fields, image alt and link label; not untranslatable or empty fields'
         );
         $this->assertSame([1 => 'Herbstverkauf'], $texts[0]['translations']);
+    }
+
+    public function testOptionLabelsAreTranslatableRowsOfAnOptInOptionList(): void
+    {
+        $texts = $this->scanner->texts(['uid' => 'doc', 'version' => 1, 'content' => [
+            'c1' => ['uid' => 'c1', 'component' => 'choice',
+                'options' => [['value' => 'red', 'label' => 'Red'], ['value' => 'blue', 'label' => ''],
+                    ['value' => 'green', 'label' => 'Green']],
+                'keys' => [['value' => 'a', 'label' => 'Internal A']],
+                'translations' => ['options.2.label' => [2 => 'Grün']]],
+        ]]);
+
+        // T-155: as the CMS 1.3.2 translation panel lists them; a list without translate: true stays out.
+        $this->assertSame(
+            ['options.0.label', 'options.2.label'],
+            array_map(static fn (array $t): string => $t['field'], $texts)
+        );
+        $this->assertSame('Green', $texts[1]['text']);
+        $this->assertSame([2 => 'Grün'], $texts[1]['translations']);
     }
 
     public function testStatusCountsPerStore(): void
