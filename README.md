@@ -828,6 +828,9 @@ Clients that parse replies:
 - **`hyva_email.template.send_test` mail failures are soft errors.** A transport failure was JSON-RPC error `-32011`.
   It is now a tool result with `isError: true`, `sent: false` and `status: "transport_error"`. See
   [Refusals](#refusals).
+- **`hyva_email.template.send_test` sends the admin's sample order.** With Email & Newsletter Templates 1.0.1+ the
+  mail is rendered inside Hyvä's test-send context, so order components show the preview fixture (items, totals,
+  addresses) as the admin "Send test" does, and the fallbacks are Hyvä's `FixtureDefaults`. On 1.0.0 nothing changes.
 - **Calls that write without confirm say `dry_run: false`.** Page/block update, image alt and replace, optimization
   clear and migration convert_to_draft replies gain the key; nothing else in them changed. See
   [Confirm and previews](#confirm-and-previews).
