@@ -64,10 +64,72 @@ class TailwindStatusTest extends TestCase
         $this->assertStringContainsString('not compiled until the daemon runs', $data['hint']);
     }
 
-    public function testUnhealthyWithInBrowserStrategyHasNoHint(): void
+    public function testInBrowserWithoutDaemonGivesReason(): void
     {
         $this->gateway->method('status')->willReturn($this->baseStatus(['healthy' => false]));
-        $this->assertNull($this->payload()['hint']);
+        $data = $this->payload();
+        // Hyvä's value is kept, not overridden.
+        $this->assertFalse($data['healthy']);
+        $this->assertSame('daemon_not_responding', $data['reason']);
+        $this->assertIsString($data['hint']);
+        $this->assertStringContainsString('only checks whether the Tailwind daemon answers', $data['hint']);
+        $this->assertStringContainsString('compiles Tailwind in the browser', $data['hint']);
+        $this->assertStringContainsString('hyva_cms_tailwind/hyva_cms_bridge/compilation_strategy', $data['hint']);
+        $this->assertStringContainsString('Hyvä CMS > CMS Tailwind Compilation', $data['hint']);
+        $this->assertStringNotContainsString('not compiled until the daemon runs', $data['hint']);
+    }
+
+    public function testDaemonHintUnchanged(): void
+    {
+        $this->gateway->method('status')->willReturn($this->baseStatus([
+            'healthy' => false,
+            'compilation_strategy' => 'daemon',
+            'daemon_management' => 'cron',
+        ]));
+        $data = $this->payload();
+        $this->assertSame('daemon_not_responding', $data['reason']);
+        $this->assertIsString($data['hint']);
+        $this->assertStringStartsWith(
+            'The Tailwind daemon is not running: Tailwind classes in newly saved CMS content are not compiled '
+                . 'until the daemon runs.',
+            $data['hint']
+        );
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function daemonManagementProvider(): array
+    {
+        return [
+            'off' => ['off', 'bin/magento config:set hyva_cms_tailwind/general/daemon_management cron'],
+            'cron' => ['cron', 'Magento cron is running'],
+            'on_demand' => ['on_demand', 'first compile request'],
+        ];
+    }
+
+    /**
+     * @dataProvider daemonManagementProvider
+     */
+    public function testDaemonHintNamesTheNextStepPerManagementMode(string $management, string $expected): void
+    {
+        $this->gateway->method('status')->willReturn($this->baseStatus([
+            'healthy' => false,
+            'compilation_strategy' => 'daemon',
+            'daemon_management' => $management,
+        ]));
+        $hint = $this->payload()['hint'];
+        $this->assertIsString($hint);
+        $this->assertStringContainsString($expected, $hint);
+    }
+
+    public function testHealthyHasNoReason(): void
+    {
+        $this->gateway->method('status')->willReturn($this->baseStatus([]));
+        $data = $this->payload();
+        $this->assertArrayHasKey('reason', $data);
+        $this->assertNull($data['reason']);
+        $this->assertNull($data['hint']);
     }
 
     public function testDaemonCompilerVersionForcesTheDaemonStrategy(): void
