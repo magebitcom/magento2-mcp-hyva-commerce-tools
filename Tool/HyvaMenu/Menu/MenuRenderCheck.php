@@ -57,10 +57,8 @@ class MenuRenderCheck extends AbstractMenuTool
     {
         return 'Render the PUBLISHED menu the way the storefront does (frontend area, per store view) and report '
             . 'whether it renders without errors and with content: html size, number of links, renderer message. '
-            . 'Empty output '
-
-                . 'or an exception is a failure (e.g. inactive, unpublished, not assigned to that store, broken '
-                    . 'component).';
+            . 'Empty output or an exception is a failure (e.g. inactive, unpublished, not assigned to that store, '
+            . 'broken component); for empty output without an error, message names the reason.';
     }
 
     /**
@@ -96,11 +94,16 @@ class MenuRenderCheck extends AbstractMenuTool
             $render = $this->menuGateway->render(Cast::string($menu['identifier']), $id);
             $html = $render['html'];
             $text = trim((string) preg_replace(['#<(script|style)\b[^>]*>.*?</\1>#is', '/\s+/'], ['', ' '], $html));
+            $passed = $render['error'] === null && trim(strip_tags($html, '<a><img>')) !== '';
+            $message = $render['message'] !== null ? strip_tags($render['message']) : null;
+            if ($message === null && !$passed && $render['error'] === null) {
+                $message = $this->emptyRenderReason($menu, $id);
+            }
             $checks[] = [
                 'store_id' => $id,
-                'passed' => $render['error'] === null && trim(strip_tags($html, '<a><img>')) !== '',
+                'passed' => $passed,
                 'error' => $render['error'],
-                'message' => $render['message'] !== null ? strip_tags($render['message']) : null,
+                'message' => $message,
                 'html_bytes' => strlen($html),
                 'links' => (int) preg_match_all('/<a\b/i', $html),
                 'excerpt' => mb_substr(trim(strip_tags($text)), 0, 300),
@@ -111,5 +114,30 @@ class MenuRenderCheck extends AbstractMenuTool
             ['id' => $menu['id'], 'identifier' => $menu['identifier'], 'passed' => $passed, 'checks' => $checks],
             ['id' => Cast::int($menu['id']), 'passed' => $passed]
         );
+    }
+
+    /**
+     * Why Hyvä rendered nothing without an error, from the menu state (T-114).
+     *
+     * @param array $menu Menu row from the gateway.
+     * @param int $storeId
+     * @return string
+     * @phpstan-param array<string, mixed> $menu
+     */
+    private function emptyRenderReason(array $menu, int $storeId): string
+    {
+        $storeIds = Cast::intList($menu['store_ids'] ?? []);
+        return match (true) {
+            !Cast::bool($menu['is_active'] ?? false) => 'Nothing rendered: the menu is inactive. Publish it with '
+                . 'hyva_menu_publish (it also activates the menu).',
+            !Cast::bool($menu['is_published'] ?? false) => 'Nothing rendered: the menu is not published. Publish '
+                . 'it with hyva_menu_publish.',
+            !in_array(0, $storeIds, true) && !in_array($storeId, $storeIds, true) => sprintf(
+                'Nothing rendered: the menu is not assigned to store view %d.',
+                $storeId
+            ),
+            default => 'The published menu rendered no content (no links or images). Check its items with '
+                . 'hyva_menu_validate.',
+        };
     }
 }
