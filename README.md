@@ -159,6 +159,9 @@ Without `"confirm": true` these calls write nothing and return a preview instead
 A call that changes `settings` writes nothing without confirm, not even the draft part of the call. Its preview lists
 each change with its storefront effect.
 
+A call outside the table writes on the first call. `hyva_menu.update` says so with `"dry_run": false` in its reply, for
+example for the title of an inactive menu or a draft structure edit.
+
 Every preview has the same keys:
 
 | Key | Content |

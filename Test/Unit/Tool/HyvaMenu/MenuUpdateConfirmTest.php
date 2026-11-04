@@ -59,6 +59,7 @@ class MenuUpdateConfirmTest extends TestCase
 
         $this->assertIsArray($payload);
         $this->assertTrue($payload['confirmation_required'] ?? null);
+        $this->assertTrue($payload['dry_run'] ?? null);
     }
 
     public function testConfirmAppliesTheSetting(): void
@@ -92,6 +93,29 @@ class MenuUpdateConfirmTest extends TestCase
 
         $this->assertIsArray($payload);
         $this->assertSame(['preview_url_key'], $payload['settings_changed'] ?? null);
+        $this->assertFalse($payload['dry_run'] ?? null, 'T-152: a write reply says it wrote.');
+    }
+
+    public function testRenamingAnInactiveMenuWritesAtOnceAndSaysSo(): void
+    {
+        // T-152: the title of an inactive menu is not live (README confirm table), so no confirm; the reply has
+        // dry_run: false so a caller that meant to preview knows the change was written.
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->expects($this->once())->method('update')->with(3, ['title' => 'Main navigation'])
+            ->willReturn(['title']);
+
+        $result = $this->tool($gateway, $this->createMock(ContentService::class), null, [], [
+            'is_active' => false,
+            'is_published' => false,
+        ])->execute(['id' => 3, 'settings' => ['title' => 'Main navigation']]);
+        $text = $result->getContent()[0]['text'] ?? '';
+        $this->assertIsString($text);
+        $payload = json_decode($text, true);
+
+        $this->assertIsArray($payload);
+        $this->assertFalse($payload['dry_run'] ?? null);
+        $this->assertArrayNotHasKey('confirmation_required', $payload);
+        $this->assertSame(['title'], $payload['settings_changed'] ?? null);
     }
 
     public function testRemovingAnItemWithChildrenWithoutConfirmPreviewsTheChildrenAndSavesNothing(): void
