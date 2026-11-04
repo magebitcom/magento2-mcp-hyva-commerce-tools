@@ -29,10 +29,15 @@ class LiveSettings
     public const NEVER_LIVE = ['preview_url_key'];
 
     /**
+     * Where Hyvä places a menu on the storefront; one phrase for every menu effect and warning (I1, review lap 3).
+     */
+    public const MENU_PLACEMENT = 'design config (header/footer) or a widget';
+
+    /**
      * Effect of activating a menu that is not published: Hyvä renders a menu only once it is published and placed.
      */
     public const MENU_ACTIVATION_EFFECT = 'Goes live on the storefront once it is published (hyva_menu_publish) and '
-        . 'placed (design config header/footer); an active, unpublished menu renders nothing.';
+        . 'placed (' . self::MENU_PLACEMENT . '); an active, unpublished menu renders nothing.';
 
     /**
      * Live-affecting changes, with what they do to the storefront.

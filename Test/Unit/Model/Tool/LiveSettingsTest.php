@@ -61,6 +61,8 @@ class LiveSettingsTest extends TestCase
         $this->assertSame(LiveSettings::MENU_ACTIVATION_EFFECT, $changes[0]['effect']);
         $this->assertStringContainsString('hyva_menu_publish', LiveSettings::MENU_ACTIVATION_EFFECT);
         $this->assertStringContainsString('renders nothing', LiveSettings::MENU_ACTIVATION_EFFECT);
+        // I1 (review lap 3): one placement phrase, shared with the schedule warning.
+        $this->assertStringContainsString(LiveSettings::MENU_PLACEMENT, LiveSettings::MENU_ACTIVATION_EFFECT);
     }
 
     public function testActivatingAPublishedMenuOrDeactivatingKeepsTheGeneralWording(): void

@@ -110,6 +110,7 @@ class MenuRenderCheckScopeTest extends TestCase
         $menus->method('resolveImportStoreId')->willReturnArgument(0);
         $gateway = $this->createMock(MenuGatewayInterface::class);
         $gateway->method('findIdByIdentifier')->willReturnMap([['main', 2, null], ['main', null, 4]]);
+        $gateway->method('getList')->willReturn([['id' => 4, 'identifier' => 'main', 'store_ids' => [1]]]);
         $gateway->method('render')->willReturn(['html' => '', 'message' => null, 'error' => null]);
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn(true);
@@ -119,7 +120,7 @@ class MenuRenderCheckScopeTest extends TestCase
         $payload = json_decode(Cast::string($result->getContent()[0]['text'] ?? ''), true);
 
         $this->assertFalse($result->isError());
-        $this->assertSame([['identifier' => 'main']], $located);
+        $this->assertSame([['id' => 4]], $located, 'the single match, by id');
         $this->assertIsArray($payload);
         $this->assertSame(2, $payload['checks'][0]['store_id'] ?? null);
         $this->assertSame(
@@ -150,6 +151,63 @@ class MenuRenderCheckScopeTest extends TestCase
         $tool->execute(['identifier' => 'main', 'store_id' => 2]);
 
         $this->assertSame([['identifier' => 'main', 'store_id' => 2]], $located);
+    }
+
+    /**
+     * L1 (review lap 3): identifiers are unique per store view only; the fallback takes the first menu the caller
+     * can read (lowest id), not whichever row the database returns first.
+     */
+    public function testByIdentifierWithDuplicatesTheFallbackTakesAMenuTheCallerCanRead(): void
+    {
+        $located = [];
+        $tool = $this->duplicateTool([1, 3], [
+            ['id' => 3, 'identifier' => 'main', 'store_ids' => [2]],
+            ['id' => 5, 'identifier' => 'main', 'store_ids' => [3]],
+            ['id' => 6, 'identifier' => 'main', 'store_ids' => [3]],
+        ], $located);
+
+        $result = $tool->execute(['identifier' => 'main', 'store_id' => 1]);
+
+        $this->assertFalse($result->isError());
+        $this->assertSame([['id' => 5]], $located);
+    }
+
+    public function testByIdentifierWithDuplicatesAnUnrestrictedCallerGetsTheLowestId(): void
+    {
+        $located = [];
+        $tool = $this->duplicateTool(null, [
+            ['id' => 3, 'identifier' => 'main', 'store_ids' => [2]],
+            ['id' => 5, 'identifier' => 'main', 'store_ids' => [1]],
+        ], $located);
+
+        $tool->execute(['identifier' => 'main', 'store_id' => 2]);
+
+        $this->assertSame([['id' => 3]], $located);
+    }
+
+    public function testByIdentifierWithNoReadableMatchTheRefusalStays(): void
+    {
+        $located = [];
+        $tool = $this->duplicateTool([1], [
+            ['id' => 3, 'identifier' => 'main', 'store_ids' => [2]],
+            ['id' => 6, 'identifier' => 'main', 'store_ids' => [2]],
+        ], $located);
+
+        $result = $tool->execute(['identifier' => 'main', 'store_id' => 1]);
+
+        $this->assertTrue($result->isError());
+        $this->assertSame([['id' => 3]], $located);
+        $this->assertSame([], $this->rendered);
+    }
+
+    public function testByIdentifierWithNoExactMatchTheLookupStaysByIdentifier(): void
+    {
+        $located = [];
+        $tool = $this->duplicateTool(null, [['id' => 6, 'identifier' => 'main-footer', 'store_ids' => [1]]], $located);
+
+        $tool->execute(['identifier' => 'main', 'store_id' => 2]);
+
+        $this->assertSame([['identifier' => 'main']], $located);
     }
 
     public function testAnAllStoreViewsMenuIsNeverReportedAsNotAssigned(): void
@@ -251,5 +309,46 @@ class MenuRenderCheckScopeTest extends TestCase
             }
         );
         return new MenuRenderCheck($features, $menus, $gateway, $this->storeScope($allowedStoreIds));
+    }
+
+    /**
+     * Render check whose store-filtered identifier lookup misses; the gateway lists $menus for the identifier.
+     *
+     * The menu service refuses a menu outside the caller's store views, as ContentLocator::locate() does.
+     *
+     * @param array|null $allowedStoreIds
+     * @param array $menus
+     * @param array $located Receives the arguments of every lookup.
+     * @return MenuRenderCheck
+     * @phpstan-param list<int>|null $allowedStoreIds
+     * @phpstan-param list<array{id: int, identifier: string, store_ids: list<int>}> $menus
+     * @phpstan-param list<array<string, mixed>> $located
+     */
+    private function duplicateTool(?array $allowedStoreIds, array $menus, array &$located): MenuRenderCheck
+    {
+        $scope = $this->storeScope($allowedStoreIds);
+        $byId = array_column($menus, null, 'id');
+        $service = $this->createMock(MenuService::class);
+        $service->method('locate')->willReturnCallback(
+            static function (array $arguments) use (&$located, $byId, $menus, $scope): array {
+                $located[] = $arguments;
+                $menu = isset($arguments['id']) ? $byId[Cast::int($arguments['id'])] : $menus[0];
+                $scope->assertReadable('Menu #' . $menu['id'], $menu['store_ids']);
+                return $menu + ['is_active' => true, 'is_published' => true];
+            }
+        );
+        $service->method('resolveImportStoreId')->willReturnArgument(0);
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->method('findIdByIdentifier')->willReturn(null);
+        $gateway->method('getList')->with(['search' => 'main'])->willReturn($menus);
+        $gateway->method('render')->willReturnCallback(
+            function (string $identifier, int $storeId): array {
+                $this->rendered[] = $storeId;
+                return ['html' => '<a href="/">Home</a>', 'message' => null, 'error' => null];
+            }
+        );
+        $features = $this->createMock(FeatureCheckerInterface::class);
+        $features->method('isAvailable')->willReturn(true);
+        return new MenuRenderCheck($features, $service, $gateway, $scope);
     }
 }

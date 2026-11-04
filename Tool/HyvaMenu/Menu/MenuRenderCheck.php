@@ -121,6 +121,8 @@ class MenuRenderCheck extends AbstractMenuTool
      *
      * The identifier lookup is store-filtered, so it would say "does not exist" for a menu that only is not
      * assigned to that store view; the check then names that reason, as it does for a lookup by id.
+     * Identifiers are unique per store view only, so several menus can match: the first one (lowest id) the
+     * caller may read is taken; when it may read none, the lowest id is looked up and refused as before (L1).
      *
      * @param array $arguments
      * @param int|null $storeId
@@ -137,7 +139,23 @@ class MenuRenderCheck extends AbstractMenuTool
             return $arguments;
         }
         unset($arguments['store_id']);
-        return $arguments;
+        $matches = array_values(array_filter(
+            $this->menuGateway->getList(['search' => $identifier]),
+            static fn (array $menu): bool => strcasecmp(Cast::string($menu['identifier'] ?? ''), $identifier) === 0
+        ));
+        if ($matches === []) {
+            return $arguments;
+        }
+        usort($matches, static fn (array $a, array $b): int => Cast::int($a['id'] ?? 0) <=> Cast::int($b['id'] ?? 0));
+        $menu = $matches[0];
+        foreach ($matches as $match) {
+            if ($this->storeScopeGuard->allowsRead(Cast::intList($match['store_ids'] ?? []))) {
+                $menu = $match;
+                break;
+            }
+        }
+        unset($arguments['identifier']);
+        return ['id' => Cast::int($menu['id'] ?? 0)] + $arguments;
     }
 
     /**

@@ -13,6 +13,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ScheduleTime;
+use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule\ScheduleCreate;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuScheduleCreate;
@@ -82,5 +83,6 @@ class ScheduleCreateWarningsTest extends TestCase
         $warning = Cast::string($warnings[0] ?? '');
         $this->assertStringContainsString('inactive', $warning);
         $this->assertStringContainsString('activates', $warning);
+        $this->assertStringContainsString(LiveSettings::MENU_PLACEMENT, $warning, 'I1: one placement phrase');
     }
 }

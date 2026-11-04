@@ -14,6 +14,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ConflictReport;
 use Magebit\McpHyvaCommerceTools\Model\Schedule\ScheduleTime;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractContentTool;
+use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
@@ -162,7 +163,7 @@ class ScheduleCreate extends AbstractContentTool
             return [];
         }
         return ['The menu is inactive: when this release fires it activates the menu (is_active true), so it goes '
-            . 'live wherever design config (header/footer) or a widget places it.'];
+            . 'live wherever ' . LiveSettings::MENU_PLACEMENT . ' places it.'];
     }
 
     /**
