@@ -19,6 +19,7 @@ use Hyva\AdminDashboardFramework\Model\Config\Widget\Converter;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\AuthorizationInterface;
+use Magebit\McpHyvaCommerceTools\Model\Audit\McpActivityReader;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\User\Model\ResourceModel\User as UserResource;
@@ -29,7 +30,8 @@ use Magento\User\Model\UserFactory;
  *
  * The dashboard's own view model, instance filter and widget auth read the admin session, which an MCP request does
  * not have; this uses the explicit-id services instead (ViewListProvider, ViewAccessControl, the read-only
- * ActiveViewResolver::resolve()) and checks widget types at type level only (isAllowed with no instance).
+ * ActiveViewResolver::resolve()) and checks widget types at type level only (isAllowed with no instance), with the
+ * extra resources our own widget types check (EXTRA_TYPE_ACL).
  */
 class DashboardCatalog
 {
@@ -37,6 +39,14 @@ class DashboardCatalog
      * The dashboard's default widget ACL (framework etc/di.xml).
      */
     private const DEFAULT_WIDGET_ACL = 'Magento_Backend::admin';
+
+    /**
+     * Resources a widget type checks in its own isAllowed() on top of its configured ACL (T-151): the type list
+     * applies them too, so it names only widgets that would render for the role.
+     */
+    private const EXTRA_TYPE_ACL = [
+        'magebit_mcp_activity_widget' => McpActivityReader::AUDIT_RESOURCE,
+    ];
 
     private const SHARING = [
         ViewInterface::SHARING_MODE_PRIVATE => 'private',
@@ -123,7 +133,10 @@ class DashboardCatalog
         foreach (array_keys(is_array($pool) ? $pool : []) as $id) {
             $data = $this->widgetConfig->getWidgetDataById((string) $id);
             $acl = Cast::string($data['acl'] ?? '') ?: self::DEFAULT_WIDGET_ACL;
-            if (!$this->authorization->isAllowed($acl)) {
+            $extraAcl = self::EXTRA_TYPE_ACL[(string) $id] ?? null;
+            if (!$this->authorization->isAllowed($acl)
+                || ($extraAcl !== null && !$this->authorization->isAllowed($extraAcl))
+            ) {
                 continue;
             }
             $types[(string) $id] = [

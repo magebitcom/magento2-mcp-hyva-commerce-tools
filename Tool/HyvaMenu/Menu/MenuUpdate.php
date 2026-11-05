@@ -81,7 +81,10 @@ class MenuUpdate extends AbstractMenuTool
             . 'edits (operations, same as hyva_cms_draft_update: '
             . 'add/remove/move/set_field/set_fields/replace_node/replace_text) are saved as a DRAFT; removing or '
             . 'replacing an item with children also needs "confirm": true (the reply lists those items). Prefer '
-            . 'hyva_menu_item_* for single items. ' . sprintf(self::DELETE_TOOL_NOTE, 'a menu', 'hyva_menu_delete')
+            . 'hyva_menu_item_* for single items. Settings that do not change the live storefront (e.g. the title of '
+            . 'an inactive menu) and operations without such removals are written on the first call; every reply that '
+            . 'wrote says "dry_run": false, a preview says "dry_run": true. '
+            . sprintf(self::DELETE_TOOL_NOTE, 'a menu', 'hyva_menu_delete')
             . ' Single items can be removed with hyva_menu_item_remove.';
     }
 
@@ -137,7 +140,9 @@ class MenuUpdate extends AbstractMenuTool
                 : ($removed === [] ? 'apply_live_settings' : 'apply_live_settings_and_remove_menu_items');
             return $this->confirmationRequired($action, array_merge($live, $removed));
         }
-        $result = ['id' => $menuId];
+        // T-152: a write reply says so, the counterpart of the preview's dry_run: true (settings that do not change
+        // the live storefront and draft structure edits are written without confirm).
+        $result = ['dry_run' => false, 'id' => $menuId];
         $stringKeyed = [];
         foreach ($settings as $key => $value) {
             $stringKeyed[(string) $key] = $value;

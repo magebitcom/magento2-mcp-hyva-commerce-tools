@@ -67,7 +67,8 @@ class MigrationConvertToDraft extends AbstractContentTool
             . '(mode=full maps rows/columns/headings/text/images to components, everything else becomes HTML '
             . 'components; mode=partial keeps every top-level element as HTML). The original Magento content is not '
             . 'changed and the storefront keeps showing it until hyva_cms_publish. Replacing an existing Hyvä draft '
-            . 'needs "confirm": true.';
+            . 'needs "confirm": true (without it nothing is written, dry_run: true); with no Hyvä draft yet the first '
+            . 'call writes the draft and says dry_run: false.';
     }
 
     /**
@@ -114,6 +115,7 @@ class MigrationConvertToDraft extends AbstractContentTool
         );
 
         return $this->jsonResult([
+            'dry_run' => false,
             'converted' => true,
             'entity_type' => $entity['type'],
             'id' => $entity['id'],

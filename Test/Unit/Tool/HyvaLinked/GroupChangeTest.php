@@ -14,6 +14,7 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupSave;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupValidate;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
+use Magento\Framework\Exception\ValidatorException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -100,6 +101,27 @@ class GroupChangeTest extends TestCase
         ]));
         $this->assertTrue($payload['confirmation_required']);
         $this->assertSame('create_linked_group', $payload['action']);
+    }
+
+    public function testAHyvaRefusalAfterTheCheckIsASoftError(): void
+    {
+        $this->gateway->method('check')->willReturn(['issues' => [], 'members' => []]);
+        $this->gateway->method('save')->willThrowException(
+            new ValidatorException(__('A group named "New" already exists.'))
+        );
+
+        $result = (new GroupSave($this->features, $this->gateway, $this->guard()))->execute([
+            'name' => 'New', 'skus' => ['A', 'B'], 'confirm' => true,
+        ]);
+
+        // T-156: Linked Products 1.0.2 re-throws save races as ValidatorException; the caller gets a soft 409.
+        $this->assertTrue($result->isError());
+        $payload = $this->payload($result);
+        $this->assertSame(409, $payload['status'] ?? null);
+        $this->assertSame('Nothing was saved: A group named "New" already exists.', $payload['error'] ?? null);
+        $issues = $payload['issues'] ?? null;
+        $this->assertIsArray($issues);
+        $this->assertSame(['save_refused'], array_column($issues, 'code'));
     }
 
     /**

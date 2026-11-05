@@ -12,9 +12,13 @@ use Hyva\CmsLiveviewEditor\Model\Component\Collector;
 use Hyva\CmsLiveviewEditor\Model\Component\CollectorFactory;
 use Hyva\CmsLiveviewEditor\Model\Component\Provider as ComponentProvider;
 use Magebit\Mcp\Api\LoggerInterface;
+use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentCatalog;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
+use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\FieldValueFormat;
+use Magebit\McpHyvaCommerceTools\Model\Content\MenuOptionScope;
+use Magento\Framework\Escaper;
 use PHPUnit\Framework\TestCase;
 
 class ComponentCatalogTest extends TestCase
@@ -47,7 +51,7 @@ class ComponentCatalogTest extends TestCase
         $this->assertIsArray($link);
         $this->assertIsArray($link['example']);
         $this->assertSame(
-            ['type', 'value', 'label', 'open_in_new_tab', 'prefix', 'suffix', 'placeholder'],
+            ['type', 'value', 'label', 'open_in_new_tab', 'prefix', 'suffix', 'placeholder', 'aria_label'],
             array_keys($link['example'])
         );
         $this->assertStringContainsString('SKU', (string) $link['notes']);
@@ -123,7 +127,8 @@ class ComponentCatalogTest extends TestCase
             new ComponentTree($provider),
             new FieldValueFormat(),
             $factory,
-            $logger
+            $logger,
+            $this->menuScope()
         );
 
         $options = $this->field($catalog->getSchema('picker'), 'choice')['options'];
@@ -145,7 +150,8 @@ class ComponentCatalogTest extends TestCase
             new ComponentTree($provider),
             new FieldValueFormat(),
             $factory,
-            $this->createMock(LoggerInterface::class)
+            $this->createMock(LoggerInterface::class),
+            $this->menuScope()
         );
 
         $fields = $catalog->getSchema('card')['fields'];
@@ -166,7 +172,8 @@ class ComponentCatalogTest extends TestCase
             new ComponentTree($provider),
             new FieldValueFormat(),
             $factory,
-            $this->createMock(LoggerInterface::class)
+            $this->createMock(LoggerInterface::class),
+            $this->menuScope()
         );
 
         $catalog->getSchema('picker');
@@ -201,10 +208,91 @@ class ComponentCatalogTest extends TestCase
             new ComponentTree($provider),
             new FieldValueFormat(),
             $factory,
-            $this->createMock(LoggerInterface::class)
+            $this->createMock(LoggerInterface::class),
+            $this->menuScope()
         );
 
         $this->assertCount(1, $catalog->getSummaries());
+    }
+
+    public function testMenuOptionsKeepOnlyMenusOfReadableStoreViews(): void
+    {
+        $components = $this->menuWidget();
+        $menus = [
+            ['id' => 1, 'identifier' => 'main', 'title' => 'Main', 'store_ids' => [1]],
+            ['id' => 2, 'identifier' => 'footer', 'title' => 'Footer', 'store_ids' => [2]],
+            ['id' => 3, 'identifier' => 'shared', 'title' => 'Shared', 'store_ids' => [1]],
+            ['id' => 4, 'identifier' => 'shared', 'title' => 'Shared', 'store_ids' => [2]],
+        ];
+        $scope = $this->menuScope(true, true, $menus, [2]);
+
+        $field = $this->field(
+            $this->catalog($this->provider($components), $components, $scope)->getSchema('hyva_menu_widget'),
+            'menu_identifier'
+        );
+
+        $options = is_array($field['options'] ?? null) ? $field['options'] : [];
+        $this->assertSame(['', 'footer', 'shared'], array_column($options, 'value'));
+        $this->assertSame(
+            ['Please select a menu', 'Footer (ID: 2)', 'Shared (ID: 4)'],
+            array_column($options, 'label'),
+            'The store view 1 menu sharing an identifier with a readable menu stays hidden.'
+        );
+        $this->assertSame(2, $field['options_hidden_by_permissions'] ?? null);
+    }
+
+    public function testMenuOptionsEmptyForACallerWhoMayNotViewMenus(): void
+    {
+        $components = $this->menuWidget();
+        $scope = $this->menuScope(false, false, [['id' => 1, 'identifier' => 'main', 'store_ids' => [0]]], [0]);
+
+        $field = $this->field(
+            $this->catalog($this->provider($components), $components, $scope)->getSchema('hyva_menu_widget'),
+            'menu_identifier'
+        );
+
+        $options = is_array($field['options'] ?? null) ? $field['options'] : [];
+        $this->assertSame([''], array_column($options, 'value'));
+        $this->assertSame(4, $field['options_hidden_by_permissions'] ?? null);
+    }
+
+    public function testMenuOptionsUnchangedForAnUnrestrictedMenuViewer(): void
+    {
+        $components = $this->menuWidget();
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->expects($this->never())->method('getList');
+        $scopeFilter = $this->createMock(ContentScopeFilter::class);
+        $scopeFilter->method('isRestricted')->willReturn(false);
+        $scopeFilter->method('viewableTypes')->willReturnArgument(0);
+
+        $field = $this->field(
+            $this->catalog(
+                $this->provider($components),
+                $components,
+                new MenuOptionScope($scopeFilter, $gateway, new Escaper())
+            )->getSchema('hyva_menu_widget'),
+            'menu_identifier'
+        );
+
+        $options = is_array($field['options'] ?? null) ? $field['options'] : [];
+        $this->assertCount(5, $options);
+        $this->assertArrayNotHasKey('options_hidden_by_permissions', $field);
+    }
+
+    public function testOtherComponentsOptionsAreNotScoped(): void
+    {
+        $components = ['picker' => ['content' => ['menu_identifier' => [
+            'type' => 'select',
+            'options' => [['value' => 'main', 'label' => 'Main']],
+        ]]]];
+        $scope = $this->menuScope(true, false);
+
+        $field = $this->field(
+            $this->catalog($this->provider($components), $components, $scope)->getSchema('picker'),
+            'menu_identifier'
+        );
+
+        $this->assertSame([['value' => 'main', 'label' => 'Main']], $field['options'] ?? null);
     }
 
     /**
@@ -226,8 +314,11 @@ class ComponentCatalogTest extends TestCase
      * @param array<string, mixed> $liveComponents what a fresh Hyvä collector run returns
      * @return ComponentCatalog
      */
-    private function catalog(ComponentProvider $provider, array $liveComponents): ComponentCatalog
-    {
+    private function catalog(
+        ComponentProvider $provider,
+        array $liveComponents,
+        ?MenuOptionScope $menuScope = null
+    ): ComponentCatalog {
         $collector = $this->createMock(Collector::class);
         $collector->method('execute')->willReturn($liveComponents);
         $factory = $this->createMock(CollectorFactory::class);
@@ -237,8 +328,56 @@ class ComponentCatalogTest extends TestCase
             new ComponentTree($provider),
             new FieldValueFormat(),
             $factory,
-            $this->createMock(LoggerInterface::class)
+            $this->createMock(LoggerInterface::class),
+            $menuScope ?? $this->menuScope()
         );
+    }
+
+    /**
+     * @param bool $restricted
+     * @param bool $menusViewable
+     * @param list<array<string, mixed>> $menus
+     * @param list<int> $readableStores
+     * @return MenuOptionScope
+     */
+    private function menuScope(
+        bool $restricted = false,
+        bool $menusViewable = true,
+        array $menus = [],
+        array $readableStores = []
+    ): MenuOptionScope {
+        $scopeFilter = $this->createMock(ContentScopeFilter::class);
+        $scopeFilter->method('isRestricted')->willReturn($restricted);
+        $scopeFilter->method('viewableTypes')->willReturnCallback(
+            static fn (array $types): array => $menusViewable ? $types : []
+        );
+        $scopeFilter->method('allowsStores')->willReturnCallback(
+            static fn (array $storeIds): bool => array_intersect($storeIds, $readableStores) !== []
+        );
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->method('getList')->willReturn($menus);
+        return new MenuOptionScope($scopeFilter, $gateway, new Escaper());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function menuWidget(): array
+    {
+        return ['hyva_menu_widget' => [
+            'label' => 'CMS Menu',
+            'content' => ['menu_identifier' => [
+                'type' => 'searchable_select',
+                'label' => 'Menu',
+                'options' => [
+                    ['value' => '', 'label' => 'Please select a menu'],
+                    ['value' => 'main', 'label' => 'Main (ID: 1)'],
+                    ['value' => 'footer', 'label' => 'Footer (ID: 2)'],
+                    ['value' => 'shared', 'label' => 'Shared (ID: 3)'],
+                    ['value' => 'shared', 'label' => 'Shared (ID: 4)'],
+                ],
+            ]],
+        ]];
     }
 
     /**

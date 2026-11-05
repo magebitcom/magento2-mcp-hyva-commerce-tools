@@ -11,8 +11,13 @@ concurrency:
 
 jobs:
   phpstan:
-    name: PHPStan
+    name: PHPStan (Store Credit ${{ matrix.store-credit }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Hyvä Commerce 1.4.0 ships Store Credit 1.0.1, 1.4.1 ships 2.0.0; the module supports both.
+        store-credit: ['^1.0.1', '^2.0']
     steps:
       - name: Checkout module
         uses: actions/checkout@v4
@@ -50,7 +55,7 @@ jobs:
             hyva-themes/commerce-module-cms-ai-translations:^1.0.2
             hyva-themes/commerce-module-form-builder:^1.0
             hyva-themes/commerce-module-email-templates:^1.0
-            hyva-themes/commerce-module-store-credit:^1.0.1
+            hyva-themes/commerce-module-store-credit:${{ matrix.store-credit }}
             hyva-themes/commerce-module-linked-products:^1.0
             hyva-themes/commerce-module-category-merchandiser:^1.0
             hyva-themes/commerce-module-ai-worker:^1.0
@@ -64,8 +69,13 @@ jobs:
           --no-progress --memory-limit=4G
 
   unit-tests:
-    name: Unit tests
+    name: Unit tests (Store Credit ${{ matrix.store-credit }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Hyvä Commerce 1.4.0 ships Store Credit 1.0.1, 1.4.1 ships 2.0.0; the module supports both.
+        store-credit: ['^1.0.1', '^2.0']
     steps:
       - name: Checkout module
         uses: actions/checkout@v4
@@ -103,7 +113,7 @@ jobs:
             hyva-themes/commerce-module-cms-ai-translations:^1.0.2
             hyva-themes/commerce-module-form-builder:^1.0
             hyva-themes/commerce-module-email-templates:^1.0
-            hyva-themes/commerce-module-store-credit:^1.0.1
+            hyva-themes/commerce-module-store-credit:${{ matrix.store-credit }}
             hyva-themes/commerce-module-linked-products:^1.0
             hyva-themes/commerce-module-category-merchandiser:^1.0
             hyva-themes/commerce-module-ai-worker:^1.0
@@ -114,3 +124,29 @@ jobs:
         run: >-
           vendor/bin/phpunit -c dev/tests/unit/phpunit.xml.dist
           "${{ steps.magento.outputs.module-path }}/Test/Unit"
+
+  phpstan-result:
+    name: PHPStan
+    runs-on: ubuntu-latest
+    needs: phpstan
+    if: always()
+    steps:
+      - name: Require every phpstan matrix job to pass
+        env:
+          RESULT: ${{ needs.phpstan.result }}
+        run: |
+          echo "phpstan matrix result: $RESULT"
+          test "$RESULT" = "success"
+
+  unit-tests-result:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    if: always()
+    steps:
+      - name: Require every unit-tests matrix job to pass
+        env:
+          RESULT: ${{ needs.unit-tests.result }}
+        run: |
+          echo "unit-tests matrix result: $RESULT"
+          test "$RESULT" = "success"

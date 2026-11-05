@@ -23,6 +23,7 @@ use Magento\Catalog\Model\Product;
 use Magento\Framework\DB\Adapter\DuplicateException;
 use Magento\Framework\Event\ManagerInterface as EventManager;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Exception\ValidatorException;
 use Magento\Framework\Indexer\CacheContextFactory;
 
 /**
@@ -211,7 +212,8 @@ class LinkedProductsGateway implements LinkedProductsGatewayInterface
         try {
             $savedId = $this->saver()->save($groupId, $name, $attributeCodes, $productIds);
         } catch (DuplicateException) {
-            throw new LocalizedException(__('A group with this name was just created by someone else; choose a '
+            // Linked Products 1.0.0 only: 1.0.2 rolls back name/member races itself and throws ValidatorException.
+            throw new ValidatorException(__('A group with this name was just created by someone else; choose a '
                 . 'different name.'));
         }
         // Products that joined or left the group render a different switcher.

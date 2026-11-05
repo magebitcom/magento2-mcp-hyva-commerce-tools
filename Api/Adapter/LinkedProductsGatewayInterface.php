@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Api\Adapter;
 
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Exception\ValidatorException;
 
 /**
  * Hyvä Linked Products access. Only the adapter references Hyva\LinkedProducts classes; tools reach it through a
@@ -87,7 +88,9 @@ interface LinkedProductsGatewayInterface
      * @param list<string> $attributeCodes
      * @param list<int> $productIds
      * @return int Group id
-     * @throws LocalizedException Hyvä refused the group; nothing was written.
+     * @throws ValidatorException Hyvä refused the group (e.g. a concurrent save took its name or members); nothing
+     *     was written.
+     * @throws LocalizedException
      */
     public function save(?int $groupId, string $name, array $attributeCodes, array $productIds): int;
 }

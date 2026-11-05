@@ -25,13 +25,15 @@ class ComponentCatalog
      * @param FieldValueFormat $fieldValueFormat
      * @param CollectorFactory $collectorFactory
      * @param LoggerInterface $logger
+     * @param MenuOptionScope $menuOptionScope
      */
     public function __construct(
         private readonly ComponentProvider $componentProvider,
         private readonly ComponentTree $componentTree,
         private readonly FieldValueFormat $fieldValueFormat,
         private readonly CollectorFactory $collectorFactory,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly MenuOptionScope $menuOptionScope
     ) {
     }
 
@@ -99,6 +101,10 @@ class ComponentCatalog
                 if (is_array($options) && is_array($liveOptions)) {
                     $options = $liveOptions;
                 }
+                $hiddenOptions = 0;
+                if (is_array($options) && $this->menuOptionScope->isMenuField($name, (string) $field)) {
+                    ['options' => $options, 'hidden' => $hiddenOptions] = $this->menuOptionScope->filter($options);
+                }
                 $fields[] = array_filter([
                     'name' => (string) $field,
                     'group' => $group,
@@ -107,6 +113,7 @@ class ComponentCatalog
                     'required' => !empty($attributes['required']),
                     'default_value' => $fieldDefinition['default_value'] ?? null,
                     'options' => is_array($options) ? $options : null,
+                    'options_hidden_by_permissions' => $hiddenOptions > 0 ? $hiddenOptions : null,
                     'translate' => !empty($fieldDefinition['translate']),
                     'validation' => array_intersect_key(
                         $attributes,

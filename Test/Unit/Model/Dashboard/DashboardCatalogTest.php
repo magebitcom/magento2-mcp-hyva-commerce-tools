@@ -38,6 +38,17 @@ class DashboardCatalogTest extends TestCase
         $this->assertSame('Magento_Backend::admin', $types[1]['acl'], 'default widget ACL');
     }
 
+    public function testMcpActivityNeedsTheAuditResourceAsWell(): void
+    {
+        // T-151: the widget renders only with Magebit_Mcp::mcp_audit (McpActivity::isAllowed()), so it is not listed
+        // for a role that holds the widget resource alone.
+        $types = $this->catalog(['Magento_Backend::system', 'Magebit_Mcp::mcp_audit'], true)->widgets(4, null)['types'];
+        $this->assertNotContains('magebit_mcp_activity_widget', array_column($types, 'id'));
+
+        $types = $this->catalog(['Magento_Backend::system'], true)->widgets(4, null)['types'];
+        $this->assertContains('magebit_mcp_activity_widget', array_column($types, 'id'));
+    }
+
     public function testAViewThatIsNotSharedIsRefused(): void
     {
         $this->expectException(LocalizedException::class);
@@ -53,9 +64,11 @@ class DashboardCatalogTest extends TestCase
     }
 
     /**
+     * @param list<string> $denied Resources the caller lacks.
+     * @param bool $withActivity Whether the MCP Activity widget type is configured.
      * @return DashboardCatalog
      */
-    private function catalog(): DashboardCatalog
+    private function catalog(array $denied = ['Magento_Backend::system'], bool $withActivity = false): DashboardCatalog
     {
         $view = $this->createMock(ViewInterface::class);
         $view->method('getViewId')->willReturn(1);
@@ -68,15 +81,20 @@ class DashboardCatalogTest extends TestCase
         $access = $this->createMock(ViewAccessControl::class);
         $access->method('canViewById')->willReturnCallback(fn (): bool => $this->viewShared);
         $config = $this->createMock(WidgetConfig::class);
-        $config->method('get')->willReturn(['sales' => [], 'secret' => [], 'no_acl' => []]);
+        $pool = ['sales' => [], 'secret' => [], 'no_acl' => []];
+        $config->method('get')->willReturn($withActivity ? $pool + ['magebit_mcp_activity_widget' => []] : $pool);
         $config->method('getWidgetDataById')->willReturnCallback(static fn (string $id): array => match ($id) {
             'sales' => ['title' => 'Sales', 'acl' => 'Magento_Sales::sales'],
             'secret' => ['title' => 'Secret', 'acl' => 'Magento_Backend::system'],
+            'magebit_mcp_activity_widget' => [
+                'title' => 'MCP Activity',
+                'acl' => 'Magebit_McpHyvaCommerceTools::widget_mcp_activity',
+            ],
             default => ['title' => 'Plain'],
         });
         $authorization = $this->createMock(AuthorizationInterface::class);
         $authorization->method('isAllowed')->willReturnCallback(
-            static fn (string $resource): bool => $resource !== 'Magento_Backend::system'
+            static fn (string $resource): bool => !in_array($resource, $denied, true)
         );
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(4);

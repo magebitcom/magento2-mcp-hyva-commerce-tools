@@ -19,7 +19,7 @@
         "hyva-themes/commerce-module-cms-ai-translations": "^1.0.2: enables hyva_cms.translation.*",
         "hyva-themes/commerce-module-form-builder": "^1.0: enables the hyva_form.* tools",
         "hyva-themes/commerce-module-email-templates": "^1.0: enables the hyva_email.* tools",
-        "hyva-themes/commerce-module-store-credit": "^1.0.1: enables the hyva_store_credit.* tools",
+        "hyva-themes/commerce-module-store-credit": "^1.0.1 || ^2.0: enables the hyva_store_credit.* tools",
         "hyva-themes/commerce-module-linked-products": "^1.0: enables the hyva_linked.* tools",
         "hyva-themes/commerce-module-category-merchandiser": "^1.0: enables the hyva_merch.* tools",
         "hyva-themes/commerce-module-ai-worker": "^1.0: enables the hyva_ai.* job monitoring tools",

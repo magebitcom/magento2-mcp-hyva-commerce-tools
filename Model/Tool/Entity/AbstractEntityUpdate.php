@@ -74,7 +74,8 @@ abstract class AbstractEntityUpdate extends AbstractTool
                 . 'changes '
                 . 'Magento fields (title, active flag, store views, meta) and applies IMMEDIATELY: a setting that '
                 . 'changes the live storefront (active flag, store views, URL key; any field of an active %1$s) needs '
-                . '"confirm": true. Without it nothing is written and the reply lists what would change. '
+                . '"confirm": true. Without it nothing is written and the reply lists what would change (dry_run: '
+                . 'true); any other call writes at once and says dry_run: false. '
                 . sprintf(self::DELETE_TOOL_NOTE, 'a CMS %1$s', 'hyva_cms_%1$s_delete'),
             strtolower(static::ENTITY_LABEL)
         );
@@ -150,7 +151,8 @@ abstract class AbstractEntityUpdate extends AbstractTool
             return $this->confirmationRequired('apply_live_settings', $live);
         }
 
-        $result = ['entity_type' => static::ENTITY_TYPE, 'id' => $entity['id']];
+        // A write reply says it wrote (T-152): only settings that change the live storefront need confirm.
+        $result = ['dry_run' => false, 'entity_type' => static::ENTITY_TYPE, 'id' => $entity['id']];
         $applied = null;
         if ($components !== [] || $operations !== []) {
             $document = $this->contentService->getWorkingDocument($entity['type'], $entity['id']);

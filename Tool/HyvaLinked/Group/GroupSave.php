@@ -11,6 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magento\Framework\Exception\ValidatorException;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LinkedProducts\AbstractLinkedTool;
 
 class GroupSave extends AbstractLinkedTool
@@ -65,12 +66,21 @@ class GroupSave extends AbstractLinkedTool
                 [$change]
             );
         }
-        $groupId = $this->linkedGroups->save(
-            $change['group_id'],
-            $change['name'],
-            $change['attribute_codes'],
-            $change['product_ids']
-        );
+        try {
+            $groupId = $this->linkedGroups->save(
+                $change['group_id'],
+                $change['name'],
+                $change['attribute_codes'],
+                $change['product_ids']
+            );
+        } catch (ValidatorException $exception) {
+            // Hyvä's own refusal after the check passed, e.g. a concurrent save took the name or the products.
+            return $this->softError('Nothing was saved: ' . $exception->getMessage(), [
+                'status' => 409,
+                'issues' => [['severity' => 'error', 'code' => 'save_refused', 'message' => $exception->getMessage()]],
+                'next_step' => 'Check the group again with hyva_linked_group_validate, then save again.',
+            ]);
+        }
         return $this->jsonResult([
             'saved' => true,
             'created' => $change['group_id'] === null,

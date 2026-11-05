@@ -422,7 +422,9 @@ class ContentLocator
             );
         }
         if ($id === null) {
-            $id = $this->menuGateway->findIdByIdentifier((string) $identifier, $storeId);
+            $id = $storeId === null
+                ? $this->findOnlyMenuId((string) $identifier)
+                : $this->menuGateway->findIdByIdentifier((string) $identifier, $storeId);
             if ($id === null) {
                 throw new LocalizedException(__('Menu "%1" does not exist.', (string) $identifier));
             }
@@ -440,6 +442,51 @@ class ContentLocator
             'is_active' => (bool) ($menu['is_active'] ?? false),
             'store_ids' => $storeIds,
         ];
+    }
+
+    /**
+     * Id of the one menu with this identifier, for a call without store_id (T-149).
+     *
+     * Several store views can each have a menu with the same identifier: as for pages and blocks, the call then names
+     * the candidates instead of picking one. A restricted role only competes among the menus it may see; with none,
+     * the first one is returned and refused by the read check. The identifier matches case-insensitively, as the
+     * store_id lookup does (MySQL collation).
+     *
+     * @param string $identifier
+     * @return int|null Null when no menu has the identifier.
+     * @throws LocalizedException
+     */
+    private function findOnlyMenuId(string $identifier): ?int
+    {
+        $candidates = array_values(array_filter(
+            $this->menuGateway->getList(['search' => $identifier]),
+            static fn (array $menu): bool => is_string($menu['identifier'] ?? null)
+                && strcasecmp($menu['identifier'], $identifier) === 0
+        ));
+        if ($candidates === []) {
+            return null;
+        }
+        if (count($candidates) > 1 && $this->storeScopeGuard->restrictedStoreIds() !== null) {
+            $candidates = array_values(array_filter(
+                $candidates,
+                fn (array $menu): bool => $this->storeScopeGuard->allowsRead(Cast::intList($menu['store_ids'] ?? []))
+            )) ?: [$candidates[0]];
+        }
+        if (count($candidates) > 1) {
+            throw new LocalizedException(__(
+                'Several menus use identifier "%1" (%2). Pass id or store_id.',
+                $identifier,
+                implode(', ', array_map(
+                    static fn (array $menu): string => sprintf(
+                        'id %d in store views %s',
+                        Cast::int($menu['id'] ?? 0),
+                        implode('/', Cast::intList($menu['store_ids'] ?? []))
+                    ),
+                    $candidates
+                ))
+            ));
+        }
+        return Cast::int($candidates[0]['id'] ?? 0);
     }
 
     /**
