@@ -473,17 +473,26 @@ class ContentLocator
             )) ?: [$candidates[0]];
         }
         if (count($candidates) > 1) {
+            // store_id selects each candidate by one of its own store views (identifiers are unique per store view);
+            // a menu without a store view can only be named by id.
+            $byStore = array_filter(
+                $candidates,
+                static fn (array $menu): bool => Cast::intList($menu['store_ids'] ?? []) === []
+            ) === [];
             throw new LocalizedException(__(
-                'Several menus use identifier "%1" (%2). Pass id or store_id.',
+                'Several menus use identifier "%1" (%2). %3',
                 $identifier,
                 implode(', ', array_map(
                     static fn (array $menu): string => sprintf(
-                        'id %d in store views %s',
+                        'id %d in %s',
                         Cast::int($menu['id'] ?? 0),
-                        implode('/', Cast::intList($menu['store_ids'] ?? []))
+                        Cast::intList($menu['store_ids'] ?? []) === []
+                            ? 'no store view'
+                            : 'store views ' . implode('/', Cast::intList($menu['store_ids'] ?? []))
                     ),
                     $candidates
-                ))
+                )),
+                $byStore ? 'Pass id, or store_id with one of the store views listed.' : 'Pass id.'
             ));
         }
         return Cast::int($candidates[0]['id'] ?? 0);

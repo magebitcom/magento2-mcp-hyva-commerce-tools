@@ -20,6 +20,7 @@ use Magento\Framework\App\Area;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Store\Model\App\Emulation;
+use Magento\Store\Model\Store;
 use Throwable;
 
 class MenuGateway implements MenuGatewayInterface
@@ -216,15 +217,33 @@ class MenuGateway implements MenuGatewayInterface
      */
     public function findIdByIdentifier(string $identifier, ?int $storeId = null): ?int
     {
-        if ($storeId !== null) {
-            try {
-                return (int) $this->menuRepository()->getByIdentifier($identifier, $storeId)->getId();
-            } catch (NoSuchEntityException) {
-                return null;
-            }
+        if ($storeId === null) {
+            return $this->firstIdByIdentifier($identifier, null);
         }
+        // Not MenuRepository::getByIdentifier(): it is the storefront loader and joins is_active = 1, so an inactive
+        // or never published menu was "missing" in its own store view, while store view 0 skipped the store join and
+        // matched any menu (T-164). Its order is kept: the store view's own menu first, then one for all store views.
+        return $this->firstIdByIdentifier($identifier, $storeId)
+            ?? ($storeId !== Store::DEFAULT_STORE_ID
+                ? $this->firstIdByIdentifier($identifier, Store::DEFAULT_STORE_ID)
+                : null);
+    }
+
+    /**
+     * Lowest id of a menu with this identifier, active or not, assigned to the store view when one is given.
+     *
+     * @param string $identifier
+     * @param int|null $storeId
+     * @return int|null
+     */
+    private function firstIdByIdentifier(string $identifier, ?int $storeId): ?int
+    {
         $collection = $this->collectionFactory()->create();
         $collection->addFieldToFilter(MenuInterface::IDENTIFIER, $identifier);
+        if ($storeId !== null) {
+            $collection->addStoreFilter($storeId, false);
+        }
+        $collection->setOrder(MenuInterface::ID, 'ASC');
         $collection->setPageSize(1);
         $menu = $collection->getFirstItem();
         return $menu instanceof MenuInterface && $menu->getId() ? (int) $menu->getId() : null;
