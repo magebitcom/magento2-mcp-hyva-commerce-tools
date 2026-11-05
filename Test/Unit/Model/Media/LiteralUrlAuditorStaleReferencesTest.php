@@ -52,6 +52,31 @@ class LiteralUrlAuditorStaleReferencesTest extends TestCase
     }
 
     /**
+     * Literal, id-backed and rich text references to the same path, and the stale id of another path, are ignored.
+     *
+     * @return void
+     */
+    public function testNonStaleFindingsAndOtherPathsAreIgnored(): void
+    {
+        $result = $this->auditor()->staleReferences(['wysiwyg/a.jpg']);
+
+        $this->assertSame(['wysiwyg/a.jpg' => [$this->reference('u1', 'wysiwyg/a.jpg', 26)]], $result);
+    }
+
+    /**
+     * Without paths there is nothing to find: the content is not scanned.
+     *
+     * @return void
+     */
+    public function testNoPathsDoesNotScanTheContent(): void
+    {
+        $scanner = $this->createMock(ContentScanner::class);
+        $scanner->expects($this->never())->method('getDocuments');
+
+        $this->assertSame([], $this->auditor($scanner)->staleReferences([]));
+    }
+
+    /**
      * Expected reference: the finding without its category.
      *
      * @param string $uid
@@ -69,9 +94,10 @@ class LiteralUrlAuditorStaleReferencesTest extends TestCase
     /**
      * Auditor over one page with every kind of image field on and around the restored paths.
      *
+     * @param ContentScanner|null $scanner Replaces the scanner that returns the page.
      * @return LiteralUrlAuditor
      */
-    private function auditor(): LiteralUrlAuditor
+    private function auditor(?ContentScanner $scanner = null): LiteralUrlAuditor
     {
         $image = static fn (string $uid, array $value): array => ['uid' => $uid, 'component' => 'image',
             'image' => $value];
@@ -91,10 +117,12 @@ class LiteralUrlAuditorStaleReferencesTest extends TestCase
             $image('u6', ['src' => 'wysiwyg/other.jpg', 'imageOptions' => ['id' => 30,
                 'path' => 'wysiwyg/other.jpg']]),
         ];
-        $scanner = $this->createMock(ContentScanner::class);
-        $scanner->method('getDocuments')->willReturn([['entity_type' => 'cms_page', 'id' => 13,
-            'identifier' => 'sale', 'title' => 'Sale', 'edition' => 'draft', 'error' => null,
-            'document' => ['nodes' => $nodes]]]);
+        if ($scanner === null) {
+            $scanner = $this->createMock(ContentScanner::class);
+            $scanner->method('getDocuments')->willReturn([['entity_type' => 'cms_page', 'id' => 13,
+                'identifier' => 'sale', 'title' => 'Sale', 'edition' => 'draft', 'error' => null,
+                'document' => ['nodes' => $nodes]]]);
+        }
         $tree = $this->createMock(ComponentTree::class);
         $tree->method('walk')->willReturnCallback(static function (array $document, callable $visit): void {
             foreach ($document['nodes'] as $node) {
