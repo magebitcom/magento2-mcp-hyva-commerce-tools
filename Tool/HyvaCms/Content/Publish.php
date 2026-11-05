@@ -13,13 +13,18 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractContentTool;
+use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
 use Magebit\Mcp\Api\ToolResultInterface;
+use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\IntegerBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 
 /**
  * `hyva_cms.publish`: the only tool that makes Hyvä CMS content live.
+ *
+ * Hyvä Menu Builder activates a menu on publish, so publishing an inactive menu needs "confirm": true, as creating
+ * an active one does (T-165); without it the reply previews the activation.
  */
 class Publish extends AbstractContentTool
 {
@@ -42,12 +47,14 @@ class Publish extends AbstractContentTool
      * @param ContentService $contentService
      * @param ComponentTree $componentTree
      * @param ContentAcl $contentAcl
+     * @param LiveSettings $liveSettings
      */
     public function __construct(
         private readonly ContentLocator $contentLocator,
         private readonly ContentService $contentService,
         private readonly ComponentTree $componentTree,
-        private readonly ContentAcl $contentAcl
+        private readonly ContentAcl $contentAcl,
+        private readonly LiveSettings $liveSettings
     ) {
     }
 
@@ -66,7 +73,9 @@ class Publish extends AbstractContentTool
     {
         return 'Make content LIVE on the storefront: publish the current draft of a page, block or menu, or a '
             . 'specific version_id from version history. Also enables Hyvä CMS rendering for the entity and cleans '
-            . 'its cache. The previous live version stays in version history.';
+            . 'its cache. The previous live version stays in version history. Publishing an inactive menu also '
+            . 'activates it and needs "confirm": true; without it nothing is published and the reply shows what '
+            . 'would go live.';
     }
 
     /**
@@ -79,6 +88,8 @@ class Publish extends AbstractContentTool
             ->integer('version_id', fn (IntegerBuilder $i) => $i
                 ->minimum(1)
                 ->description('Publish this version instead of the current draft.'))
+            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description('Publish an inactive menu, which '
+                . 'activates it, after reviewing the preview.'))
             ->toArray();
     }
 
@@ -90,6 +101,21 @@ class Publish extends AbstractContentTool
         $type = $this->requireString($arguments, 'entity_type');
         $entity = $this->contentLocator->locateForWrite($type, $arguments);
         $before = $this->contentService->getDocuments($entity['type'], $entity['id'])['published'];
+        $live = $entity['type'] === ContentLocator::TYPE_MENU
+            ? $this->liveSettings->changes(['is_active' => $entity['is_active']], ['is_active' => true])
+            : [];
+        if ($live !== [] && !$this->boolArg($arguments, 'confirm')) {
+            return $this->confirmationRequired('publish_activate', [[
+                'entity_type' => $entity['type'],
+                'id' => $entity['id'],
+                'identifier' => $entity['identifier'],
+                'title' => $entity['title'],
+                'store_ids' => $entity['store_ids'],
+                'version_id' => $this->intArg($arguments, 'version_id'),
+                'changes' => $live,
+            ]], [], null, 'Hyvä Menu Builder activates a menu when it publishes it; the storefront shows it where '
+                . LiveSettings::MENU_PLACEMENT . ' places it.');
+        }
         $result = $this->contentService->publish(
             $entity['type'],
             $entity['id'],

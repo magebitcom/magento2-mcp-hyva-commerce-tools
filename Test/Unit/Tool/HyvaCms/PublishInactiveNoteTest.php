@@ -72,10 +72,11 @@ class PublishInactiveNoteTest extends TestCase
             $locator,
             $content,
             $this->createMock(ComponentTree::class),
-            $this->createMock(ContentAcl::class)
+            $this->createMock(ContentAcl::class),
+            new LiveSettings()
         );
 
-        $text = $tool->execute(['entity_type' => $type, 'id' => 4])->getContent()[0]['text'] ?? '';
+        $text = $tool->execute(['entity_type' => $type, 'id' => 4, 'confirm' => true])->getContent()[0]['text'] ?? '';
         $payload = Cast::stringKeyed(json_decode(is_string($text) ? $text : '', true));
 
         $this->assertSame($activeAfter, $payload['is_active'] ?? null);

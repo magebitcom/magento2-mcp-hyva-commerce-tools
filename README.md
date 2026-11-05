@@ -145,6 +145,7 @@ Without `"confirm": true` these calls write nothing and return a preview instead
 |---|---|
 | `hyva_cms.page.create` / `hyva_cms.block.create` / `hyva_menu.create` with `is_active=true` | Always (`action: "create_active"`). The preview shows what would go live. An inactive create never needs it, whatever its identifier and store views: an inactive page, block or menu is not served. |
 | `settings`: active flag, store views, URL key or identifier | Always. |
+| `hyva_menu.publish` / `hyva_cms.publish` of an inactive menu | Always (`action: "publish_activate"`): Hyvä Menu Builder activates a menu when it publishes it. Publishing an active menu, a page or a block never needs it. |
 | `settings`: any other field | Only on an active page, block or menu. A menu's `preview_url_key` never needs it: it only picks the page the editor previews the menu on. |
 | Replacing a draft | `hyva_cms.draft.create` and `hyva_cms.import` when the current draft has unpublished changes; `hyva_cms.migration.convert_to_draft` when a Hyvä draft already exists. |
 | Removing a menu item that has children | Always, also through `hyva_menu.update` / `hyva_cms.draft.update` operations that remove or replace one. The preview lists the children and `children_count`. |
@@ -862,6 +863,9 @@ Clients that parse replies:
 - **A menu `identifier` with `store_id` finds inactive and unpublished menus.** It was resolved by Hyvä's storefront
   loader, so it only found active menus, and `store_id: 0` matched a menu of any store view. It now takes the menu
   assigned to that store view, else one for all store views, active or not; `store_id: 0` matches only the latter.
+- **Publishing an inactive menu needs `"confirm": true`.** `hyva_menu.publish` and `hyva_cms.publish` with
+  `entity_type: "menu"` used to publish and activate it at once; without confirm the reply is now the preview
+  (`action: "publish_activate"`). Publishing an active menu, a page or a block is unchanged.
 - **Calls that write without confirm say `dry_run: false`.** Page/block update, menu update, image alt and replace,
   optimization clear and migration convert_to_draft replies gain the key; nothing else in them changed. See
   [Confirm and previews](#confirm-and-previews).
@@ -869,6 +873,8 @@ Clients that parse replies:
 Custom code:
 
 - **`Tool\HyvaMedia\Trash\TrashRestore` takes a `LiteralUrlAuditor`** as its last constructor argument.
+- **`Tool\HyvaCms\Content\Publish` (and `Tool\HyvaMenu\Release\MenuPublish`) takes a `Model\Tool\LiveSettings`** as
+  its last constructor argument (it previews the activation of an inactive menu).
 - **`Tool\HyvaMenu\Menu\MenuDelete` takes a `Model\Content\ScheduleService`** as its last constructor argument
   (it cancels the deleted menu's pending scheduled items).
 - **`Model\Content\ComponentCatalog` takes a `Model\Content\MenuOptionScope`** as its last constructor argument
