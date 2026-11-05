@@ -29,23 +29,42 @@ class ContentLocatorMenuIdentifierTest extends TestCase
 
     /**
      * Menus by id: 1 = "main" in store view 1, 2 = "main" in store view 2, 3 = "footer" in all store views,
-     * 4 = "main_extra" (matched by the substring search, not by the identifier).
+     * 4 = "main_extra" (matched by the substring search, not by the identifier), 5 = "side" in store view 1 and
+     * 6 = "side" in no store view.
      */
     private const MENUS = [
         1 => ['id' => 1, 'identifier' => 'main', 'title' => 'Main EN', 'is_active' => true, 'store_ids' => [1]],
         2 => ['id' => 2, 'identifier' => 'main', 'title' => 'Main DE', 'is_active' => true, 'store_ids' => [2]],
         3 => ['id' => 3, 'identifier' => 'footer', 'title' => 'Footer', 'is_active' => true, 'store_ids' => [0]],
         4 => ['id' => 4, 'identifier' => 'main_extra', 'title' => 'Extra', 'is_active' => true, 'store_ids' => [1]],
+        5 => ['id' => 5, 'identifier' => 'side', 'title' => 'Side', 'is_active' => false, 'store_ids' => [1]],
+        6 => ['id' => 6, 'identifier' => 'side', 'title' => 'Side old', 'is_active' => false, 'store_ids' => []],
     ];
 
     public function testASharedIdentifierWithoutStoreIdNamesTheCandidates(): void
     {
         $this->expectException(LocalizedException::class);
         $this->expectExceptionMessage(
-            'Several menus use identifier "main" (id 1 in store views 1, id 2 in store views 2). Pass id or store_id.'
+            'Several menus use identifier "main" (id 1 in store views 1, id 2 in store views 2). Pass id, or '
+                . 'store_id with one of the store views listed.'
         );
 
         $this->locator(null)->locate(ContentLocator::TYPE_MENU, ['identifier' => 'main']);
+    }
+
+    /**
+     * T-164: store_id cannot name a menu without a store view, so the hint only offers id.
+     *
+     * @return void
+     */
+    public function testACandidateWithoutStoreViewIsOnlyNamedById(): void
+    {
+        $this->expectException(LocalizedException::class);
+        $this->expectExceptionMessage(
+            'Several menus use identifier "side" (id 5 in store views 1, id 6 in no store view). Pass id.'
+        );
+
+        $this->locator(null)->locate(ContentLocator::TYPE_MENU, ['identifier' => 'side']);
     }
 
     public function testAUniqueIdentifierResolvesWithoutStoreId(): void

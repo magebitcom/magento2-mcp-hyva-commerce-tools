@@ -859,6 +859,9 @@ Clients that parse replies:
 - **`hyva_linked.group.save` answers a Hyvä refusal softly.** A save that Linked Products refuses after the check (a
   concurrent save took the name or the products; 1.0.2 says so in its own words) was a JSON-RPC error; it is now a
   soft error with status 409 and `issues` code `save_refused`.
+- **A menu `identifier` with `store_id` finds inactive and unpublished menus.** It was resolved by Hyvä's storefront
+  loader, so it only found active menus, and `store_id: 0` matched a menu of any store view. It now takes the menu
+  assigned to that store view, else one for all store views, active or not; `store_id: 0` matches only the latter.
 - **Calls that write without confirm say `dry_run: false`.** Page/block update, menu update, image alt and replace,
   optimization clear and migration convert_to_draft replies gain the key; nothing else in them changed. See
   [Confirm and previews](#confirm-and-previews).

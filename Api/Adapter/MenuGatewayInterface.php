@@ -41,10 +41,12 @@ interface MenuGatewayInterface
     public function get(int $menuId): array;
 
     /**
-     * Find id by identifier.
+     * Find id by identifier, active or not, published or not.
+     *
+     * With a store view: the menu assigned to it, else the one assigned to all store views (0).
      *
      * @param string $identifier
-     * @param int|null $storeId Null searches every store, active or not.
+     * @param int|null $storeId Null searches every store view.
      * @return int|null
      */
     public function findIdByIdentifier(string $identifier, ?int $storeId = null): ?int;
