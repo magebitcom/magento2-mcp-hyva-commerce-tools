@@ -16,15 +16,19 @@ use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\DeletionUsage;
 use Magebit\McpHyvaCommerceTools\Model\Content\EntityWriter;
+use Magebit\McpHyvaCommerceTools\Model\Content\PendingScheduleCleanup;
+use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockDelete;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageDelete;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magento\Framework\Exception\LocalizedException;
 use PHPUnit\Framework\TestCase;
 
 /**
  * T-22: hyva_cms.page.delete / hyva_cms.block.delete are confirm-gated, need both delete permissions and the store
- * scope write rule. T-73: a page in use needs "force": true as well.
+ * scope write rule. T-73: a page in use needs "force": true as well. T-166: pending scheduled items are previewed
+ * and cancelled with the delete, as T-68 does for menus.
  */
 class PageDeleteTest extends TestCase
 {
@@ -172,6 +176,89 @@ class PageDeleteTest extends TestCase
         $this->assertSame(7, $payload['id']);
     }
 
+    public function testThePreviewListsPendingScheduledItems(): void
+    {
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->expects($this->never())->method('delete');
+        $schedule = $this->scheduleWithPendingItem();
+        $schedule->expects($this->never())->method('cancel');
+
+        $payload = $this->payload(
+            $this->tool($writer, self::BOTH, null, null, [1], $schedule)->execute(['id' => 7])
+        );
+
+        $this->assertSame(
+            [[
+                'item_id' => 4,
+                'release_id' => 3,
+                'release_name' => 'Black Friday',
+                'time_scheduled' => '2026-11-27 07:00:00',
+            ]],
+            $this->valueAt($payload, 'details', 'scheduled_items')
+        );
+        $hint = Cast::string($payload['hint'] ?? '');
+        $this->assertStringContainsString('The page has 1 pending scheduled release item(s)', $hint);
+        $this->assertStringContainsString('deleting cancels them', $hint);
+    }
+
+    public function testThePreviewOfAPageWithoutScheduledItemsHasNoScheduleDetails(): void
+    {
+        $payload = $this->payload(
+            $this->tool($this->createMock(EntityWriter::class), self::BOTH)->execute(['id' => 7])
+        );
+
+        $this->assertNull($this->valueAt($payload, 'details', 'scheduled_items'));
+        $this->assertStringNotContainsString('scheduled', Cast::string($payload['hint'] ?? ''));
+    }
+
+    public function testConfirmCancelsThePendingScheduledItems(): void
+    {
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->expects($this->once())->method('delete')->with('cms_page', 7);
+        $schedule = $this->scheduleWithPendingItem();
+        $schedule->expects($this->once())->method('cancel')->with([4])
+            ->willReturn(['cancelled_items' => [4], 'cancelled_releases' => [3]]);
+
+        $payload = $this->payload(
+            $this->tool($writer, self::BOTH, null, null, [1], $schedule)->execute(['id' => 7, 'confirm' => true])
+        );
+
+        $this->assertTrue($payload['deleted']);
+        $this->assertSame([4], $payload['scheduled_items_cancelled']);
+        $this->assertSame([3], $payload['scheduled_releases_cancelled']);
+    }
+
+    public function testAFailedCancelStillReportsTheDeleteWithAWarning(): void
+    {
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->expects($this->once())->method('delete');
+        $schedule = $this->scheduleWithPendingItem();
+        $schedule->method('cancel')->willThrowException(new \RuntimeException('Lock wait timeout'));
+
+        $result = $this->tool($writer, self::BOTH, null, null, [1], $schedule)
+            ->execute(['id' => 7, 'confirm' => true]);
+        $payload = $this->payload($result);
+
+        $this->assertFalse($result->isError());
+        $this->assertTrue($payload['deleted']);
+        $this->assertSame([], $payload['scheduled_items_cancelled']);
+        $this->assertStringContainsString(
+            'The page was deleted, but its pending scheduled items #4 could not be cancelled (Lock wait timeout)',
+            Cast::string($payload['warning'])
+        );
+    }
+
+    public function testNothingIsCancelledWhenTheDeleteFails(): void
+    {
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->method('delete')->willThrowException(new LocalizedException(__('Could not delete')));
+        $schedule = $this->scheduleWithPendingItem();
+        $schedule->expects($this->never())->method('cancel');
+
+        $this->expectException(LocalizedException::class);
+        $this->tool($writer, self::BOTH, null, null, [1], $schedule)->execute(['id' => 7, 'confirm' => true]);
+    }
+
     /**
      * @return array<string, array{0: list<string>, 1: string}>
      */
@@ -247,6 +334,42 @@ class PageDeleteTest extends TestCase
         );
     }
 
+    public function testABlockDeleteCancelsTheBlocksPendingScheduledItems(): void
+    {
+        $caller = $this->createMock(CallerContext::class);
+        $caller->method('isAllowed')->willReturn(true);
+        $locator = $this->createMock(ContentLocator::class);
+        $locator->method('locateForWrite')->willReturn(['type' => 'cms_block', 'id' => 5, 'identifier' => 'promo',
+            'title' => 'Promo', 'is_active' => true, 'store_ids' => [0]]);
+        $deletionUsage = $this->createMock(DeletionUsage::class);
+        $deletionUsage->method('forBlock')->willReturn(['used' => false, 'total' => 0]);
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->expects($this->once())->method('delete')->with('cms_block', 5);
+        $schedule = $this->createMock(ScheduleService::class);
+        $schedule->method('getItems')->with(['status' => 'pending', 'entity_type' => 'cms_block', 'entity_id' => 5])
+            ->willReturn([[
+                'item_id' => 9, 'release_id' => 6, 'entity_type' => 'cms_block', 'entity_id' => 5, 'name' => 'Promo',
+                'status' => 'pending', 'settings' => null, 'version_history_id' => null,
+                'creation_time' => '2026-11-05 10:00:00', 'release_name' => 'Sale', 'release_status' => 'pending',
+                'time_scheduled' => '2026-11-27 07:00:00',
+            ]]);
+        $schedule->expects($this->once())->method('cancel')->with([9])
+            ->willReturn(['cancelled_items' => [9], 'cancelled_releases' => [6]]);
+        $tool = new BlockDelete(
+            $locator,
+            new ContentAcl($this->createMock(ContentTypeAuthorization::class), $caller),
+            $caller,
+            $deletionUsage,
+            $writer,
+            new PendingScheduleCleanup($schedule)
+        );
+
+        $payload = $this->payload($tool->execute(['id' => 5, 'confirm' => true]));
+
+        $this->assertSame([9], $payload['scheduled_items_cancelled']);
+        $this->assertSame([6], $payload['scheduled_releases_cancelled']);
+    }
+
     public function testThePermissionRefusalNamesTheBlockTypeInThePlural(): void
     {
         $caller = $this->createMock(CallerContext::class);
@@ -258,7 +381,8 @@ class PageDeleteTest extends TestCase
             new ContentAcl($this->createMock(ContentTypeAuthorization::class), $caller),
             $caller,
             $this->createMock(DeletionUsage::class),
-            $writer
+            $writer,
+            $this->createMock(PendingScheduleCleanup::class)
         );
 
         $text = json_encode($tool->execute(['id' => 5, 'confirm' => true])->getContent()) ?: '';
@@ -277,6 +401,7 @@ class PageDeleteTest extends TestCase
      * @param list<int>|null $allowedStoreIds Store views of a restricted caller; null = unrestricted.
      * @param array<string, mixed>|null $usage DeletionUsage::forPage() report; null = unused.
      * @param list<int> $storeIds Store views of the page.
+     * @param ScheduleService|null $schedule Defaults to one without pending items.
      * @return PageDelete
      */
     private function tool(
@@ -284,7 +409,8 @@ class PageDeleteTest extends TestCase
         array $granted,
         ?array $allowedStoreIds = null,
         ?array $usage = null,
-        array $storeIds = [1]
+        array $storeIds = [1],
+        ?ScheduleService $schedule = null
     ): PageDelete {
         $page = ['type' => 'cms_page', 'id' => 7, 'identifier' => 'sale', 'title' => 'Sale', 'is_active' => true,
             'store_ids' => $storeIds];
@@ -310,13 +436,38 @@ class PageDeleteTest extends TestCase
         $deletionUsage->method('forPage')->willReturn(
             $usage ?? ['used' => false, 'total' => 0, 'store_config' => [], 'links' => []]
         );
+        if ($schedule === null) {
+            $schedule = $this->createMock(ScheduleService::class);
+            $schedule->method('getItems')->willReturn([]);
+            $schedule->expects($this->never())->method('cancel');
+        }
         return new PageDelete(
             $locator,
             new ContentAcl($authorization, $caller),
             $caller,
             $deletionUsage,
-            $writer
+            $writer,
+            new PendingScheduleCleanup($schedule)
         );
+    }
+
+    /**
+     * Schedule service with one pending item (#4 in release #3) for page 7.
+     *
+     * @return ScheduleService&\PHPUnit\Framework\MockObject\MockObject
+     */
+    private function scheduleWithPendingItem(): ScheduleService
+    {
+        $schedule = $this->createMock(ScheduleService::class);
+        $schedule->method('getItems')->with(
+            ['status' => 'pending', 'entity_type' => 'cms_page', 'entity_id' => 7]
+        )->willReturn([[
+            'item_id' => 4, 'release_id' => 3, 'entity_type' => 'cms_page', 'entity_id' => 7, 'name' => 'Sale',
+            'status' => 'pending', 'settings' => null, 'version_history_id' => null,
+            'creation_time' => '2026-11-05 10:00:00', 'release_name' => 'Black Friday', 'release_status' => 'pending',
+            'time_scheduled' => '2026-11-27 07:00:00',
+        ]]);
+        return $schedule;
     }
 
     /**

@@ -337,9 +337,10 @@ Exceptions:
   in the admin area, Hyvä's menu repository for menus, Magento's template models for email and newsletter templates.
 - **Hyvä data goes with it.** Hyvä drafts, version history and Tailwind CSS are deleted too, as in the admin (foreign
   keys with `ON DELETE CASCADE`).
-- **Scheduled releases stay.** Releases that name a page or block are not removed, as in the admin.
-  `hyva_menu.delete` lists the menu's pending scheduled items in the preview and cancels them with the delete
-  (a release left without pending items is cancelled too), since an item whose menu is gone can never publish.
+- **Pending scheduled items are cancelled.** `hyva_cms.page.delete`, `hyva_cms.block.delete` and `hyva_menu.delete`
+  list the entity's pending scheduled items in the preview (`details.scheduled_items`) and cancel them with the delete
+  (a release left without pending items is cancelled too), since an item whose entity is gone can never publish. The
+  admin delete leaves them pending.
 
 To remove a single menu item use `hyva_menu.item.remove`. To remove media files, `hyva_media.asset.trash` moves them to
 the Media Gallery trash.
@@ -866,6 +867,9 @@ Clients that parse replies:
 - **Publishing an inactive menu needs `"confirm": true`.** `hyva_menu.publish` and `hyva_cms.publish` with
   `entity_type: "menu"` used to publish and activate it at once; without confirm the reply is now the preview
   (`action: "publish_activate"`). Publishing an active menu, a page or a block is unchanged.
+- **Page and block deletes cancel pending scheduled items.** The `hyva_cms.page.delete` / `hyva_cms.block.delete`
+  preview gains `details.scheduled_items` and the result `scheduled_items_cancelled` /
+  `scheduled_releases_cancelled` (or a `warning`), as `hyva_menu.delete` has.
 - **Calls that write without confirm say `dry_run: false`.** Page/block update, menu update, image alt and replace,
   optimization clear and migration convert_to_draft replies gain the key; nothing else in them changed. See
   [Confirm and previews](#confirm-and-previews).
@@ -875,8 +879,9 @@ Custom code:
 - **`Tool\HyvaMedia\Trash\TrashRestore` takes a `LiteralUrlAuditor`** as its last constructor argument.
 - **`Tool\HyvaCms\Content\Publish` (and `Tool\HyvaMenu\Release\MenuPublish`) takes a `Model\Tool\LiveSettings`** as
   its last constructor argument (it previews the activation of an inactive menu).
-- **`Tool\HyvaMenu\Menu\MenuDelete` takes a `Model\Content\ScheduleService`** as its last constructor argument
-  (it cancels the deleted menu's pending scheduled items).
+- **`Tool\HyvaMenu\Menu\MenuDelete` and `Model\Tool\Entity\AbstractEntityDelete` (`PageDelete`, `BlockDelete`) take a
+  `Model\Content\PendingScheduleCleanup`** as their last constructor argument (it cancels the deleted entity's
+  pending scheduled items).
 - **`Model\Content\ComponentCatalog` takes a `Model\Content\MenuOptionScope`** as its last constructor argument
   (it cuts the `hyva_menu_widget` menu options to the menus the caller may see).
 - **`Api\Adapter\LinkedProductsGatewayInterface::save()`** throws `ValidatorException` when Hyvä refuses the group;

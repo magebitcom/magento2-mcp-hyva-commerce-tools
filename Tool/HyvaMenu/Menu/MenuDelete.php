@@ -13,12 +13,11 @@ use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\DeletionUsage;
-use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
+use Magebit\McpHyvaCommerceTools\Model\Content\PendingScheduleCleanup;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Entity\InUseDeleteGate;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Menu\AbstractMenuTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
-use Throwable;
 
 /**
  * `hyva_menu.delete` MCP tool: confirm-gated delete of one menu.
@@ -51,14 +50,14 @@ class MenuDelete extends AbstractMenuTool
      * @param MenuService $menuService
      * @param MenuGatewayInterface $menuGateway
      * @param DeletionUsage $deletionUsage
-     * @param ScheduleService $scheduleService
+     * @param PendingScheduleCleanup $scheduleCleanup
      */
     public function __construct(
         FeatureCheckerInterface $featureChecker,
         MenuService $menuService,
         private readonly MenuGatewayInterface $menuGateway,
         private readonly DeletionUsage $deletionUsage,
-        private readonly ScheduleService $scheduleService
+        private readonly PendingScheduleCleanup $scheduleCleanup
     ) {
         parent::__construct($featureChecker, $menuService);
     }
@@ -117,7 +116,7 @@ class MenuDelete extends AbstractMenuTool
             'store_ids' => Cast::intList($menu['store_ids'] ?? []),
             'in_use' => $inUse,
         ];
-        $scheduled = $this->pendingScheduledItems($menuId);
+        $scheduled = $this->scheduleCleanup->pendingItems(ContentLocator::TYPE_MENU, $menuId);
         if (!$this->boolArg($arguments, 'confirm')) {
             return $this->confirmationRequired(
                 'delete_menu',
@@ -127,11 +126,7 @@ class MenuDelete extends AbstractMenuTool
                 null,
                 'Deleting removes the menu from every store view listed, with its drafts and version history; it '
                     . 'cannot be undone (hyva_cms_export keeps a copy).'
-                    . ($scheduled !== [] ? sprintf(
-                        ' The menu has %d pending scheduled release item(s) (details.scheduled_items); deleting '
-                            . 'cancels them, and a release left without pending items is cancelled as well.',
-                        count($scheduled)
-                    ) : '')
+                    . $this->scheduleCleanup->previewHint('menu', $scheduled)
                     . ($inUse ? $this->inUseHint(self::IN_USE_CONSEQUENCE) : '')
             );
         }
@@ -144,7 +139,7 @@ class MenuDelete extends AbstractMenuTool
         }
         $this->menuGateway->delete($menuId);
         $audit = ['entity_type' => 'menu', 'id' => $menuId, 'deleted' => true, 'in_use' => $inUse];
-        $cancelled = $this->cancelScheduledItems($scheduled);
+        $cancelled = $this->scheduleCleanup->cancel('menu', $scheduled);
         if (isset($cancelled['scheduled_items_cancelled'])) {
             $audit['scheduled_items_cancelled'] = $cancelled['scheduled_items_cancelled'];
         }
@@ -155,64 +150,5 @@ class MenuDelete extends AbstractMenuTool
             ['deleted' => true] + $summary + $cancelled + $this->forcedDeleteDetails($usage),
             $audit + ['forced' => true]
         );
-    }
-
-    /**
-     * Pending items of pending releases that publish this menu.
-     *
-     * @param int $menuId
-     * @return array
-     * @phpstan-return list<array{item_id: int, release_id: int, release_name: string, time_scheduled: string}>
-     */
-    private function pendingScheduledItems(int $menuId): array
-    {
-        $items = [];
-        foreach ($this->scheduleService->getItems(
-            ['status' => 'pending', 'entity_type' => ContentLocator::TYPE_MENU, 'entity_id' => $menuId]
-        ) as $row) {
-            $items[] = [
-                'item_id' => $row['item_id'],
-                'release_id' => $row['release_id'],
-                'release_name' => $row['release_name'],
-                'time_scheduled' => $row['time_scheduled'],
-            ];
-        }
-        return $items;
-    }
-
-    /**
-     * Cancel the deleted menu's pending scheduled items; the menu is gone either way, so a failure is reported.
-     *
-     * @param array $scheduled
-     * @return array
-     * @phpstan-param list<array{item_id: int, release_id: int, release_name: string,
-     *     time_scheduled: string}> $scheduled
-     * @phpstan-return array<string, mixed>
-     */
-    private function cancelScheduledItems(array $scheduled): array
-    {
-        if ($scheduled === []) {
-            return [];
-        }
-        try {
-            $result = $this->scheduleService->cancel(array_column($scheduled, 'item_id'));
-        } catch (Throwable $e) {
-            return [
-                'scheduled_items_cancelled' => [],
-                'warning' => sprintf(
-                    'The menu was deleted, but its pending scheduled items %s could not be cancelled (%s); cancel '
-                        . 'them with hyva_cms_schedule_cancel.',
-                    implode(', ', array_map(
-                        static fn (int $id): string => '#' . $id,
-                        array_column($scheduled, 'item_id')
-                    )),
-                    $e->getMessage()
-                ),
-            ];
-        }
-        return [
-            'scheduled_items_cancelled' => $result['cancelled_items'],
-            'scheduled_releases_cancelled' => $result['cancelled_releases'],
-        ];
     }
 }

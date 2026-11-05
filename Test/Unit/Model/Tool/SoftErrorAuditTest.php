@@ -20,6 +20,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DeletionUsage;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Content\EntityWriter;
+use Magebit\McpHyvaCommerceTools\Model\Content\PendingScheduleCleanup;
 use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
@@ -124,7 +125,8 @@ class SoftErrorAuditTest extends TestCase
             new ContentAcl($this->createMock(ContentTypeAuthorization::class), $caller),
             $caller,
             $this->createMock(DeletionUsage::class),
-            $this->createMock(EntityWriter::class)
+            $this->createMock(EntityWriter::class),
+            $this->createMock(PendingScheduleCleanup::class)
         ))->execute(['id' => 5, 'confirm' => true]);
 
         $this->assertTrue($result->isError());

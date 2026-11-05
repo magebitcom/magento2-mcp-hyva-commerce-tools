@@ -14,6 +14,7 @@ use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\DeletionUsage;
+use Magebit\McpHyvaCommerceTools\Model\Content\PendingScheduleCleanup;
 use Magebit\McpHyvaCommerceTools\Model\Content\ScheduleService;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
@@ -260,7 +261,7 @@ class MenuDeleteTest extends TestCase
             $schedule->method('getItems')->willReturn([]);
             $schedule->expects($this->never())->method('cancel');
         }
-        return new MenuDelete($features, $menus, $gateway, $deletionUsage, $schedule);
+        return new MenuDelete($features, $menus, $gateway, $deletionUsage, new PendingScheduleCleanup($schedule));
     }
 
     /**

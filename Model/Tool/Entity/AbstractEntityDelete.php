@@ -14,6 +14,7 @@ use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\DeletionUsage;
 use Magebit\McpHyvaCommerceTools\Model\Content\EntityWriter;
+use Magebit\McpHyvaCommerceTools\Model\Content\PendingScheduleCleanup;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magento\Framework\Exception\AuthorizationException;
 
@@ -25,6 +26,8 @@ use Magento\Framework\Exception\AuthorizationException;
  * Magento admin delete permission (ADMIN_DELETE_RESOURCE) and Hyvä's delete verb for the type. The core checks the
  * tool resource and the listing resource (the first of the other two the role lacks), and run() checks both again.
  * The store scope write rule applies: every store view the entity is assigned to must be the role's.
+ * Pending scheduled items of the entity are listed in the preview and cancelled after the delete (T-166, as T-68
+ * does for menus; PendingScheduleCleanup).
  */
 abstract class AbstractEntityDelete extends AbstractTool
 {
@@ -60,13 +63,15 @@ abstract class AbstractEntityDelete extends AbstractTool
      * @param CallerContext $callerContext
      * @param DeletionUsage $deletionUsage
      * @param EntityWriter $entityWriter
+     * @param PendingScheduleCleanup $scheduleCleanup
      */
     public function __construct(
         private readonly ContentLocator $contentLocator,
         private readonly ContentAcl $contentAcl,
         private readonly CallerContext $callerContext,
         private readonly DeletionUsage $deletionUsage,
-        private readonly EntityWriter $entityWriter
+        private readonly EntityWriter $entityWriter,
+        private readonly PendingScheduleCleanup $scheduleCleanup
     ) {
     }
 
@@ -92,11 +97,13 @@ abstract class AbstractEntityDelete extends AbstractTool
                 . 'Magento content, widget_instances = widget instances';
         return sprintf(
             'Delete a %1$s permanently, from every store view it is assigned to, with its Hyvä drafts, version '
-                . 'history and Tailwind CSS (scheduled releases that name it are not removed). Without "confirm": '
+                . 'history and Tailwind CSS. Without "confirm": '
                 . 'true nothing is deleted and the reply previews the %1$s, its store views and where it is still '
                 . 'used (%2$s). A %1$s in use is deleted only with "force": true as well as "confirm": true (its '
                 . 'references break; the result then says "forced": true and repeats the usage); tell the user '
-                . 'where it is used before confirming. Needs the '
+                . 'where it is used before confirming. Pending scheduled release items of the %1$s are listed in '
+                . 'the preview (details.scheduled_items) and cancelled with the delete (scheduled_items_cancelled). '
+                . 'Needs the '
                 . 'MCP permission for this tool plus the admin delete permissions %3$s and %4$s. A role restricted '
                 . 'to some websites can delete only a %1$s whose store views are all its own. To hide it instead, '
                 . 'set settings.is_active=false with hyva_cms_%5$s_update.',
@@ -154,17 +161,21 @@ abstract class AbstractEntityDelete extends AbstractTool
             'store_ids' => $entity['store_ids'],
             'in_use' => $inUse,
         ];
+        $scheduled = $this->scheduleCleanup->pendingItems($entity['type'], $entity['id']);
+        $what = strtolower(static::ENTITY_LABEL);
         if (!$this->boolArg($arguments, 'confirm')) {
             return $this->confirmationRequired(
                 'delete_' . static::ENTITY_TYPE,
                 [$summary],
-                ['in_use' => $inUse, 'force_required' => $inUse, 'usage' => $usage],
+                ['in_use' => $inUse, 'force_required' => $inUse, 'usage' => $usage]
+                    + ($scheduled !== [] ? ['scheduled_items' => $scheduled] : []),
                 null,
                 sprintf(
                     'Deleting removes the %1$s from every store view listed, with its Hyvä drafts and version '
                         . 'history; it cannot be undone (hyva_cms_export keeps a copy).',
-                    strtolower(static::ENTITY_LABEL)
-                ) . ($inUse ? $this->inUseHint(self::IN_USE_CONSEQUENCE) : '')
+                    $what
+                ) . $this->scheduleCleanup->previewHint($what, $scheduled)
+                    . ($inUse ? $this->inUseHint(self::IN_USE_CONSEQUENCE) : '')
             );
         }
         if ($inUse && !$this->boolArg($arguments, 'force')) {
@@ -176,11 +187,15 @@ abstract class AbstractEntityDelete extends AbstractTool
         }
         $this->entityWriter->delete($entity['type'], $entity['id']);
         $audit = ['entity_type' => $entity['type'], 'id' => $entity['id'], 'deleted' => true, 'in_use' => $inUse];
+        $cancelled = $this->scheduleCleanup->cancel($what, $scheduled);
+        if (isset($cancelled['scheduled_items_cancelled'])) {
+            $audit['scheduled_items_cancelled'] = $cancelled['scheduled_items_cancelled'];
+        }
         if (!$inUse) {
-            return $this->jsonResult(['deleted' => true] + $summary, $audit);
+            return $this->jsonResult(['deleted' => true] + $summary + $cancelled, $audit);
         }
         return $this->jsonResult(
-            ['deleted' => true] + $summary + $this->forcedDeleteDetails($usage),
+            ['deleted' => true] + $summary + $cancelled + $this->forcedDeleteDetails($usage),
             $audit + ['forced' => true]
         );
     }
