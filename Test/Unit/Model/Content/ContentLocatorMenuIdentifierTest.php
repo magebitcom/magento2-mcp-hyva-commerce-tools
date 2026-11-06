@@ -30,7 +30,7 @@ class ContentLocatorMenuIdentifierTest extends TestCase
     /**
      * Menus by id: 1 = "main" in store view 1, 2 = "main" in store view 2, 3 = "footer" in all store views,
      * 4 = "main_extra" (matched by the substring search, not by the identifier), 5 = "side" in store view 1 and
-     * 6 = "side" in no store view.
+     * 6 = "side" in no store view, 7 = "top" in all store views and 8 = "top" in store view 2.
      */
     private const MENUS = [
         1 => ['id' => 1, 'identifier' => 'main', 'title' => 'Main EN', 'is_active' => true, 'store_ids' => [1]],
@@ -39,6 +39,8 @@ class ContentLocatorMenuIdentifierTest extends TestCase
         4 => ['id' => 4, 'identifier' => 'main_extra', 'title' => 'Extra', 'is_active' => true, 'store_ids' => [1]],
         5 => ['id' => 5, 'identifier' => 'side', 'title' => 'Side', 'is_active' => false, 'store_ids' => [1]],
         6 => ['id' => 6, 'identifier' => 'side', 'title' => 'Side old', 'is_active' => false, 'store_ids' => []],
+        7 => ['id' => 7, 'identifier' => 'top', 'title' => 'Top', 'is_active' => false, 'store_ids' => [0]],
+        8 => ['id' => 8, 'identifier' => 'top', 'title' => 'Top DE', 'is_active' => false, 'store_ids' => [2]],
     ];
 
     public function testASharedIdentifierWithoutStoreIdNamesTheCandidates(): void
@@ -65,6 +67,22 @@ class ContentLocatorMenuIdentifierTest extends TestCase
         );
 
         $this->locator(null)->locate(ContentLocator::TYPE_MENU, ['identifier' => 'side']);
+    }
+
+    /**
+     * T-169: a candidate in every store view reads "all store views", not "store views 0".
+     *
+     * @return void
+     */
+    public function testACandidateInAllStoreViewsIsNamedSo(): void
+    {
+        $this->expectException(LocalizedException::class);
+        $this->expectExceptionMessage(
+            'Several menus use identifier "top" (id 7 in all store views (store_id 0), id 8 in store views 2). Pass '
+                . 'id, or store_id with one of the store views listed.'
+        );
+
+        $this->locator(null)->locate(ContentLocator::TYPE_MENU, ['identifier' => 'top']);
     }
 
     public function testAUniqueIdentifierResolvesWithoutStoreId(): void
