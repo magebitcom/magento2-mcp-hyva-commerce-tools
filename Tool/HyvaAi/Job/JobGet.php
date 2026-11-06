@@ -16,7 +16,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AiWorker\AbstractAiWorkerTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
-use Magento\Framework\Exception\AuthorizationException;
+use Magebit\McpHyvaCommerceTools\Exception\AclRefusalException;
 
 class JobGet extends AbstractAiWorkerTool
 {
@@ -76,7 +76,10 @@ class JobGet extends AbstractAiWorkerTool
         // Like Hyvä's Job/Status: a job without an owner (CLI, scheduler) is nobody's own job.
         $owner = $job['admin_user_id'] ?? null;
         if (!$this->seesAllJobs() && ($owner === null || $owner !== $this->adminUserId())) {
-            throw new AuthorizationException(__('You may only read your own AI Worker jobs.'));
+            throw new AclRefusalException(
+                __('You may only read your own AI Worker jobs.'),
+                self::ALL_JOBS_RESOURCE
+            );
         }
         return $this->jsonResult($job, ['job_id' => $jobId]);
     }

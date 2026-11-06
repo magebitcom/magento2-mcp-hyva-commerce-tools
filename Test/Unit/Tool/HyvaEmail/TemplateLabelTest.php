@@ -16,8 +16,8 @@ use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterGet;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterPublish;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateGet;
-use Magebit\Mcp\Api\ToolResultInterface;
 use Magento\Framework\Exception\LocalizedException;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -25,6 +25,7 @@ use PHPUnit\Framework\TestCase;
  */
 class TemplateLabelTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     /**
@@ -112,33 +113,19 @@ class TemplateLabelTest extends TestCase
 
     public function testTheScopeRefusalNamesNewsletterTemplatesInThePlural(): void
     {
-        $result = (new NewsletterPublish(
+        $tool = new NewsletterPublish(
             $this->features(),
             $this->createMock(EmailGatewayInterface::class),
             $this->createMock(ContentService::class),
             $this->createMock(PreviewService::class),
             $this->storeScope([1])
-        ))->execute(['id' => 4, 'confirm' => true]);
+        );
 
-        $this->assertTrue($result->isError());
+        $refusal = $this->assertRefused(fn () => $tool->execute(['id' => 4, 'confirm' => true]), 'scope');
         $this->assertStringContainsString(
             'may not change newsletter templates: they apply to every store view.',
-            $this->text($result)
+            $refusal->getMessage()
         );
-    }
-
-    /**
-     * Text of a tool result.
-     *
-     * @param ToolResultInterface $result
-     * @return string
-     */
-    private function text(ToolResultInterface $result): string
-    {
-        return implode("\n", array_map(
-            static fn (array $block): string => is_string($block['text'] ?? null) ? $block['text'] : '',
-            $result->getContent()
-        ));
     }
 
     /**

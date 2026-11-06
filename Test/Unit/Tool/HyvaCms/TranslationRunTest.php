@@ -20,10 +20,13 @@ use Magebit\McpHyvaCommerceTools\Model\Content\TranslationScanner;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Translation\TranslationRun;
 use Magento\Framework\Exception\AuthorizationException;
 use PHPUnit\Framework\MockObject\MockObject;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 class TranslationRunTest extends TestCase
 {
+    use RefusalAssertTrait;
+
     /**
      * @var ContentService&MockObject
      */
@@ -140,10 +143,12 @@ class TranslationRunTest extends TestCase
         $this->acl->method('isAllowed')->willReturn(false);
         $this->gateway->expects($this->never())->method('translate');
         $this->contentService->expects($this->never())->method('saveDraft');
-        $payload = $this->payload($this->tool()->execute([
+        $this->acl->method('resources')->willReturn(['Hyva_Cms::page_save']);
+        $tool = $this->tool();
+        $refusal = $this->assertRefused(fn () => $tool->execute([
             'entity_type' => 'cms_page', 'id' => 7, 'write_draft' => true,
-        ]));
-        $this->assertSame(403, $payload['status']);
+        ]), 'acl');
+        $this->assertSame('Hyva_Cms::page_save', $refusal->getData()['resource'] ?? null);
     }
 
     public function testAHyvaPermissionRefusalFromTheAiCallStaysARefusal(): void
@@ -151,8 +156,8 @@ class TranslationRunTest extends TestCase
         $this->acl->method('isAllowed')->willReturn(true);
         $this->gateway->method('translate')->willThrowException(new AuthorizationException(__('Not allowed.')));
         $this->contentService->expects($this->never())->method('saveDraft');
-        $payload = $this->payload($this->tool()->execute(['entity_type' => 'cms_page', 'id' => 7]));
-        $this->assertSame(403, $payload['status']);
+        $tool = $this->tool();
+        $this->assertRefused(fn () => $tool->execute(['entity_type' => 'cms_page', 'id' => 7]), 'acl');
     }
 
     /**

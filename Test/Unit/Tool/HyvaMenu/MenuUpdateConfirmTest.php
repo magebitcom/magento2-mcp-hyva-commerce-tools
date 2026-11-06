@@ -20,10 +20,12 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuUpdate;
 use Magento\Framework\Exception\LocalizedException;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 class MenuUpdateConfirmTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     public function testARestrictedRoleMayNotAssignAForeignStoreView(): void
@@ -31,14 +33,13 @@ class MenuUpdateConfirmTest extends TestCase
         $gateway = $this->createMock(MenuGatewayInterface::class);
         $gateway->expects($this->never())->method('update');
 
-        $result = $this->tool($gateway, $this->createMock(ContentService::class), [1])->execute([
+        $tool = $this->tool($gateway, $this->createMock(ContentService::class), [1]);
+
+        $this->assertRefused(fn () => $tool->execute([
             'id' => 3,
             'settings' => ['store_ids' => [2]],
             'confirm' => true,
-        ]);
-
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        ]), 'scope');
     }
 
     public function testRenamingAnActiveMenuWithoutConfirmWritesNothing(): void

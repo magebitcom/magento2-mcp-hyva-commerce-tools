@@ -19,7 +19,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Entity\InUseDeleteGate;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
-use Magento\Framework\Exception\AuthorizationException;
+use Magebit\McpHyvaCommerceTools\Exception\AclRefusalException;
 
 /**
  * hyva_email.template.delete / hyva_email.newsletter.delete: confirm-gated delete of one email or newsletter template
@@ -29,7 +29,8 @@ use Magento\Framework\Exception\AuthorizationException;
  * the tool's own resource (granted to no role by default), the Magento admin permission the native delete action
  * needs (ADMIN_DELETE_RESOURCE) and, where Hyvä has one, its delete verb (HYVA_DELETE_RESOURCE). The core checks the
  * tool resource and the listing resource (the first of the others the role lacks); executeEmail() checks them again.
- * Templates apply to every store view, so a role restricted to some websites gets the soft 403 of every email write.
+ * Templates apply to every store view, so a role restricted to some websites gets the -32004 scope refusal of every
+ * email write.
  */
 abstract class AbstractTemplateDelete extends AbstractEmailTool
 {
@@ -214,17 +215,17 @@ abstract class AbstractTemplateDelete extends AbstractEmailTool
      * Refuse a role without one of the delete permissions (the core gate checks one of them per role)
      *
      * @return void
-     * @throws AuthorizationException
+     * @throws AclRefusalException
      */
     private function assertDeletePermissions(): void
     {
         foreach ($this->deleteResources() as $resource) {
             if ($this->callerContext->isAllowed($resource) === false) {
-                throw new AuthorizationException(__(
+                throw new AclRefusalException(__(
                     'Your admin role may not delete %1: it needs the %2 permission.',
                     static::LABEL_PLURAL,
                     $resource
-                ));
+                ), $resource);
             }
         }
     }

@@ -23,6 +23,7 @@ use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockDelete;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageDelete;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Framework\Exception\LocalizedException;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -32,6 +33,7 @@ use PHPUnit\Framework\TestCase;
  */
 class PageDeleteTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     private const BOTH = ['Magento_Cms::page_delete', 'Hyva_Cms::page_delete'];
@@ -284,14 +286,12 @@ class PageDeleteTest extends TestCase
         // The core gate refuses the call on the listing resource...
         $this->assertSame($missing, $tool->getUnderlyingAclResource());
         // ...and the tool refuses it again.
-        $result = $tool->execute(['id' => 7, 'confirm' => true]);
-        $this->assertTrue($result->isError());
-        $text = json_encode($result->getContent()) ?: '';
-        $this->assertStringContainsString('403', $text);
-        $this->assertStringContainsString(
+        $refusal = $this->assertRefused(fn () => $tool->execute(['id' => 7, 'confirm' => true]), 'acl');
+        $this->assertSame(
             'Your admin role may not delete CMS pages: it needs the ' . $missing . ' permission.',
-            $text
+            $refusal->getMessage()
         );
+        $this->assertSame($missing, $refusal->getData()['resource'] ?? null);
     }
 
     public function testARoleWithBothPermissionsIsListedWithTheHyvaVerb(): void
@@ -307,10 +307,9 @@ class PageDeleteTest extends TestCase
         $writer = $this->createMock(EntityWriter::class);
         $writer->expects($this->never())->method('delete');
 
-        $result = $this->tool($writer, self::BOTH, [1], null, [1, 2])->execute(['id' => 7, 'confirm' => true]);
+        $tool = $this->tool($writer, self::BOTH, [1], null, [1, 2]);
 
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        $this->assertRefused(fn () => $tool->execute(['id' => 7, 'confirm' => true]), 'scope');
     }
 
     public function testARestrictedRoleDeletesAPageOfItsOwnStoreView(): void
@@ -385,11 +384,11 @@ class PageDeleteTest extends TestCase
             $this->createMock(PendingScheduleCleanup::class)
         );
 
-        $text = json_encode($tool->execute(['id' => 5, 'confirm' => true])->getContent()) ?: '';
+        $refusal = $this->assertRefused(fn () => $tool->execute(['id' => 5, 'confirm' => true]), 'acl');
 
-        $this->assertStringContainsString(
+        $this->assertSame(
             'Your admin role may not delete CMS blocks: it needs the Magento_Cms::block permission.',
-            $text
+            $refusal->getMessage()
         );
     }
 

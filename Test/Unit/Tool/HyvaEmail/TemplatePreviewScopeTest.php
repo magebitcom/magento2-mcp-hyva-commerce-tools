@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\ToolPayloadTrait;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterPreview;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplatePreview;
 use PHPUnit\Framework\MockObject\MockObject;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -24,6 +25,7 @@ use PHPUnit\Framework\TestCase;
  */
 class TemplatePreviewScopeTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
     use ToolPayloadTrait;
 
@@ -33,10 +35,9 @@ class TemplatePreviewScopeTest extends TestCase
             $gateway = $this->gateway();
             $gateway->expects($this->never())->method('render');
 
-            $result = $this->tool($class, $gateway)->execute(['id' => 4, 'store_id' => 2, 'render' => true]);
+            $tool = $this->tool($class, $gateway);
 
-            $this->assertTrue($result->isError(), $class);
-            $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '', $class);
+            $this->assertRefused(fn () => $tool->execute(['id' => 4, 'store_id' => 2, 'render' => true]), 'scope');
         }
     }
 
@@ -57,11 +58,9 @@ class TemplatePreviewScopeTest extends TestCase
         $gateway = $this->gateway();
         $gateway->expects($this->never())->method('render');
 
-        $result = $this->tool(TemplatePreview::class, $gateway)
-            ->execute(['id' => 4, 'store_id' => 0, 'render' => true]);
+        $tool = $this->tool(TemplatePreview::class, $gateway);
 
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        $this->assertRefused(fn () => $tool->execute(['id' => 4, 'store_id' => 0, 'render' => true]), 'scope');
     }
 
     public function testPreviewLinksOfOtherStoreViewsAreLeftOut(): void

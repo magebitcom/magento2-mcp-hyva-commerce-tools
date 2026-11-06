@@ -28,6 +28,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\ObjectBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Exception\AuthorizationException;
 
 /**
  * `hyva_menu.update` MCP tool.
@@ -181,7 +182,9 @@ class MenuUpdate extends AbstractMenuTool
                     // The draft is already saved: report it with the error instead of hiding a partial write.
                     return $this->softError(
                         'The draft was saved but the settings were not applied: ' . $exception->getMessage(),
-                        ['draft_saved' => true, 'settings_applied' => false] + $result
+                        ['draft_saved' => true, 'settings_applied' => false]
+                            + ($exception instanceof AuthorizationException ? $this->refusalData($exception) : [])
+                            + $result
                     );
                 }
             }

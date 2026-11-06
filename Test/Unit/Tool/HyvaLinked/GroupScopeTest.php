@@ -12,6 +12,7 @@ use Magebit\McpHyvaCommerceTools\Api\Adapter\LinkedProductsGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaLinked\Group\GroupSave;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -19,6 +20,7 @@ use PHPUnit\Framework\TestCase;
  */
 class GroupScopeTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     public function testARestrictedRoleMayNotSaveAGroup(): void
@@ -28,11 +30,10 @@ class GroupScopeTest extends TestCase
         $gateway = $this->createMock(LinkedProductsGatewayInterface::class);
         $gateway->expects($this->never())->method('save');
 
-        $result = (new GroupSave($features, $gateway, $this->storeScope([1])))->execute([
-            'name' => 'Colours', 'attributes' => ['color'], 'skus' => ['A'], 'confirm' => true,
-        ]);
+        $tool = new GroupSave($features, $gateway, $this->storeScope([1]));
 
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        $this->assertRefused(fn () => $tool->execute([
+            'name' => 'Colours', 'attributes' => ['color'], 'skus' => ['A'], 'confirm' => true,
+        ]), 'scope');
     }
 }

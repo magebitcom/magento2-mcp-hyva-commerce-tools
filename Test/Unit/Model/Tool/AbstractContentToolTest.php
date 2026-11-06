@@ -24,6 +24,8 @@ use PHPUnit\Framework\TestCase;
 
 class AbstractContentToolTest extends TestCase
 {
+    use RefusalAssertTrait;
+
     /**
      * @var ContentAcl
      */
@@ -59,6 +61,13 @@ class AbstractContentToolTest extends TestCase
         $this->assertSame(['Hyva_Cms::transfer'], $tool->getContextualAclResources(['entity_type' => ['cms_page']]));
     }
 
+    public function testAHyvaPermissionRefusalRefusesTheCall(): void
+    {
+        $tool = $this->tool(new AuthorizationException(__('Not allowed')));
+        $refusal = $this->assertRefused(fn () => $tool->execute(['entity_type' => 'cms_page']), 'acl');
+        $this->assertSame(['reason' => 'acl'], $refusal->getData());
+    }
+
     /**
      * @dataProvider refusalProvider
      * @param \Throwable $exception
@@ -88,7 +97,6 @@ class AbstractContentToolTest extends TestCase
                 422,
             ],
             'stale draft' => [new ConflictException('Saved elsewhere'), 409],
-            'no permission' => [new AuthorizationException(__('Not allowed')), 403],
             'content guard' => [new SecurityViolationException(__('Too large')), 422],
         ];
     }

@@ -21,10 +21,13 @@ use Magebit\McpHyvaCommerceTools\Tool\HyvaAi\Worker\WorkerStatus;
 use Magento\Framework\AuthorizationInterface;
 use Magento\User\Model\User;
 use PHPUnit\Framework\MockObject\MockObject;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 class OwnJobsTest extends TestCase
 {
+    use RefusalAssertTrait;
+
     /**
      * @var AiWorkerGatewayInterface&MockObject
      */
@@ -61,17 +64,17 @@ class OwnJobsTest extends TestCase
     public function testAnotherAdminsJobIsRefused(): void
     {
         $this->gateway->method('job')->willReturn(['job_id' => str_repeat('a', 32), 'admin_user_id' => 1]);
-        $result = $this->tool(JobGet::class)->execute(['job_id' => str_repeat('a', 32)]);
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        $tool = $this->tool(JobGet::class);
+        $refusal = $this->assertRefused(fn () => $tool->execute(['job_id' => str_repeat('a', 32)]), 'acl');
+        $this->assertSame('Hyva_AiWorker::jobs', $refusal->getData()['resource'] ?? null);
     }
 
     public function testAJobWithoutOwnerIsNotOwn(): void
     {
         $this->gateway->method('job')->willReturn(['job_id' => str_repeat('b', 32), 'admin_user_id' => null]);
-        $result = $this->tool(JobGet::class)->execute(['job_id' => str_repeat('b', 32)]);
-        $this->assertTrue($result->isError(), 'CLI and scheduler jobs need Hyva_AiWorker::jobs');
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        $tool = $this->tool(JobGet::class);
+        // CLI and scheduler jobs need Hyva_AiWorker::jobs.
+        $this->assertRefused(fn () => $tool->execute(['job_id' => str_repeat('b', 32)]), 'acl');
     }
 
     public function testWorkerStatusSpellsOutWhatStopsJobs(): void

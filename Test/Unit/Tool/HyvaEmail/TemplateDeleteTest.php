@@ -19,6 +19,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateDelete;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -27,6 +28,7 @@ use PHPUnit\Framework\TestCase;
  */
 class TemplateDeleteTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     /**
@@ -131,17 +133,15 @@ class TemplateDeleteTest extends TestCase
         $this->assertTrue($result->getAuditSummary()['forced'] ?? null);
     }
 
-    public function testARestrictedRoleGetsTheSoft403(): void
+    public function testARestrictedRoleIsRefusedWithReasonScope(): void
     {
         $gateway = $this->gateway(self::UNUSED);
         $gateway->expects($this->never())->method('deleteTemplate');
 
-        $result = $this->tool($gateway, [1])->execute(['id' => 12, 'confirm' => true]);
-        $payload = $this->payload($result);
+        $tool = $this->tool($gateway, [1]);
+        $refusal = $this->assertRefused(fn () => $tool->execute(['id' => 12, 'confirm' => true]), 'scope');
 
-        $this->assertTrue($result->isError());
-        $this->assertSame(403, $payload['status']);
-        $this->assertStringContainsString('may not change email templates', Cast::string($payload['error']));
+        $this->assertStringContainsString('may not change email templates', $refusal->getMessage());
     }
 
     public function testWithoutTheNativeDeletePermissionItIsHiddenAndRefused(): void
@@ -152,9 +152,8 @@ class TemplateDeleteTest extends TestCase
 
         // The core lists and runs the tool only for a role with this resource, which this role lacks.
         $this->assertSame('Magento_Email::template', $tool->getUnderlyingAclResource());
-        $result = $tool->execute(['id' => 12, 'confirm' => true]);
-        $this->assertTrue($result->isError());
-        $this->assertSame(403, $this->payload($result)['status']);
+        $refusal = $this->assertRefused(fn () => $tool->execute(['id' => 12, 'confirm' => true]), 'acl');
+        $this->assertSame($tool->getUnderlyingAclResource(), $refusal->getData()['resource'] ?? null);
     }
 
     public function testWithoutHyvasDeletePermissionItIsHiddenAndRefused(): void
@@ -164,12 +163,9 @@ class TemplateDeleteTest extends TestCase
         $tool = $this->tool($gateway, null, ['Hyva_EmailTemplates::email_template_delete' => false]);
 
         $this->assertSame('Hyva_EmailTemplates::email_template_delete', $tool->getUnderlyingAclResource());
-        $result = $tool->execute(['id' => 12, 'confirm' => true]);
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString(
-            'Hyva_EmailTemplates::email_template_delete',
-            Cast::string($this->payload($result)['error'])
-        );
+        $refusal = $this->assertRefused(fn () => $tool->execute(['id' => 12, 'confirm' => true]), 'acl');
+        $this->assertStringContainsString('Hyva_EmailTemplates::email_template_delete', $refusal->getMessage());
+        $this->assertSame('Hyva_EmailTemplates::email_template_delete', $refusal->getData()['resource'] ?? null);
     }
 
     public function testItHasItsOwnResourceAndIsAWriteTool(): void

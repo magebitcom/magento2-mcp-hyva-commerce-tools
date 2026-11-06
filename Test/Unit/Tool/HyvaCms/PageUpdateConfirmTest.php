@@ -9,6 +9,8 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaCms;
 
 use Hyva\CmsConnect\Exception\ConflictException;
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
+use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
@@ -21,10 +23,12 @@ use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockUpdate;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageUpdate;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 class PageUpdateConfirmTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     private const PAGE = ['type' => 'cms_page', 'id' => 7, 'identifier' => 'sale', 'title' => 'Sale',
@@ -119,14 +123,13 @@ class PageUpdateConfirmTest extends TestCase
         $writer = $this->createMock(EntityWriter::class);
         $writer->expects($this->never())->method('update');
 
-        $result = $this->tool($this->createMock(ContentService::class), $writer, [1])->execute([
+        $tool = $this->tool($this->createMock(ContentService::class), $writer, [1]);
+
+        $this->assertRefused(fn () => $tool->execute([
             'identifier' => 'sale',
             'settings' => ['store_ids' => [0]],
             'confirm' => true,
-        ]);
-
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        ]), 'scope');
     }
 
     public function testARestrictedRoleChangesAPageOfItsOwnStoreView(): void
@@ -159,11 +162,13 @@ class PageUpdateConfirmTest extends TestCase
         $writer = $this->createMock(EntityWriter::class);
         $writer->expects($this->never())->method('update');
 
-        $result = $this->tool($this->createMock(ContentService::class), $writer, [1], false, [0])
-            ->execute(['identifier' => 'sale', 'settings' => ['title' => 'Summer sale']]);
+        $tool = $this->tool($this->createMock(ContentService::class), $writer, [1], false, [0]);
 
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('store view 0', json_encode($result->getContent()) ?: '');
+        $refusal = $this->assertRefused(
+            fn () => $tool->execute(['identifier' => 'sale', 'settings' => ['title' => 'Summer sale']]),
+            'scope'
+        );
+        $this->assertStringContainsString('store view 0', $refusal->getMessage());
     }
 
     public function testARestrictedRoleMayNotEmptyTheStoreViewsOfAnAllStoreViewsPage(): void
@@ -172,14 +177,14 @@ class PageUpdateConfirmTest extends TestCase
         $writer = $this->createMock(EntityWriter::class);
         $writer->expects($this->never())->method('update');
 
-        $result = $this->tool($this->createMock(ContentService::class), $writer, [1], false, [0])->execute([
+        $tool = $this->tool($this->createMock(ContentService::class), $writer, [1], false, [0]);
+
+        $refusal = $this->assertRefused(fn () => $tool->execute([
             'identifier' => 'sale',
             'settings' => ['store_ids' => [], 'title' => 'Summer sale'],
             'confirm' => true,
-        ]);
-
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('store view 0', json_encode($result->getContent()) ?: '');
+        ]), 'scope');
+        $this->assertStringContainsString('store view 0', $refusal->getMessage());
     }
 
     /**
@@ -284,6 +289,29 @@ class PageUpdateConfirmTest extends TestCase
         $this->assertSame(['store_ids'], $payload['settings_changed'] ?? null);
     }
 
+    public function testAPermissionRefusedDraftAfterTheMoveStaysSoftWithItsReason(): void
+    {
+        $contentService = $this->createMock(ContentService::class);
+        $contentService->method('getWorkingDocument')->willReturn(['content' => []]);
+        $contentService->method('saveDraft')->willThrowException(new AuthorizationException(__('Not allowed.')));
+        $writer = $this->createMock(EntityWriter::class);
+        $writer->expects($this->once())->method('update')->willReturn(['store_ids']);
+
+        $result = $this->tool($contentService, $writer, [1], false, [0], $this->editor())->execute([
+            'identifier' => 'sale',
+            'operations' => [['op' => 'remove', 'uid' => 'x']],
+            'settings' => ['store_ids' => [1]],
+            'confirm' => true,
+        ]);
+        $payload = $this->payload($result);
+
+        // Settings were written, so the reply must say so: a soft error, not a -32004 refusal.
+        $this->assertTrue($result->isError());
+        $this->assertTrue($payload['settings_applied'] ?? null);
+        $this->assertSame('acl', $payload['reason'] ?? null);
+        $this->assertArrayNotHasKey('status', $payload);
+    }
+
     public function testADraftRefusalKnownBeforeTheMoveWritesNothing(): void
     {
         // F4: a stale base_version_uid is refused before the page is moved, so nothing is written.
@@ -356,15 +384,22 @@ class PageUpdateConfirmTest extends TestCase
         $this->assertSame(['draft', 'settings'], $order);
     }
 
-    public function testAFailingSettingsSaveReportsTheAlreadySavedDraft(): void
-    {
+    /**
+     * @dataProvider settingsErrorProvider
+     * @param LocalizedException $settingsError
+     * @param string|null $reason
+     */
+    public function testAFailingSettingsSaveReportsTheAlreadySavedDraft(
+        LocalizedException $settingsError,
+        ?string $reason
+    ): void {
         $contentService = $this->createMock(ContentService::class);
         $contentService->method('getWorkingDocument')->willReturn(['content' => []]);
         $contentService->expects($this->once())->method('saveDraft')->willReturn(['version_uid' => 'v1']);
         $editor = $this->createMock(DraftEditor::class);
         $editor->method('apply')->willReturn(['document' => ['content' => []], 'applied' => []]);
         $writer = $this->createMock(EntityWriter::class);
-        $writer->method('update')->willThrowException(new LocalizedException(__('Could not save')));
+        $writer->method('update')->willThrowException($settingsError);
         $locator = $this->createMock(ContentLocator::class);
         $locator->method('locateForWrite')->willReturn(['is_active' => false] + self::PAGE);
         $tool = new PageUpdate(
@@ -387,6 +422,18 @@ class PageUpdateConfirmTest extends TestCase
         $this->assertTrue($payload['draft_saved'] ?? null);
         $this->assertFalse($payload['settings_applied'] ?? null);
         $this->assertSame(['version_uid' => 'v1'], $payload['draft'] ?? null);
+        $this->assertSame($reason, $payload['reason'] ?? null);
+    }
+
+    /**
+     * @return array<string, array{LocalizedException, string|null}>
+     */
+    public static function settingsErrorProvider(): array
+    {
+        return [
+            'plain error' => [new LocalizedException(__('Could not save')), null],
+            'scope refusal' => [new OutOfScopeException(__('Outside.')), 'scope'],
+        ];
     }
 
     /**

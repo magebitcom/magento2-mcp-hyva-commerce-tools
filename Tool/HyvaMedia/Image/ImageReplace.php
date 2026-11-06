@@ -22,6 +22,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\ArrayBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Exception\AclRefusalException;
 
 /**
  * `hyva_media.image.replace` MCP tool.
@@ -112,7 +113,10 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
         $requested = $scope === 'global' ? ContentLocator::TYPES : [$scope];
         $types = $this->contentAcl->allowedTypes($requested, ContentAcl::VERB_SAVE);
         if ($types === []) {
-            return $this->softError(sprintf('Your role may not save %s drafts.', implode(' / ', $requested)));
+            throw new AclRefusalException(
+                __('Your role may not save %1 drafts.', implode(' / ', $requested)),
+                $this->contentAcl->resources($requested, [ContentAcl::VERB_SAVE])
+            );
         }
         $targets = $this->editor->findTargets($old, $types, $this->intListArg($arguments, 'entity_ids'));
         // A role restricted to some websites or store views only changes the content it may change.

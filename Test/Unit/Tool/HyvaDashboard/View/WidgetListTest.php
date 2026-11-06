@@ -19,10 +19,12 @@ use Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\ToolPayloadTrait;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaDashboard\View\WidgetList;
 use Magento\Framework\Exception\AuthorizationException;
 use Magento\User\Model\User;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 class WidgetListTest extends TestCase
 {
+    use RefusalAssertTrait;
     use ToolPayloadTrait;
 
     public function testAHyvaPermissionRefusalStaysARefusal(): void
@@ -37,6 +39,6 @@ class WidgetListTest extends TestCase
         $context->set(new AuthenticatedContext($this->createMock(TokenInterface::class), $user));
         $tool = new WidgetList($features, $catalog, new CallerContext($context, $this->createMock(AclChecker::class)));
 
-        $this->assertSame(403, $this->payloadAt($tool->execute(['view_id' => 1]), 'status'));
+        $this->assertRefused(fn () => $tool->execute(['view_id' => 1]), 'acl');
     }
 }

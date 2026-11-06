@@ -18,6 +18,7 @@ use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Category\CategorySyncPreview;
 use Magento\Framework\Exception\AuthorizationException;
 use Magebit\Mcp\Api\ToolResultInterface;
 use PHPUnit\Framework\MockObject\MockObject;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -25,6 +26,7 @@ use PHPUnit\Framework\TestCase;
  */
 class CategorySyncPreviewTest extends TestCase
 {
+    use RefusalAssertTrait;
     use ToolPayloadTrait;
 
     public function testThePreviewLocatesTheMenuForReading(): void
@@ -69,10 +71,7 @@ class CategorySyncPreviewTest extends TestCase
         $menus->method('resolveImportStoreId')->willThrowException(new AuthorizationException(__('Outside.')));
         $menus->expects($this->never())->method('planCategoryImport');
 
-        $result = $this->runTool(['store_id' => 0], $menus);
-
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        $this->assertRefused(fn () => $this->runTool(['store_id' => 0], $menus), 'acl');
     }
 
     /**

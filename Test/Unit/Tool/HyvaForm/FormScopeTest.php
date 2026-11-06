@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Model\Form\FormRules;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormUpdateDraft;
 use PHPUnit\Framework\MockObject\MockObject;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -24,6 +25,7 @@ use PHPUnit\Framework\TestCase;
  */
 class FormScopeTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     /**
@@ -35,18 +37,16 @@ class FormScopeTest extends TestCase
     {
         $this->gateway($this->form([2]));
         $this->gateway->expects($this->never())->method('update');
-        $result = $this->tool([1])->execute(['id' => 3, 'title' => 'Contact us']);
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        $tool = $this->tool([1]);
+        $this->assertRefused(fn () => $tool->execute(['id' => 3, 'title' => 'Contact us']), 'scope');
     }
 
     public function testAFormMayNotBeMovedToAllStoreViews(): void
     {
         $this->gateway($this->form([1]));
         $this->gateway->expects($this->never())->method('update');
-        $result = $this->tool([1])->execute(['id' => 3, 'store_ids' => [0]]);
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        $tool = $this->tool([1]);
+        $this->assertRefused(fn () => $tool->execute(['id' => 3, 'store_ids' => [0]]), 'scope');
     }
 
     public function testAFormOfTheOwnStoreViewIsChanged(): void

@@ -14,6 +14,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ListPagination;
 use Magebit\McpHyvaCommerceTools\Model\Tool\StoreCredit\AbstractStoreCreditTool;
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
 
 class HistoryList extends AbstractStoreCreditTool
 {
@@ -72,9 +73,10 @@ class HistoryList extends AbstractStoreCreditTool
             $this->website($websiteId);
             $this->assertWebsiteAllowed($websiteId, false);
         } elseif ($scopes['restricted']) {
-            return $this->softError('Your admin role is restricted to some websites: pass website_id.', [
-                'allowed_website_ids' => $scopes['website_ids'],
-            ]);
+            throw new OutOfScopeException(
+                __('Your admin role is restricted to some websites: pass website_id.'),
+                ['allowed_website_ids' => $scopes['website_ids']]
+            );
         }
         $to = $this->stringArg($arguments, 'to');
         if ($to !== null && strlen($to) === 10) {

@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateSendTest;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\MailException;
 use PHPUnit\Framework\MockObject\MockObject;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -24,6 +25,7 @@ use PHPUnit\Framework\TestCase;
  */
 class TemplateSendTestScopeTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     public function testWithoutAStoreViewTheFirstReadableOneIsUsed(): void
@@ -41,10 +43,12 @@ class TemplateSendTestScopeTest extends TestCase
         $gateway = $this->gateway();
         $gateway->expects($this->never())->method('sendTest');
 
-        $result = $this->tool($gateway)->execute(['id' => 4, 'recipient' => 'a@b.co', 'store_id' => 0]);
+        $tool = $this->tool($gateway);
 
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        $this->assertRefused(
+            fn () => $tool->execute(['id' => 4, 'recipient' => 'a@b.co', 'store_id' => 0]),
+            'scope'
+        );
     }
 
     public function testTransportFailureIsSoftError(): void

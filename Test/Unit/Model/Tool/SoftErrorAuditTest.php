@@ -35,6 +35,7 @@ use PHPUnit\Framework\TestCase;
 
 class SoftErrorAuditTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     public function testTheAuditSummaryKeepsACodeNotTheMessage(): void
@@ -64,34 +65,32 @@ class SoftErrorAuditTest extends TestCase
     }
 
     /**
-     * T-90: a store scope refusal is audited with its reason, like the in-use refusal; the reply is the same soft 403.
+     * A store scope refusal refuses the whole call (-32004); core audits it, the reason travels in error.data.
      */
-    public function testAScopeRefusalIsAuditedAsOutOfScope(): void
+    public function testAScopeRefusalIsRefusedWithReasonScope(): void
     {
-        $result = (new NewsletterPublish(
+        $tool = (new NewsletterPublish(
             $this->features(),
             $this->createMock(EmailGatewayInterface::class),
             $this->createMock(ContentService::class),
             $this->createMock(PreviewService::class),
             $this->storeScope([1])
-        ))->execute(['id' => 4, 'confirm' => true]);
+        ));
 
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
-        $this->assertSame(['error' => 'out_of_scope'], $result->getAuditSummary());
+        $this->assertRefused(fn () => $tool->execute(['id' => 4, 'confirm' => true]), 'scope');
     }
 
     /**
-     * The create tools' own store view check is a scope refusal too: audited as out_of_scope, same soft 403 reply.
+     * The create tools' own store view check is a scope refusal too, naming the refused store views.
      *
      * @param class-string<PageCreate|BlockCreate> $class
      * @dataProvider createToolProvider
      */
-    public function testACreateOutsideTheScopeIsAuditedAsOutOfScope(string $class): void
+    public function testACreateOutsideTheScopeIsRefusedWithTheDeniedStoreViews(string $class): void
     {
         $writer = $this->createMock(EntityWriter::class);
         $writer->expects($this->never())->method('create');
-        $result = (new $class(
+        $tool = (new $class(
             $writer,
             $this->createMock(ContentService::class),
             $this->createMock(ComponentTree::class),
@@ -101,11 +100,13 @@ class SoftErrorAuditTest extends TestCase
             new LiveSettings(),
             $this->createMock(ContentAcl::class),
             $this->storeScope([1])
-        ))->execute(['title' => 'Sale', 'identifier' => 'sale', 'store_ids' => [2]]);
+        ));
 
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
-        $this->assertSame(['error' => 'out_of_scope'], $result->getAuditSummary());
+        $refusal = $this->assertRefused(
+            fn () => $tool->execute(['title' => 'Sale', 'identifier' => 'sale', 'store_ids' => [2]]),
+            'scope'
+        );
+        $this->assertSame([2], $refusal->getData()['denied_store_ids'] ?? null);
     }
 
     /**
@@ -116,21 +117,21 @@ class SoftErrorAuditTest extends TestCase
         return ['page' => [PageCreate::class], 'block' => [BlockCreate::class]];
     }
 
-    public function testAPermissionRefusalKeepsTheStatusCode(): void
+    public function testAPermissionRefusalNamesTheMissingResource(): void
     {
         $caller = $this->createMock(CallerContext::class);
         $caller->method('isAllowed')->willReturn(false);
-        $result = (new PageDelete(
+        $tool = (new PageDelete(
             $this->createMock(ContentLocator::class),
             new ContentAcl($this->createMock(ContentTypeAuthorization::class), $caller),
             $caller,
             $this->createMock(DeletionUsage::class),
             $this->createMock(EntityWriter::class),
             $this->createMock(PendingScheduleCleanup::class)
-        ))->execute(['id' => 5, 'confirm' => true]);
+        ));
 
-        $this->assertTrue($result->isError());
-        $this->assertSame(['error' => 'status_403'], $result->getAuditSummary());
+        $refusal = $this->assertRefused(fn () => $tool->execute(['id' => 5, 'confirm' => true]), 'acl');
+        $this->assertSame('Magento_Cms::page_delete', $refusal->getData()['resource'] ?? null);
     }
 
     /**

@@ -17,6 +17,7 @@ use Magebit\McpHyvaCommerceTools\Model\Media\ImageContentEditor;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageUpdateAlt;
 use PHPUnit\Framework\MockObject\MockObject;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -24,6 +25,8 @@ use PHPUnit\Framework\TestCase;
  */
 class ImageUpdateAltTest extends TestCase
 {
+    use RefusalAssertTrait;
+
     private const TARGETS = [['entity_type' => 'cms_page', 'id' => 13, 'identifier' => 'sale']];
 
     public function testItWritesTheDraftsOnTheFirstCallAndSaysSo(): void
@@ -42,6 +45,23 @@ class ImageUpdateAltTest extends TestCase
         $this->assertFalse($payload['dry_run'] ?? null);
         $this->assertFalse($payload['published'] ?? null);
         $this->assertCount(1, Cast::array($payload['drafts'] ?? null));
+    }
+
+    public function testARoleThatMayNotSaveTheTypeIsRefusedWithTheResource(): void
+    {
+        $editor = $this->editor();
+        $editor->expects($this->never())->method('rewrite');
+        $acl = $this->createMock(ContentAcl::class);
+        $acl->method('allowedTypes')->willReturn([]);
+        $acl->method('resources')->with(['cms_page'], [ContentAcl::VERB_SAVE])->willReturn(['Hyva_Cms::page_save']);
+        $tool = $this->tool($editor, $acl);
+
+        $refusal = $this->assertRefused(
+            fn () => $tool->execute(['path' => 'wysiwyg/a.jpg', 'alt' => 'A', 'scope' => 'cms_page']),
+            'acl'
+        );
+        $this->assertSame('Your role may not save cms_page drafts.', $refusal->getMessage());
+        $this->assertSame('Hyva_Cms::page_save', $refusal->getData()['resource'] ?? null);
     }
 
     public function testTheSchemaAcceptsConfirmSoAPreviewMindedCallIsNoSchemaError(): void
@@ -72,12 +92,15 @@ class ImageUpdateAltTest extends TestCase
      * Update-alt tool for an unrestricted role that may save every content type.
      *
      * @param ImageContentEditor $editor
+     * @param ContentAcl|null $acl Default: may save every content type
      * @return ImageUpdateAlt
      */
-    private function tool(ImageContentEditor $editor): ImageUpdateAlt
+    private function tool(ImageContentEditor $editor, ?ContentAcl $acl = null): ImageUpdateAlt
     {
-        $acl = $this->createMock(ContentAcl::class);
-        $acl->method('allowedTypes')->willReturnArgument(0);
+        if ($acl === null) {
+            $acl = $this->createMock(ContentAcl::class);
+            $acl->method('allowedTypes')->willReturnArgument(0);
+        }
         $locator = $this->createMock(ContentLocator::class);
         $locator->method('partitionByScope')->willReturnCallback(
             static fn (array $targets): array => ['writable' => $targets, 'read_only' => []]
