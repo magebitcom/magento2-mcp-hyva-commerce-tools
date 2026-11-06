@@ -29,6 +29,12 @@ class ScheduleCancel extends AbstractContentTool
     public const CONTENT_VERBS = [ContentAcl::VERB_SCHEDULE_CANCEL, ContentAcl::VERB_VIEW];
 
     /**
+     * Hyvä keeps cancelled items and releases as history; there is no delete (T-141).
+     */
+    public const HISTORY_NOTE = 'Cancelled items and releases stay in the release list with status cancelled: Hyvä '
+        . 'keeps them as history and has no delete.';
+
+    /**
      * @param ScheduleService $scheduleService
      * @param ContentAcl $contentAcl
      * @param ContentLocator $contentLocator
@@ -56,7 +62,8 @@ class ScheduleCancel extends AbstractContentTool
     public function getDescription(): string
     {
         return 'Cancel pending scheduled items (item_ids) or a whole release (release_id). Drafts, versions and live '
-            . 'content are not changed; a release with no pending items left is cancelled too.';
+            . 'content are not changed; a release with no pending items left is cancelled too. Cancelled items and '
+            . 'releases stay in the release list (Hyvä keeps history).';
     }
 
     /**
@@ -109,7 +116,10 @@ class ScheduleCancel extends AbstractContentTool
                 && $this->contentScopeFilter->viewableTypes([$type]) !== []
                 && $this->contentLocator->allowsWrite($type, $entityId)
         );
-        return $this->jsonResult($result + ['content_changed' => false], [
+        return $this->jsonResult($result + [
+            'content_changed' => false,
+            'note' => self::HISTORY_NOTE,
+        ], [
             'items' => count($result['cancelled_items']),
             'releases' => count($result['cancelled_releases']),
         ]);

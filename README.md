@@ -793,6 +793,9 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
 
 - **Scheduling.** Hyvä scheduled releases are one-way: there is no end date. `hyva_cms.schedule.detect_conflicts`
   reports a `no_fallback` info when nothing restores the previous content after a campaign.
+- **Cancelled releases stay.** `hyva_cms.schedule.cancel` sets items and releases to `cancelled`; Hyvä keeps them as
+  history and has no delete, so they stay in `hyva_cms.schedule.list` (with a status filter other than `pending`) and
+  in the admin release list. The cancel reply says so (`note`).
 - **Schedule list cap.** `hyva_cms.schedule.list` with a status other than `pending` lists the newest releases first
   and reads at most the newest 1000 items. It reports `truncated: true` when it cut; the release cut by the cap is left
   out, so no release is partial. `total_releases` counts releases within the items read. Pending is never capped.
