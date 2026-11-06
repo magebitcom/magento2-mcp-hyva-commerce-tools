@@ -21,7 +21,6 @@ and content health.
 - [Prompts](#prompts)
 - [Dashboard widgets](#dashboard-widgets)
 - [Notes on Hyvä behaviour](#notes-on-hyvä-behaviour)
-- [Upgrade notes](#upgrade-notes)
 - [Development](#development)
 - [License](#license)
 
@@ -471,6 +470,9 @@ each of them.
 | `hyva_email.newsletter.create_draft` | Always saves a versioned draft (Hyvä's blank `email_wrapper` when no components are given) and returns `draft` with `version_id`, `version_uid` and `warnings`. |
 | `hyva_cms.tailwind.status` | `reason` is `daemon_not_responding` when `healthy` is false, else `null`. `hint` names the next step for the compilation strategy and daemon management mode. `daemon_management` honours Hyvä's legacy env.php flag `hyva_cms_tailwind/cron_daemon_manager_enabled`, as Hyvä does. |
 | `hyva_cms.component.schema` | Field `options` from a source model (e.g. the menu widget's `menu_identifier`) are read at request time, so a menu created after Hyvä cached its components is listed. The menu widget's options list only menus the role may view (`Hyva_MenuBuilder::menu_view`) in store views it may read, as `hyva_menu.list` does; `options_hidden_by_permissions` counts the rest. |
+| Menu tools that take an `identifier` | With `store_id`, the identifier finds the menu assigned to that store view, else the one for all store views, active or not; `store_id: 0` matches only a menu for all store views. Without `store_id`, an identifier that several store views share is refused with the candidate ids and store views (`store_id: 0` is named "all store views"). The match is case-insensitive. |
+| `hyva_media.image.list` | `folder` limits the Media Gallery images to that folder and its subfolders, and the scan to that folder. An unknown folder adds a `hint`. Without `folder`, the list is every gallery image plus a scan of `wysiwyg`. |
+| `hyva_email.template.send_test` | With Email & Newsletter Templates 1.0.1+ the mail is rendered inside Hyvä's test-send context, so order components show the preview fixture (items, totals, addresses) as the admin "Send test" does, and the fallbacks are Hyvä's `FixtureDefaults`. On 1.0.0 the render has no fixture. |
 | `hyva_media.trash.list`, `hyva_media.asset.search` | `trashed_at` and `updated_at` are UTC `Y-m-d H:i:s`, read from the database (seconds), as in every other media reply. |
 | Media audits (`hyva_media.audit_*`, `hyva_commerce.audit.media`) | `counts` is a JSON object, `{}` when no image has a problem. |
 
@@ -827,8 +829,8 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
   `hyva_media.asset.trash` resolve links and refuse a target folder or an asset file whose real path lies outside
   `pub/media` (soft error; assets in `paths_outside_media`). Other media tools follow Magento's rule.
 - **Links in the literal-URL audit.** Link field values (`{type, value, src, ...}`) are not images: their `src` is the
-  link target of a `custom_url` or `cms_page` link. `hyva_media.audit.literal_urls` skips them; before, menu
-  `custom_url` links showed up as `literal_not_in_gallery`.
+  link target of a `custom_url` or `cms_page` link. `hyva_media.audit.literal_urls` skips them, so they are never
+  counted as `literal_not_in_gallery`.
 - **Optimized image cleanup.** `hyva_media.optimization.clear` also removes conversions of resized variants
   (`converted/resized/<hash>`), which Hyvä's own cleaner leaves behind.
 - **Category import.** `hyva_menu.category.import` leaves out new subcategories of a category whose menu item lies
@@ -849,130 +851,6 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
 - **Dashboard services.** Several Hyvä Admin Dashboard services (view model, widget instance repository, widget auth)
   need the admin session or adminhtml-only configuration. The dashboard tools therefore read views and widgets through
   the explicit-id services, the widget configuration and the instance table.
-
-## Upgrade notes
-
-### Since 0.1.0 (release 0.2.0)
-
-Hyvä Commerce 1.4.1 and Store Credit `^1.0.1 || ^2.0` are supported; 1.4.0 still works.
-
-After deploying, run `bin/magento setup:di:compile` and `cache:flush`: several constructors changed. No DB change. New
-tools `hyva_email.template.delete` and `hyva_email.newsletter.delete` (128 tools, was 126); their two ACL resources come
-from `etc/acl.xml` and are granted to no role.
-
-Clients that parse replies:
-
-- **Media dates are UTC `Y-m-d H:i:s`.** `hyva_media.trash.list` `trashed_at` and `hyva_media.asset.search`
-  `updated_at` were Hyvä's locale strings in store time (e.g. `"Nov 3, 2026, 2:10 PM"`). They are now UTC SQL
-  datetimes (e.g. `"2026-11-03 20:10:00"`), as in every other media reply.
-- **Media audit `counts` is always an object.** With no image problem it is `{}`, not `[]` (`hyva_media.audit_*`,
-  `hyva_commerce.audit.media`, `media.counts` in `hyva_commerce.audit.menu`).
-- **`hyva_media.image.replace` needs `"confirm": true` for every scope.** With one content type (`cms_page`,
-  `cms_block`, `menu`) it saved the drafts on the first call (`dry_run: false`). Without `confirm` it now writes
-  nothing and returns the preview (`action: "replace_image"`), as `scope=global` already did. A call with nothing to
-  change still answers with the soft error at once.
-- **`hyva_menu.create` with `is_active: true` needs `"confirm": true`.** Without it nothing is created and the reply is
-  the preview (`action: "create_active"`), as for pages and blocks. An inactive create is unchanged.
-- **`hyva_email.template.send_test` mail failures are soft errors.** A transport failure was JSON-RPC error `-32011`.
-  It is now a tool result with `isError: true`, `sent: false` and `status: "transport_error"`. See
-  [Refusals](#refusals).
-- **`hyva_email.template.send_test` sends the admin's sample order.** With Email & Newsletter Templates 1.0.1+ the
-  mail is rendered inside Hyvä's test-send context, so order components show the preview fixture (items, totals,
-  addresses) as the admin "Send test" does, and the fallbacks are Hyvä's `FixtureDefaults`. On 1.0.0 nothing changes.
-- **`hyva_media.trash.restore` reports the id change.** Each `assets` entry gains `asset_id` (the new id), and the
-  reply a `note` that points to `hyva_media.audit.literal_urls` (`stale_asset_id`) for image fields still holding the
-  old id; the restore itself does not scan the content. See [Notes on Hyvä behaviour](#notes-on-hyvä-behaviour).
-- **`hyva_media.audit.literal_urls` no longer counts link fields** as `literal_not_in_gallery`.
-- **`hyva_linked.group.save` answers a Hyvä refusal softly.** A save that Linked Products refuses after the check (a
-  concurrent save took the name or the products; 1.0.2 says so in its own words) was a JSON-RPC error; it is now a
-  soft error with status 409 and `issues` code `save_refused`.
-- **Menu tools are listed only with every verb they need.** `hyva_menu.schedule.create` / `.cancel` also need
-  `Hyva_MenuBuilder::menu_view` to be listed, and `hyva_menu.version.restore` needs `menu_version_history` next to
-  `menu_save`. Before, they were listed with their first verb and every call of a role missing the rest was refused.
-- **Media move and trash refuse paths outside `pub/media`.** A target folder or asset file that a symbolic link takes
-  outside `pub/media` is refused with a soft error, preview included; nothing is moved or trashed.
-- **Page and block scheduling needs view.** `hyva_cms.schedule.*` on a page or block also needs `Hyva_Cms::page_view` /
-  `Hyva_Cms::block_view`, as menus already needed `Hyva_MenuBuilder::menu_view`. A role without it is refused
-  (`-32004`) and no longer sees those items in the schedule list or conflicts. See [ACL](#acl).
-- **A menu `identifier` with `store_id` finds inactive and unpublished menus.** It was resolved by Hyvä's storefront
-  loader, so it only found active menus, and `store_id: 0` matched a menu of any store view. It now takes the menu
-  assigned to that store view, else one for all store views, active or not; `store_id: 0` matches only the latter.
-- **A menu `identifier` without `store_id` that several store views share is refused** with the candidate ids and store
-  views (`store_id: 0` is named 'all store views'), and the match is case-insensitive. It used to pick the first menu.
-- **Publishing an inactive menu needs `"confirm": true`.** `hyva_menu.publish` and `hyva_cms.publish` with
-  `entity_type: "menu"` used to publish and activate it at once; without confirm the reply is now the preview
-  (`action: "publish_activate"`). Publishing an active menu, a page or a block is unchanged.
-- **Page and block deletes cancel pending scheduled items.** The `hyva_cms.page.delete` / `hyva_cms.block.delete`
-  preview gains `details.scheduled_items` and the result `scheduled_items_cancelled` /
-  `scheduled_releases_cancelled` (or a `warning`), as `hyva_menu.delete` has.
-- **`hyva_media.image.list` filters by `folder`.** `folder` now also limits the Media Gallery images to that folder and
-  its subfolders (before, only the scan of the folder was limited). An unknown folder adds a `hint`. Without `folder`,
-  the list is every gallery image plus a scan of `wysiwyg`.
-- **`fields` takes `has_draft`, `is_published` and `draft_differs` as top-level keys** in `hyva_cms.page.get`,
-  `hyva_cms.block.get` and `hyva_menu.get`. See [Draft status](#draft-status).
-- **Calls that write without confirm say `dry_run: false`.** Page/block update, menu update, image alt and replace,
-  optimization clear and migration convert_to_draft replies gain the key; nothing else in them changed. See
-  [Confirm and previews](#confirm-and-previews).
-
-Custom code:
-
-- **`Tool\HyvaCms\Content\Publish` (and `Tool\HyvaMenu\Release\MenuPublish`) takes a `Model\Tool\LiveSettings`** as
-  its last constructor argument (it previews the activation of an inactive menu).
-- **`Tool\HyvaMenu\Menu\MenuDelete` and `Model\Tool\Entity\AbstractEntityDelete` (`PageDelete`, `BlockDelete`) take a
-  `Model\Content\PendingScheduleCleanup`** as their last constructor argument (it cancels the deleted entity's
-  pending scheduled items).
-- **`Model\Content\ComponentCatalog` takes a `CollectorFactory`, a `LoggerInterface` and a
-  `Model\Content\MenuOptionScope`** as its last constructor arguments (the scope cuts the `hyva_menu_widget` menu options
-  to the menus the caller may see).
-- **`Api\Adapter\LinkedProductsGatewayInterface::save()`** throws `ValidatorException` when Hyvä refuses the group;
-  `GroupSave` turns it into the soft 409.
-- **`Api\Adapter\EmailGatewayInterface`** gains `deletionUsage()`, `deleteTemplate()` and `deleteNewsletter()`. A
-  project that replaces the module's preference for it must add them, or PHP stops with a fatal error.
-- **`Api\FeatureCheckerInterface`** gains `isInstalledAndEnabled(string $feature): bool`. A custom implementation must
-  add it.
-- **`AbstractTool::DELETE_TOOL_NOTE`** takes the article in `%1$s` ("a menu", "an email template").
-- **`Tool\HyvaMenu\Menu\MenuCreate` takes a `Model\Tool\LiveSettings`** as its last constructor argument.
-- **`ScheduleList`, `ScheduleCreate`, `ScheduleCancel` and `ScheduleDetectConflicts`** (`Tool\HyvaCms\Schedule`) take a
-  `Model\Content\ContentScopeFilter` as their last constructor argument.
-- **`Model\Content\ContentScopeFilter` takes a `FeatureCheckerInterface`** as its last constructor argument.
-  `Model\Content\DeletionUsage` no longer takes one.
-- **`Model\Content\PreviewService` takes a `Model\Content\AdminEditorUrl` instead of `BackendUrl`.**
-- **`Tool\HyvaMedia\Asset\AssetMove` and `AssetTrash` take a `Model\Media\MediaFileInfo`** as their last constructor
-  argument. `MediaFileInfo` takes a `Magento\Framework\Filesystem\Driver\File` as its last one.
-- **`Model\Adapter\MediaGallery\MediaGalleryGateway` takes a `TimezoneInterface` and a `ResolverInterface`** as its
-  last constructor arguments (they parse Hyvä's locale date strings, in the store locale and time zone, into UTC).
-- **Dashboard widget data holds `route` + `params`, not `url`.** This covers the rows and footer links of the Magebit
-  widgets (`AbstractHealthWidget`); `health-summary.phtml` builds the URL when it renders.
-  `AbstractHealthWidget::row()` takes `?array $link` instead of `?string $url`. `ContentHealth`, `MenuHealth`,
-  `CampaignCalendar`, `CampaignAssetReadiness` and `MigrationStatus` take `Model\Content\AdminEditorUrl` instead of
-  `UrlInterface`; `McpActivity` and `MediaHealth` no longer take `UrlInterface`. Widget data cached before the upgrade still renders.
-- **`Model\Tool\Media\AbstractMediaTool` takes a `FeatureCheckerInterface`** (constructor), and hides its tools
-  without Media Gallery. A subclass must pass it to `parent::__construct()`. The `hyva_media.image.*` and
-  `hyva_media.audit_*` tools and `MediaStatus` take it as their first constructor argument.
-
-### Since 0.0.1 (breaking for custom gateways and for clients that parse replies)
-
-`Api\Adapter\MenuGatewayInterface` has a new method `delete(int $menuId): void`, used by `hyva_menu.delete`.
-
-- **Projects that keep the module's `MenuGateway`** need no change.
-- **Projects that replace the module's preference for this interface** in their own `di.xml` must add the method.
-  Otherwise PHP stops with a fatal error when the class is loaded.
-
-Three reply shapes changed. Clients that read them must switch:
-
-- **Confirm previews have one envelope: `affected` is always a list and context sits in `details`.** In 0.0.1
-  `hyva_media.asset.trash` had `affected.assets` and `affected.in_use`, `hyva_media.asset.move` had `affected.assets`
-  and `affected.target_folder`, and `hyva_media.image.replace` (scope=global) had `affected.hyva_entities`. Now the
-  items are `affected[]` and the context is `details.*` (e.g. `details.in_use`, `details.target_folder`).
-  `hyva_media.optimization.clear` (all_images) had its counts and `mode` as the only `affected` entry; now `affected`
-  lists sample paths, `total` counts every file and the counts and `mode` are in `details`.
-- **`hyva_media.asset.trash`: `in_use` is a boolean**, in the preview (`details.in_use`) and in the confirmed reply,
-  as in the delete tools. In 0.0.1 it was the number of assets still in use (preview: `affected.in_use`). Read that
-  number from `in_use_count` (preview: `details.in_use_count`).
-- **`hyva_media.image.replace` (scope=global) preview lists each entity once.** In 0.0.1 every usage that is not
-  changed was in `affected.not_editable_usages`. Now the usages of an entity that is changed sit on that entity's
-  `affected[]` row as `not_editable_usages`, and `details.not_editable_usages` keeps only entities that are not
-  changed at all. Read both to get every usage. The confirmed reply's `not_changed` still lists all of them.
 
 ## Development
 
