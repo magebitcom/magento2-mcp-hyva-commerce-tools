@@ -803,10 +803,10 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
 - **Trash and asset ids.** Trashing deletes the Media Gallery asset row and Hyvä's trash keeps no asset id, so a
   restored file always comes back with a new asset id. References by the old id are stale: they still render (Hyvä
   falls back to the stored path) but no longer follow the asset when it moves. The `hyva_media.trash.restore` reply
-  gives each restored asset's new `asset_id`, the image fields still holding an old id (`stale_references`, the old id
-  in `asset_id`) and those old ids (`previous_asset_ids`). Re-link them with `hyva_media.image.replace` using the same
-  path as `old_path` and `new_path`: it saves drafts that carry the new id. `hyva_media.audit.literal_urls` lists
-  them too (`stale_asset_id`).
+  gives each restored asset's new `asset_id` and does not scan the content (that would read every document on each
+  restore). Find the image fields still holding an old id with `hyva_media.audit.literal_urls` (category
+  `stale_asset_id`, the old id in `asset_id`), then re-link them with `hyva_media.image.replace` using the same path
+  as `old_path` and `new_path`: it saves drafts that carry the new id.
 - **Links in the literal-URL audit.** Link field values (`{type, value, src, ...}`) are not images: their `src` is the
   link target of a `custom_url` or `cms_page` link. `hyva_media.audit.literal_urls` skips them; before, menu
   `custom_url` links showed up as `literal_not_in_gallery`.
@@ -853,10 +853,9 @@ Clients that parse replies:
 - **`hyva_email.template.send_test` sends the admin's sample order.** With Email & Newsletter Templates 1.0.1+ the
   mail is rendered inside Hyvä's test-send context, so order components show the preview fixture (items, totals,
   addresses) as the admin "Send test" does, and the fallbacks are Hyvä's `FixtureDefaults`. On 1.0.0 nothing changes.
-- **`hyva_media.trash.restore` reports the id change.** Each `assets` entry gains `asset_id` (the new id),
-  `previous_asset_ids` and `stale_references`, and the reply a `note`. If the content scan for the old ids fails
-  after the restore, `stale_references` is empty and the reply gains a `warning`. See
-  [Notes on Hyvä behaviour](#notes-on-hyvä-behaviour).
+- **`hyva_media.trash.restore` reports the id change.** Each `assets` entry gains `asset_id` (the new id), and the
+  reply a `note` that points to `hyva_media.audit.literal_urls` (`stale_asset_id`) for image fields still holding the
+  old id; the restore itself does not scan the content. See [Notes on Hyvä behaviour](#notes-on-hyvä-behaviour).
 - **`hyva_media.audit.literal_urls` no longer counts link fields** as `literal_not_in_gallery`.
 - **`hyva_linked.group.save` answers a Hyvä refusal softly.** A save that Linked Products refuses after the check (a
   concurrent save took the name or the products; 1.0.2 says so in its own words) was a JSON-RPC error; it is now a
