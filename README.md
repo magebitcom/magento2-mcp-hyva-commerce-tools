@@ -852,10 +852,13 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
 
 ## Upgrade notes
 
-### Since 0.1.0
+### Since 0.1.0 (release 0.2.0)
 
-After deploying, run `bin/magento setup:di:compile` and `cache:flush`: several constructors changed. No DB change; the
-two new delete resources come from `etc/acl.xml` and are granted to no role.
+Hyvä Commerce 1.4.1 and Store Credit `^1.0.1 || ^2.0` are supported; 1.4.0 still works.
+
+After deploying, run `bin/magento setup:di:compile` and `cache:flush`: several constructors changed. No DB change. New
+tools `hyva_email.template.delete` and `hyva_email.newsletter.delete` (128 tools, was 126); their two ACL resources come
+from `etc/acl.xml` and are granted to no role.
 
 Clients that parse replies:
 
@@ -894,26 +897,33 @@ Clients that parse replies:
 - **A menu `identifier` with `store_id` finds inactive and unpublished menus.** It was resolved by Hyvä's storefront
   loader, so it only found active menus, and `store_id: 0` matched a menu of any store view. It now takes the menu
   assigned to that store view, else one for all store views, active or not; `store_id: 0` matches only the latter.
+- **A menu `identifier` without `store_id` that several store views share is refused** with the candidate ids and store
+  views (`store_id: 0` is named 'all store views'), and the match is case-insensitive. It used to pick the first menu.
 - **Publishing an inactive menu needs `"confirm": true`.** `hyva_menu.publish` and `hyva_cms.publish` with
   `entity_type: "menu"` used to publish and activate it at once; without confirm the reply is now the preview
   (`action: "publish_activate"`). Publishing an active menu, a page or a block is unchanged.
 - **Page and block deletes cancel pending scheduled items.** The `hyva_cms.page.delete` / `hyva_cms.block.delete`
   preview gains `details.scheduled_items` and the result `scheduled_items_cancelled` /
   `scheduled_releases_cancelled` (or a `warning`), as `hyva_menu.delete` has.
+- **`hyva_media.image.list` filters by `folder`.** `folder` now also limits the Media Gallery images to that folder and
+  its subfolders (before, only the scan of the folder was limited). An unknown folder adds a `hint`. Without `folder`,
+  the list is every gallery image plus a scan of `wysiwyg`.
+- **`fields` takes `has_draft`, `is_published` and `draft_differs` as top-level keys** in `hyva_cms.page.get`,
+  `hyva_cms.block.get` and `hyva_menu.get`. See [Draft status](#draft-status).
 - **Calls that write without confirm say `dry_run: false`.** Page/block update, menu update, image alt and replace,
   optimization clear and migration convert_to_draft replies gain the key; nothing else in them changed. See
   [Confirm and previews](#confirm-and-previews).
 
 Custom code:
 
-- **`Tool\HyvaMedia\Trash\TrashRestore` takes a `LiteralUrlAuditor`** as its last constructor argument.
 - **`Tool\HyvaCms\Content\Publish` (and `Tool\HyvaMenu\Release\MenuPublish`) takes a `Model\Tool\LiveSettings`** as
   its last constructor argument (it previews the activation of an inactive menu).
 - **`Tool\HyvaMenu\Menu\MenuDelete` and `Model\Tool\Entity\AbstractEntityDelete` (`PageDelete`, `BlockDelete`) take a
   `Model\Content\PendingScheduleCleanup`** as their last constructor argument (it cancels the deleted entity's
   pending scheduled items).
-- **`Model\Content\ComponentCatalog` takes a `Model\Content\MenuOptionScope`** as its last constructor argument
-  (it cuts the `hyva_menu_widget` menu options to the menus the caller may see).
+- **`Model\Content\ComponentCatalog` takes a `CollectorFactory`, a `LoggerInterface` and a
+  `Model\Content\MenuOptionScope`** as its last constructor arguments (the scope cuts the `hyva_menu_widget` menu options
+  to the menus the caller may see).
 - **`Api\Adapter\LinkedProductsGatewayInterface::save()`** throws `ValidatorException` when Hyvä refuses the group;
   `GroupSave` turns it into the soft 409.
 - **`Api\Adapter\EmailGatewayInterface`** gains `deletionUsage()`, `deleteTemplate()` and `deleteNewsletter()`. A
@@ -921,10 +931,21 @@ Custom code:
 - **`Api\FeatureCheckerInterface`** gains `isInstalledAndEnabled(string $feature): bool`. A custom implementation must
   add it.
 - **`AbstractTool::DELETE_TOOL_NOTE`** takes the article in `%1$s` ("a menu", "an email template").
+- **`Tool\HyvaMenu\Menu\MenuCreate` takes a `Model\Tool\LiveSettings`** as its last constructor argument.
+- **`ScheduleList`, `ScheduleCreate`, `ScheduleCancel` and `ScheduleDetectConflicts`** (`Tool\HyvaCms\Schedule`) take a
+  `Model\Content\ContentScopeFilter` as their last constructor argument.
+- **`Model\Content\ContentScopeFilter` takes a `FeatureCheckerInterface`** as its last constructor argument.
+  `Model\Content\DeletionUsage` no longer takes one.
+- **`Model\Content\PreviewService` takes a `Model\Content\AdminEditorUrl` instead of `BackendUrl`.**
+- **`Tool\HyvaMedia\Asset\AssetMove` and `AssetTrash` take a `Model\Media\MediaFileInfo`** as their last constructor
+  argument. `MediaFileInfo` takes a `Magento\Framework\Filesystem\Driver\File` as its last one.
+- **`Model\Adapter\MediaGallery\MediaGalleryGateway` takes a `TimezoneInterface` and a `ResolverInterface`** as its
+  last constructor arguments (they parse Hyvä's locale date strings, in the store locale and time zone, into UTC).
 - **Dashboard widget data holds `route` + `params`, not `url`.** This covers the rows and footer links of the Magebit
   widgets (`AbstractHealthWidget`); `health-summary.phtml` builds the URL when it renders.
-  `AbstractHealthWidget::row()` takes `?array $link` instead of `?string $url`. `ContentHealth`, `McpActivity`,
-  `MediaHealth` and `MenuHealth` no longer take `UrlInterface`. Widget data cached before the upgrade still renders.
+  `AbstractHealthWidget::row()` takes `?array $link` instead of `?string $url`. `ContentHealth`, `MenuHealth`,
+  `CampaignCalendar`, `CampaignAssetReadiness` and `MigrationStatus` take `Model\Content\AdminEditorUrl` instead of
+  `UrlInterface`; `McpActivity` and `MediaHealth` no longer take `UrlInterface`. Widget data cached before the upgrade still renders.
 - **`Model\Tool\Media\AbstractMediaTool` takes a `FeatureCheckerInterface`** (constructor), and hides its tools
   without Media Gallery. A subclass must pass it to `parent::__construct()`. The `hyva_media.image.*` and
   `hyva_media.audit_*` tools and `MediaStatus` take it as their first constructor argument.
