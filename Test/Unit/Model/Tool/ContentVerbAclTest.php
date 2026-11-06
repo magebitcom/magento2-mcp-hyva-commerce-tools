@@ -126,17 +126,17 @@ class ContentVerbAclTest extends TestCase
     {
         $tool = $this->withAcl(ScheduleCreate::class, ScheduleCreate::class);
         $this->assertSame(
-            ['Hyva::cms_block_schedule_save', 'Hyva::cms_block_version_history'],
+            ['Hyva::cms_block_schedule_save', 'Hyva::cms_block_view', 'Hyva::cms_block_version_history'],
             $tool->getContextualAclResources(['entity_type' => 'cms_block', 'version_id' => 4])
         );
         $this->assertSame(
-            ['Hyva::cms_block_schedule_save'],
+            ['Hyva::cms_block_schedule_save', 'Hyva::cms_block_view'],
             $tool->getContextualAclResources(['entity_type' => 'cms_block'])
         );
 
         $menu = $this->withAcl(MenuScheduleCreate::class, ScheduleCreate::class);
         $this->assertSame(
-            ['Hyva::menu_schedule_save', 'Hyva::menu_version_history', 'Hyva::menu_view'],
+            ['Hyva::menu_schedule_save', 'Hyva::menu_view', 'Hyva::menu_version_history'],
             $menu->getContextualAclResources(['id' => 2, 'version_id' => 4])
         );
     }

@@ -65,7 +65,13 @@ class MenuScheduleCancelTest extends TestCase
         $locator->method('isScopeRestricted')->willReturn(false);
         $locator->expects($this->never())->method('prefetchScope');
 
-        (new ScheduleCancel($service, $acl, $locator, $this->viewableAll()))->execute(['item_ids' => [10]]);
+        $result = (new ScheduleCancel($service, $acl, $locator, $this->viewableAll()))->execute(['item_ids' => [10]]);
+
+        // T-141: the reply says cancelled releases stay in the list.
+        $text = $result->getContent()[0]['text'] ?? '';
+        $payload = json_decode(is_string($text) ? $text : '', true);
+        $this->assertIsArray($payload);
+        $this->assertSame(ScheduleCancel::HISTORY_NOTE, $payload['note'] ?? null);
     }
 
     /**

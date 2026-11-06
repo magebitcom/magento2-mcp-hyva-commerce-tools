@@ -59,66 +59,6 @@ class LiteralUrlAuditor
      */
     public function audit(array $types = ContentLocator::TYPES, int $limit = 200): array
     {
-        $scan = $this->scan($types, static fn (array $finding): bool => true);
-        $report = [
-            'documents_checked' => $scan['documents_checked'],
-            'counts' => $scan['counts'],
-            'findings' => array_slice($scan['findings'], 0, $limit),
-        ];
-        if ($this->scopeFilter->isRestricted()) {
-            $report['documents_hidden_by_permissions'] = $scan['hidden'];
-        }
-        return $report;
-    }
-
-    /**
-     * Image fields whose stored asset id no longer resolves, per path.
-     *
-     * E.g. after a trash and restore: Hyvä indexes a restored file under a new id, and the content keeps the old one.
-     * Only the stale findings of the given paths are kept while walking, so the scan does not hold every finding of
-     * the content in memory.
-     *
-     * @param array $paths Media paths
-     * @return array Path => references (the old id is asset_id)
-     * @phpstan-param list<string> $paths
-     * @phpstan-return array<string, list<array<string, mixed>>>
-     */
-    public function staleReferences(array $paths): array
-    {
-        if ($paths === []) {
-            return [];
-        }
-        $wanted = array_flip($paths);
-        $scan = $this->scan(
-            ContentLocator::TYPES,
-            static fn (array $finding): bool => $finding['category'] === 'stale_asset_id'
-                && is_string($finding['path'] ?? null)
-                && isset($wanted[$finding['path']])
-        );
-        $byPath = [];
-        foreach ($scan['findings'] as $finding) {
-            $path = Cast::string($finding['path'] ?? '');
-            unset($finding['category']);
-            $byPath[$path][] = $finding;
-        }
-        return $byPath;
-    }
-
-    /**
-     * Walk the component trees of the visible documents and collect the findings the predicate keeps.
-     *
-     * Every classified reference is counted; only the retained findings are built and kept, in document order.
-     *
-     * @param array $types
-     * @param callable $retain Receives the classified reference (category, path, asset_id); true keeps it as a finding.
-     * @return array
-     * @phpstan-param list<string> $types
-     * @phpstan-param callable(array<string, mixed>): bool $retain
-     * @phpstan-return array{documents_checked: int, hidden: int, counts: array<string, int>,
-     *     findings: list<array<string, mixed>>}
-     */
-    private function scan(array $types, callable $retain): array
-    {
         $scoped = $this->scopeFilter->filter($this->contentScanner->getDocuments($types));
         $documents = $scoped['visible'];
         $this->extractor->prefetchAssetIds(array_column($documents, 'document'));
@@ -132,8 +72,7 @@ class LiteralUrlAuditor
             $this->componentTree->walk($entry['document'], function (array $node) use (
                 &$counts,
                 &$findings,
-                $entry,
-                $retain
+                $entry
             ): void {
                 foreach ($node as $field => $value) {
                     if (in_array($field, ['uid', 'component', 'componentPath', 'children'], true)) {
@@ -141,7 +80,7 @@ class LiteralUrlAuditor
                     }
                     foreach ($this->classify($value) as $finding) {
                         $counts[$finding['category']]++;
-                        if ($finding['category'] !== 'id_backed' && $retain($finding)) {
+                        if ($finding['category'] !== 'id_backed') {
                             $findings[] = [
                                 'entity_type' => $entry['entity_type'],
                                 'id' => $entry['id'],
@@ -155,12 +94,15 @@ class LiteralUrlAuditor
                 }
             });
         }
-        return [
+        $report = [
             'documents_checked' => count($documents),
-            'hidden' => $scoped['hidden'],
             'counts' => $counts,
-            'findings' => $findings,
+            'findings' => array_slice($findings, 0, $limit),
         ];
+        if ($this->scopeFilter->isRestricted()) {
+            $report['documents_hidden_by_permissions'] = $scoped['hidden'];
+        }
+        return $report;
     }
 
     /**

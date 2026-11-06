@@ -26,7 +26,8 @@ use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuScheduleCreate;
 use PHPUnit\Framework\TestCase;
 
 /**
- * T-145: the schedule tools keep menus out of reach of a role without Hyva_MenuBuilder::menu_view (T-144 rule).
+ * T-145: the schedule tools keep menus out of reach of a role without Hyva_MenuBuilder::menu_view (T-144 rule);
+ * T-147: the same for pages and blocks without their view permission.
  */
 class ScheduleMenuViewTest extends TestCase
 {
@@ -111,12 +112,14 @@ class ScheduleMenuViewTest extends TestCase
             ->with(60, 'cms_page', 4, $menusViewable ? null : ['cms_page', 'cms_block'])
             ->willReturn(['conflicts' => [], 'hidden' => 0]);
 
+        $acl = $this->createMock(ContentAcl::class);
+        $acl->method('allowedTypes')->willReturnArgument(0);
         $tool = new ScheduleCreate(
             $locator,
             $schedule,
             $this->createMock(ScheduleTime::class),
             $report,
-            $this->createMock(ContentAcl::class),
+            $acl,
             $this->scopeFilter($menusViewable)
         );
         $this->assertFalse($tool->execute(['entity_type' => 'cms_page', 'id' => 4, 'release_id' => 9])->isError());
@@ -146,18 +149,80 @@ class ScheduleMenuViewTest extends TestCase
         }
     }
 
-    public function testCallsTargetingOtherTypesNeedNoView(): void
+    /**
+     * T-147: pages and blocks need their view permission too.
+     *
+     * @return void
+     */
+    public function testCallsTargetingPagesAndBlocksNeedTheirView(): void
     {
         $acl = $this->realAcl();
         $this->assertSame(
-            ['Hyva::cms_page_schedule_save'],
+            ['Hyva::cms_page_schedule_save', 'Hyva::cms_page_view'],
             $this->withAcl(ScheduleCreate::class, $acl)->getContextualAclResources(['entity_type' => 'cms_page'])
         );
         $this->assertSame(
-            ['Hyva::cms_block_scheduling'],
+            ['Hyva::cms_block_scheduling', 'Hyva::cms_block_view'],
             $this->withAcl(ScheduleList::class, $acl)->getContextualAclResources(['entity_type' => 'cms_block'])
         );
+        $this->assertSame(
+            ['Hyva::cms_block_scheduling', 'Hyva::cms_block_view'],
+            $this->withAcl(ScheduleDetectConflicts::class, $acl)
+                ->getContextualAclResources(['entity_type' => 'cms_block'])
+        );
         $this->assertSame([], $this->withAcl(ScheduleList::class, $acl)->getContextualAclResources([]));
+    }
+
+    /**
+     * T-147: without page view, page items are hidden from the list and refused by cancel; conflicts leave pages out.
+     *
+     * @return void
+     */
+    public function testPagesStayOutOfReachWithoutPageView(): void
+    {
+        $acl = $this->createMock(ContentAcl::class);
+        $acl->method('isAllowed')->willReturnCallback(
+            static fn (string $type, string $verb): bool => !($type === 'cms_page' && $verb === ContentAcl::VERB_VIEW)
+        );
+        $acl->method('allowedTypes')->willReturnCallback(
+            static fn (array $types, string $verb): array => $verb === ContentAcl::VERB_VIEW
+                ? array_values(array_diff($types, ['cms_page']))
+                : $types
+        );
+        $locator = $this->createMock(ContentLocator::class);
+        $locator->method('allowsRead')->willReturn(true);
+        $locator->method('allowsWrite')->willReturn(true);
+
+        $service = $this->createMock(ScheduleService::class);
+        $service->method('getItems')->willReturn([
+            $this->item(1, 10, 'cms_page', 5),
+            $this->item(2, 11, 'cms_block', 7),
+        ]);
+        $callback = null;
+        $service->method('cancel')->willReturnCallback(
+            static function (array $items, ?int $release, callable $mayCancel) use (&$callback): array {
+                $callback = $mayCancel;
+                return ['cancelled_items' => [], 'cancelled_releases' => []];
+            }
+        );
+        $time = $this->createMock(ScheduleTime::class);
+        $time->method('toLocal')->willReturnArgument(0);
+
+        $list = $this->payload((new ScheduleList($service, $time, $locator, $acl, $this->scopeFilter(true)))
+            ->execute([]));
+        $this->assertSame(1, $list['items_hidden_by_permissions'] ?? null);
+        $this->assertSame(1, $list['total_releases'] ?? null);
+
+        (new ScheduleCancel($service, $acl, $locator, $this->scopeFilter(true)))->execute(['item_ids' => [1]]);
+        $this->assertIsCallable($callback);
+        $this->assertFalse((bool) $callback('cms_page', 5));
+        $this->assertTrue((bool) $callback('cms_block', 7));
+
+        $report = $this->createMock(ConflictReport::class);
+        $report->expects($this->once())->method('getConflictsWithinCallerScope')
+            ->with(60, null, null, ['cms_block', 'menu'])
+            ->willReturn(['conflicts' => [], 'hidden' => 0]);
+        (new ScheduleDetectConflicts($report, $locator, $acl, $this->scopeFilter(true)))->execute([]);
     }
 
     /**

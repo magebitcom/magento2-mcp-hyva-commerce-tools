@@ -12,6 +12,7 @@ use Magebit\Mcp\Api\LoggerInterface;
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\Filesystem;
 use Magento\Framework\Filesystem\Directory\ReadInterface;
+use Magento\Framework\Filesystem\Driver\File;
 use Throwable;
 
 /**
@@ -27,10 +28,12 @@ class MediaFileInfo
     /**
      * @param Filesystem $filesystem
      * @param LoggerInterface $logger
+     * @param File $fileDriver
      */
     public function __construct(
         private readonly Filesystem $filesystem,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly File $fileDriver
     ) {
     }
 
@@ -70,6 +73,42 @@ class MediaFileInfo
             return $this->media()->isDirectory($folder);
         } catch (Throwable) {
             // As exists(): a path the validator refuses is a folder that does not exist, never an error.
+            return false;
+        }
+    }
+
+    /**
+     * Whether the path, with symbolic links resolved, lies outside pub/media (T-143).
+     *
+     * Magento's path validator normalises paths without resolving links, so a link under pub/media that points
+     * elsewhere passes it. A path that does not exist yet (e.g. a new target folder) is judged by its nearest
+     * existing parent. Unknown (no local media directory, a path the validator refuses) counts as inside: the
+     * other checks refuse such paths on their own.
+     *
+     * @param string $path Relative to pub/media.
+     * @return bool
+     */
+    public function resolvesOutsideMedia(string $path): bool
+    {
+        try {
+            $root = $this->fileDriver->getRealPath($this->media()->getAbsolutePath());
+            if (!is_string($root) || $root === '') {
+                return false;
+            }
+            $root = rtrim($root, '/');
+            $candidate = trim($path, '/');
+            while (true) {
+                $real = $this->fileDriver->getRealPath($this->media()->getAbsolutePath($candidate));
+                if (is_string($real) && $real !== '') {
+                    return $real !== $root && !str_starts_with($real, $root . '/');
+                }
+                if ($candidate === '') {
+                    return false;
+                }
+                $slash = strrpos($candidate, '/');
+                $candidate = $slash === false ? '' : substr($candidate, 0, $slash);
+            }
+        } catch (Throwable) {
             return false;
         }
     }

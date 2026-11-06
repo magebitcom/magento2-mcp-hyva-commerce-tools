@@ -131,8 +131,10 @@ Publishing a menu also activates it: Hyvä Menu Builder sets `is_active` when it
 takes the same path, so it also activates an inactive menu when it fires; the schedule reply's `warnings` list says
 so when the menu is inactive. Activating a menu that is not published yet (`hyva_menu.create` or
 `hyva_menu.update` with `is_active: true`) shows nothing until it is published and placed, and the confirm preview
-says so. Publishing a page or block
-leaves its active flag as it is; an inactive one stays hidden, and the reply's `note` names the update call.
+says so. A published, active menu also renders nowhere until it is placed: in the header or footer menu of the design
+configuration, or through a menu widget (CMS content or a widget instance). The tools do not look the placement up,
+so their replies still say the menu goes live; `hyva_menu.find_usage` shows where it is placed. Publishing a page or
+block leaves its active flag as it is; an inactive one stays hidden, and the reply's `note` names the update call.
 
 `settings` are different: they are Magento fields and apply at once. A `settings` change that affects the live
 storefront therefore needs `"confirm": true` (see the next section).
@@ -149,7 +151,7 @@ Without `"confirm": true` these calls write nothing and return a preview instead
 | `settings`: any other field | Only on an active page, block or menu. A menu's `preview_url_key` never needs it: it only picks the page the editor previews the menu on. |
 | Replacing a draft | `hyva_cms.draft.create` and `hyva_cms.import` when the current draft has unpublished changes; `hyva_cms.migration.convert_to_draft` when a Hyvä draft already exists. |
 | Removing a menu item that has children | Always, also through `hyva_menu.update` / `hyva_cms.draft.update` operations that remove or replace one. The preview lists the children and `children_count`. |
-| `hyva_media.image.replace` | Only with `scope=global`. |
+| `hyva_media.image.replace` | Always (`action: "replace_image_globally"` for `scope=global`, else `"replace_image"`). |
 | `hyva_media.optimization.clear` | Only with `all_images=true` (clears every optimized image). |
 | `hyva_media.asset.move`, `hyva_media.asset.trash` | Always. |
 | `hyva_store_credit.balance.credit`, `hyva_store_credit.balance.debit` | Always. |
@@ -175,10 +177,11 @@ The rule behind the table: `confirm` guards what changes the live storefront at 
 what overwrites unpublished work. A call that only writes a draft, or removes generated files that are rebuilt on
 the next request, runs on the first call. That covers `hyva_cms.page.update` / `hyva_cms.block.update` without a
 live `settings` change, `hyva_menu.update` outside the table (e.g. the title of an inactive menu, `preview_url_key`
-or a draft structure edit), `hyva_media.image.update_alt`, `hyva_media.image.replace` with one content type,
-`hyva_media.optimization.clear` with one `path` and `hyva_cms.migration.convert_to_draft` with no Hyvä draft yet.
-To tell a preview from a write without knowing the table, read `dry_run`: `true` in a preview (nothing written),
-`false` in the reply of these calls, which wrote. `hyva_media.image.update_alt` accepts `confirm` but ignores it.
+or a draft structure edit), `hyva_media.image.update_alt`, `hyva_media.optimization.clear` with one `path` and
+`hyva_cms.migration.convert_to_draft` with no Hyvä draft yet. `hyva_media.image.replace` only writes drafts too, but
+needs `confirm` for every scope: callers run it once to see what it would change, and a write on that first call left
+a duplicate draft per entity. To tell a preview from a write without knowing the table, read `dry_run`: `true` in a
+preview (nothing written), `false` in the reply of these calls, which wrote. `hyva_media.image.update_alt` accepts `confirm` but ignores it.
 
 ### Refusals
 
@@ -208,7 +211,16 @@ A call passes three checks, all against the token's admin role:
 **Tools with `entity_type` in `tools/list`.** `tools/list` has no arguments, so it cannot check the verb per type.
 These tools are listed for a role that holds their verb on at least one content type ("the verb on any type" in the
 catalog). A call on a type the role lacks is refused with `-32004`. A role with only the view verbs therefore does not
-see the draft, publish, import, restore and schedule tools, or `hyva_cms.migration.convert_to_draft`.
+see the draft, publish, import, restore and schedule tools, or `hyva_cms.migration.convert_to_draft`. The menu
+variants (`hyva_menu.publish`, `hyva_menu.schedule.*`, `hyva_menu.version.*`) follow the same rule on menus: they are
+listed only when the role holds every verb they need there, e.g. `hyva_menu.schedule.create` needs
+`menu_schedule_save` and `menu_view`.
+
+**Scheduling needs view.** The schedule tools need the content type's view verb next to its scheduling verb
+(`Hyva_Cms::page_view`, `Hyva_Cms::block_view`, `Hyva_MenuBuilder::menu_view`): Hyvä keeps them as siblings, so a
+role can schedule a type it may not read. A call on such a type is refused (`-32004`); `hyva_cms.schedule.list` and
+the conflict lists hide its items (`items_hidden_by_permissions`, `conflicts_hidden_by_permissions`), and
+`hyva_cms.schedule.cancel` refuses them per item.
 
 **Version history needs its own verb.** Reading a version also needs the type's `version_history` verb:
 
@@ -572,10 +584,10 @@ with underscores (`hyva_cms_page_get`); `tools/call` accepts both forms.
 | `hyva_cms.permission.check` | read | `-` |  | Check Hyvä CMS Permissions |
 | `hyva_cms.preview` | read | the verb on any type | entity_type → view (+ version_history with version_id) | Preview Hyvä CMS Content |
 | `hyva_cms.publish` | write | the verb on any type | entity_type → publish (+ version_history with version_id) | Publish Hyvä CMS Content |
-| `hyva_cms.schedule.cancel` | write | the verb on any type | entity_type → schedule_cancel | Cancel Hyvä CMS Schedule |
-| `hyva_cms.schedule.create` | write | the verb on any type | entity_type → schedule_save (+ version_history with version_id) | Schedule Hyvä CMS Content |
-| `hyva_cms.schedule.detect_conflicts` | read | the verb on any type | entity_type → scheduling | Detect Hyvä CMS Schedule Conflicts |
-| `hyva_cms.schedule.list` | read | the verb on any type | entity_type → scheduling | List Hyvä CMS Schedules |
+| `hyva_cms.schedule.cancel` | write | the verbs on any type | per item: schedule_cancel + view | Cancel Hyvä CMS Schedule |
+| `hyva_cms.schedule.create` | write | the verbs on any type | entity_type → schedule_save + view (+ version_history with version_id) | Schedule Hyvä CMS Content |
+| `hyva_cms.schedule.detect_conflicts` | read | the verbs on any type | entity_type → scheduling + view | Detect Hyvä CMS Schedule Conflicts |
+| `hyva_cms.schedule.list` | read | the verbs on any type | entity_type → scheduling + view | List Hyvä CMS Schedules |
 | `hyva_cms.tailwind.status` | read | `Magento_Config::config_system` |  | Hyvä CMS Tailwind Status (compiler daemon health, strategy, `reason`; hint per strategy) |
 | `hyva_cms.translation.run` | write | the verb on any type | entity_type → view + `Hyva_CmsAiTranslations::translate` | Run Hyvä CMS AI Translation |
 | `hyva_cms.translation.status` | read | the verb on any type | entity_type → view | Hyvä CMS Translation Status |
@@ -599,14 +611,14 @@ with underscores (`hyva_cms_page_get`); `tools/call` accepts both forms.
 | `hyva_menu.preview` | read | `Hyva_MenuBuilder::menu_view` | version_id → version_history | Preview Hyvä Menu |
 | `hyva_menu.publish` | write | `Hyva_MenuBuilder::menu_publish` | entity_type → publish (+ version_history with version_id) | Publish Hyvä Menu |
 | `hyva_menu.render_check` | read | `Hyva_MenuBuilder::menu_view` |  | Check Hyvä Menu Rendering |
-| `hyva_menu.schedule.cancel` | write | `Hyva_MenuBuilder::menu_schedule_cancel` | entity_type → schedule_cancel | Cancel Hyvä Menu Schedule |
-| `hyva_menu.schedule.create` | write | `Hyva_MenuBuilder::menu_schedule_save` | entity_type → schedule_save (+ version_history with version_id) | Schedule Hyvä Menu |
+| `hyva_menu.schedule.cancel` | write | `Hyva_MenuBuilder::menu_schedule_cancel` + `menu_view` | entity_type → schedule_cancel + view | Cancel Hyvä Menu Schedule |
+| `hyva_menu.schedule.create` | write | `Hyva_MenuBuilder::menu_schedule_save` + `menu_view` | entity_type → schedule_save + view (+ version_history with version_id) | Schedule Hyvä Menu |
 | `hyva_menu.status` | read | `Hyva_Cms::cms` |  | Menu Builder Status |
 | `hyva_menu.delete` | write | `Hyva_MenuBuilder::menu_delete` |  | Delete Hyvä Menu (own resource *Delete Hyvä Menus via MCP*; confirm-gated) |
 | `hyva_menu.update` | write | `Hyva_MenuBuilder::menu_save` |  | Update Hyvä Menu |
 | `hyva_menu.validate` | read | `Hyva_MenuBuilder::menu_view` |  | Validate Hyvä Menu |
 | `hyva_menu.version.list` | read | `Hyva_MenuBuilder::menu_version_history` | entity_type → version_history | List Hyvä Menu Versions |
-| `hyva_menu.version.restore` | write | `Hyva_MenuBuilder::menu_save` | entity_type → save + version_history | Restore Hyvä Menu Version |
+| `hyva_menu.version.restore` | write | `Hyva_MenuBuilder::menu_save` + `menu_version_history` | entity_type → save + version_history | Restore Hyvä Menu Version |
 
 ### Hyvä Media (optimization tools need Hyva_MediaOptimization)
 
@@ -781,6 +793,9 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
 
 - **Scheduling.** Hyvä scheduled releases are one-way: there is no end date. `hyva_cms.schedule.detect_conflicts`
   reports a `no_fallback` info when nothing restores the previous content after a campaign.
+- **Cancelled releases stay.** `hyva_cms.schedule.cancel` sets items and releases to `cancelled`; Hyvä keeps them as
+  history and has no delete, so they stay in `hyva_cms.schedule.list` (with a status filter other than `pending`) and
+  in the admin release list. The cancel reply says so (`note`).
 - **Schedule list cap.** `hyva_cms.schedule.list` with a status other than `pending` lists the newest releases first
   and reads at most the newest 1000 items. It reports `truncated: true` when it cut; the release cut by the cap is left
   out, so no release is partial. `total_releases` counts releases within the items read. Pending is never capped.
@@ -803,10 +818,14 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
 - **Trash and asset ids.** Trashing deletes the Media Gallery asset row and Hyvä's trash keeps no asset id, so a
   restored file always comes back with a new asset id. References by the old id are stale: they still render (Hyvä
   falls back to the stored path) but no longer follow the asset when it moves. The `hyva_media.trash.restore` reply
-  gives each restored asset's new `asset_id`, the image fields still holding an old id (`stale_references`, the old id
-  in `asset_id`) and those old ids (`previous_asset_ids`). Re-link them with `hyva_media.image.replace` using the same
-  path as `old_path` and `new_path`: it saves drafts that carry the new id. `hyva_media.audit.literal_urls` lists
-  them too (`stale_asset_id`).
+  gives each restored asset's new `asset_id` and does not scan the content (that would read every document on each
+  restore). Find the image fields still holding an old id with `hyva_media.audit.literal_urls` (category
+  `stale_asset_id`, the old id in `asset_id`), then re-link them with `hyva_media.image.replace` using the same path
+  as `old_path` and `new_path` and `"confirm": true`: it saves drafts that carry the new id.
+- **Symbolic links in pub/media.** Magento's media path validator checks paths lexically and does not resolve symbolic
+  links, so a link under `pub/media` that points elsewhere passes it. `hyva_media.asset.move` and
+  `hyva_media.asset.trash` resolve links and refuse a target folder or an asset file whose real path lies outside
+  `pub/media` (soft error; assets in `paths_outside_media`). Other media tools follow Magento's rule.
 - **Links in the literal-URL audit.** Link field values (`{type, value, src, ...}`) are not images: their `src` is the
   link target of a `custom_url` or `cms_page` link. `hyva_media.audit.literal_urls` skips them; before, menu
   `custom_url` links showed up as `literal_not_in_gallery`.
@@ -845,6 +864,10 @@ Clients that parse replies:
   datetimes (e.g. `"2026-11-03 20:10:00"`), as in every other media reply.
 - **Media audit `counts` is always an object.** With no image problem it is `{}`, not `[]` (`hyva_media.audit_*`,
   `hyva_commerce.audit.media`, `media.counts` in `hyva_commerce.audit.menu`).
+- **`hyva_media.image.replace` needs `"confirm": true` for every scope.** With one content type (`cms_page`,
+  `cms_block`, `menu`) it saved the drafts on the first call (`dry_run: false`). Without `confirm` it now writes
+  nothing and returns the preview (`action: "replace_image"`), as `scope=global` already did. A call with nothing to
+  change still answers with the soft error at once.
 - **`hyva_menu.create` with `is_active: true` needs `"confirm": true`.** Without it nothing is created and the reply is
   the preview (`action: "create_active"`), as for pages and blocks. An inactive create is unchanged.
 - **`hyva_email.template.send_test` mail failures are soft errors.** A transport failure was JSON-RPC error `-32011`.
@@ -853,14 +876,21 @@ Clients that parse replies:
 - **`hyva_email.template.send_test` sends the admin's sample order.** With Email & Newsletter Templates 1.0.1+ the
   mail is rendered inside Hyvä's test-send context, so order components show the preview fixture (items, totals,
   addresses) as the admin "Send test" does, and the fallbacks are Hyvä's `FixtureDefaults`. On 1.0.0 nothing changes.
-- **`hyva_media.trash.restore` reports the id change.** Each `assets` entry gains `asset_id` (the new id),
-  `previous_asset_ids` and `stale_references`, and the reply a `note`. If the content scan for the old ids fails
-  after the restore, `stale_references` is empty and the reply gains a `warning`. See
-  [Notes on Hyvä behaviour](#notes-on-hyvä-behaviour).
+- **`hyva_media.trash.restore` reports the id change.** Each `assets` entry gains `asset_id` (the new id), and the
+  reply a `note` that points to `hyva_media.audit.literal_urls` (`stale_asset_id`) for image fields still holding the
+  old id; the restore itself does not scan the content. See [Notes on Hyvä behaviour](#notes-on-hyvä-behaviour).
 - **`hyva_media.audit.literal_urls` no longer counts link fields** as `literal_not_in_gallery`.
 - **`hyva_linked.group.save` answers a Hyvä refusal softly.** A save that Linked Products refuses after the check (a
   concurrent save took the name or the products; 1.0.2 says so in its own words) was a JSON-RPC error; it is now a
   soft error with status 409 and `issues` code `save_refused`.
+- **Menu tools are listed only with every verb they need.** `hyva_menu.schedule.create` / `.cancel` also need
+  `Hyva_MenuBuilder::menu_view` to be listed, and `hyva_menu.version.restore` needs `menu_version_history` next to
+  `menu_save`. Before, they were listed with their first verb and every call of a role missing the rest was refused.
+- **Media move and trash refuse paths outside `pub/media`.** A target folder or asset file that a symbolic link takes
+  outside `pub/media` is refused with a soft error, preview included; nothing is moved or trashed.
+- **Page and block scheduling needs view.** `hyva_cms.schedule.*` on a page or block also needs `Hyva_Cms::page_view` /
+  `Hyva_Cms::block_view`, as menus already needed `Hyva_MenuBuilder::menu_view`. A role without it is refused
+  (`-32004`) and no longer sees those items in the schedule list or conflicts. See [ACL](#acl).
 - **A menu `identifier` with `store_id` finds inactive and unpublished menus.** It was resolved by Hyvä's storefront
   loader, so it only found active menus, and `store_id: 0` matched a menu of any store view. It now takes the menu
   assigned to that store view, else one for all store views, active or not; `store_id: 0` matches only the latter.

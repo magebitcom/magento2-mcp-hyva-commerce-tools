@@ -483,12 +483,10 @@ class ContentLocator
                 'Several menus use identifier "%1" (%2). %3',
                 $identifier,
                 implode(', ', array_map(
-                    static fn (array $menu): string => sprintf(
+                    fn (array $menu): string => sprintf(
                         'id %d in %s',
                         Cast::int($menu['id'] ?? 0),
-                        Cast::intList($menu['store_ids'] ?? []) === []
-                            ? 'no store view'
-                            : 'store views ' . implode('/', Cast::intList($menu['store_ids'] ?? []))
+                        $this->describeMenuStores(Cast::intList($menu['store_ids'] ?? []))
                     ),
                     $candidates
                 )),
@@ -496,6 +494,24 @@ class ContentLocator
             ));
         }
         return Cast::int($candidates[0]['id'] ?? 0);
+    }
+
+    /**
+     * Store views of a menu as the ambiguity hint names them; store view 0 reads "all store views" (T-169).
+     *
+     * @param array $storeIds
+     * @return string
+     * @phpstan-param list<int> $storeIds
+     */
+    private function describeMenuStores(array $storeIds): string
+    {
+        if ($storeIds === []) {
+            return 'no store view';
+        }
+        if (in_array(0, $storeIds, true)) {
+            return 'all store views (store_id 0)';
+        }
+        return 'store views ' . implode('/', $storeIds);
     }
 
     /**

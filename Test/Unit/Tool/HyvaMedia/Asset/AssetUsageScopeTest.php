@@ -14,6 +14,7 @@ use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
+use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content\ContentScopeStub;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\ToolPayloadTrait;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset\AssetMove;
@@ -138,7 +139,8 @@ class AssetUsageScopeTest extends TestCase
             $this->createMock(ImageReferenceExtractor::class),
             $this->usageIndex(),
             $this->createMock(CallerContext::class),
-            $scope
+            $scope,
+            $this->createMock(MediaFileInfo::class)
         );
     }
 
@@ -156,7 +158,8 @@ class AssetUsageScopeTest extends TestCase
             $this->createMock(ImageReferenceExtractor::class),
             $this->usageIndex(),
             $this->createMock(CallerContext::class),
-            $scope
+            $scope,
+            $this->createMock(MediaFileInfo::class)
         );
     }
 

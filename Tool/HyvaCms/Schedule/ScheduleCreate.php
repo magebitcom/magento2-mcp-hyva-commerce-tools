@@ -30,7 +30,7 @@ class ScheduleCreate extends AbstractContentTool
     public const TOOL_NAME = 'hyva_cms.schedule.create';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_cms_schedule_create';
     public const IS_WRITE = true;
-    public const CONTENT_VERBS = [ContentAcl::VERB_SCHEDULE_SAVE];
+    public const CONTENT_VERBS = [ContentAcl::VERB_SCHEDULE_SAVE, ContentAcl::VERB_VIEW];
 
     /**
      * @param ContentLocator $contentLocator
@@ -134,8 +134,11 @@ class ScheduleCreate extends AbstractContentTool
             $stringKeyed !== [] ? $stringKeyed : null
         );
 
-        // Conflicts naming menus stay hidden from a role without menu_view.
-        $viewable = $this->contentScopeFilter->viewableTypes(ContentLocator::TYPES);
+        // Conflicts naming content of a type the role may not view stay hidden (T-145, T-147).
+        $viewable = $this->contentAcl->allowedTypes(
+            $this->contentScopeFilter->viewableTypes(ContentLocator::TYPES),
+            ContentAcl::VERB_VIEW
+        );
 
         return $this->jsonResult([
             'scheduled' => true,
@@ -174,7 +177,7 @@ class ScheduleCreate extends AbstractContentTool
     }
 
     /**
-     * Schedule save; scheduling a version_id also reads version history, scheduling a menu needs menu view.
+     * Schedule save and view (CONTENT_VERBS); scheduling a version_id also reads version history.
      *
      * @inheritDoc
      */
@@ -184,7 +187,7 @@ class ScheduleCreate extends AbstractContentTool
         if (($arguments['version_id'] ?? null) !== null) {
             $verbs[] = ContentAcl::VERB_VERSION_HISTORY;
         }
-        return array_values(array_merge($verbs, $this->menuViewVerbs($arguments)));
+        return $verbs;
     }
 
     /**

@@ -14,6 +14,7 @@ use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
+use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Model\Tool\MediaGallery\AbstractMediaGalleryTool;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
@@ -37,6 +38,7 @@ class AssetTrash extends AbstractMediaGalleryTool
      * @param ImageUsageIndex $usageIndex
      * @param CallerContext $callerContext
      * @param ContentScopeFilter $scopeFilter
+     * @param MediaFileInfo $fileInfo
      */
     public function __construct(
         FeatureCheckerInterface $featureChecker,
@@ -44,7 +46,8 @@ class AssetTrash extends AbstractMediaGalleryTool
         ImageReferenceExtractor $extractor,
         ImageUsageIndex $usageIndex,
         CallerContext $callerContext,
-        private readonly ContentScopeFilter $scopeFilter
+        private readonly ContentScopeFilter $scopeFilter,
+        private readonly MediaFileInfo $fileInfo
     ) {
         parent::__construct($featureChecker, $gallery, $extractor, $usageIndex, $callerContext);
     }
@@ -94,6 +97,16 @@ class AssetTrash extends AbstractMediaGalleryTool
         $assets = $this->gallery->getByIds($this->intListArg($arguments, 'ids'));
         if ($assets === []) {
             return $this->softError('None of the ids is a Media Gallery asset.');
+        }
+        $outside = array_values(array_filter(
+            array_column($assets, 'path'),
+            fn (string $path): bool => $this->fileInfo->resolvesOutsideMedia($path)
+        ));
+        if ($outside !== []) {
+            return $this->softError(
+                'These assets resolve outside pub/media through a symbolic link; nothing was trashed.',
+                ['paths_outside_media' => $outside]
+            );
         }
         $affected = [];
         $inUse = 0;

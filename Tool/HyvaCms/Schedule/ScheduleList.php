@@ -27,7 +27,7 @@ class ScheduleList extends AbstractContentTool
 {
     public const TOOL_NAME = 'hyva_cms.schedule.list';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_cms_schedule_list';
-    public const CONTENT_VERBS = [ContentAcl::VERB_SCHEDULING];
+    public const CONTENT_VERBS = [ContentAcl::VERB_SCHEDULING, ContentAcl::VERB_VIEW];
     public const HISTORY_ROW_CAP = 1000;
 
     /**
@@ -123,9 +123,9 @@ class ScheduleList extends AbstractContentTool
                 static fn (array $item): bool => $item['release_id'] !== $cutRelease
             ));
         }
-        // Items of content outside the caller's website/store view restriction, and menus of a role without
-        // menu_view, are hidden like those of content types the role may not schedule; one store view lookup per
-        // type covers all items.
+        // Items of content outside the caller's website/store view restriction, and of a type the role may not view
+        // (T-145 menus, T-147 pages and blocks), are hidden like those of content types the role may not schedule;
+        // one store view lookup per type covers all items.
         $viewable = $this->contentScopeFilter->viewableTypes(ContentLocator::TYPES);
         $this->contentLocator->prefetchScope(array_map(
             static fn (array $item): array => ['entity_type' => $item['entity_type'], 'id' => $item['entity_id']],
@@ -134,6 +134,7 @@ class ScheduleList extends AbstractContentTool
         foreach ($items as $item) {
             if (!in_array($item['entity_type'], $viewable, true)
                 || !$this->contentAcl->isAllowed($item['entity_type'], ContentAcl::VERB_SCHEDULING)
+                || !$this->contentAcl->isAllowed($item['entity_type'], ContentAcl::VERB_VIEW)
                 || !$this->contentLocator->allowsRead($item['entity_type'], $item['entity_id'])
             ) {
                 $hidden++;
@@ -182,18 +183,5 @@ class ScheduleList extends AbstractContentTool
     protected function contentAcl(): ContentAcl
     {
         return $this->contentAcl;
-    }
-
-    /**
-     * Scheduling; a call about a menu also needs menu view.
-     *
-     * @param array $arguments
-     * @return array
-     * @phpstan-param array<string, mixed> $arguments
-     * @phpstan-return list<string>
-     */
-    protected function contentVerbs(array $arguments): array
-    {
-        return array_values(array_merge(parent::contentVerbs($arguments), $this->menuViewVerbs($arguments)));
     }
 }
