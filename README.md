@@ -149,7 +149,7 @@ Without `"confirm": true` these calls write nothing and return a preview instead
 | `settings`: any other field | Only on an active page, block or menu. A menu's `preview_url_key` never needs it: it only picks the page the editor previews the menu on. |
 | Replacing a draft | `hyva_cms.draft.create` and `hyva_cms.import` when the current draft has unpublished changes; `hyva_cms.migration.convert_to_draft` when a Hyvä draft already exists. |
 | Removing a menu item that has children | Always, also through `hyva_menu.update` / `hyva_cms.draft.update` operations that remove or replace one. The preview lists the children and `children_count`. |
-| `hyva_media.image.replace` | Only with `scope=global`. |
+| `hyva_media.image.replace` | Always (`action: "replace_image_globally"` for `scope=global`, else `"replace_image"`). |
 | `hyva_media.optimization.clear` | Only with `all_images=true` (clears every optimized image). |
 | `hyva_media.asset.move`, `hyva_media.asset.trash` | Always. |
 | `hyva_store_credit.balance.credit`, `hyva_store_credit.balance.debit` | Always. |
@@ -175,10 +175,11 @@ The rule behind the table: `confirm` guards what changes the live storefront at 
 what overwrites unpublished work. A call that only writes a draft, or removes generated files that are rebuilt on
 the next request, runs on the first call. That covers `hyva_cms.page.update` / `hyva_cms.block.update` without a
 live `settings` change, `hyva_menu.update` outside the table (e.g. the title of an inactive menu, `preview_url_key`
-or a draft structure edit), `hyva_media.image.update_alt`, `hyva_media.image.replace` with one content type,
-`hyva_media.optimization.clear` with one `path` and `hyva_cms.migration.convert_to_draft` with no Hyvä draft yet.
-To tell a preview from a write without knowing the table, read `dry_run`: `true` in a preview (nothing written),
-`false` in the reply of these calls, which wrote. `hyva_media.image.update_alt` accepts `confirm` but ignores it.
+or a draft structure edit), `hyva_media.image.update_alt`, `hyva_media.optimization.clear` with one `path` and
+`hyva_cms.migration.convert_to_draft` with no Hyvä draft yet. `hyva_media.image.replace` only writes drafts too, but
+needs `confirm` for every scope: callers run it once to see what it would change, and a write on that first call left
+a duplicate draft per entity. To tell a preview from a write without knowing the table, read `dry_run`: `true` in a
+preview (nothing written), `false` in the reply of these calls, which wrote. `hyva_media.image.update_alt` accepts `confirm` but ignores it.
 
 ### Refusals
 
@@ -806,7 +807,7 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
   gives each restored asset's new `asset_id` and does not scan the content (that would read every document on each
   restore). Find the image fields still holding an old id with `hyva_media.audit.literal_urls` (category
   `stale_asset_id`, the old id in `asset_id`), then re-link them with `hyva_media.image.replace` using the same path
-  as `old_path` and `new_path`: it saves drafts that carry the new id.
+  as `old_path` and `new_path` and `"confirm": true`: it saves drafts that carry the new id.
 - **Links in the literal-URL audit.** Link field values (`{type, value, src, ...}`) are not images: their `src` is the
   link target of a `custom_url` or `cms_page` link. `hyva_media.audit.literal_urls` skips them; before, menu
   `custom_url` links showed up as `literal_not_in_gallery`.
@@ -845,6 +846,10 @@ Clients that parse replies:
   datetimes (e.g. `"2026-11-03 20:10:00"`), as in every other media reply.
 - **Media audit `counts` is always an object.** With no image problem it is `{}`, not `[]` (`hyva_media.audit_*`,
   `hyva_commerce.audit.media`, `media.counts` in `hyva_commerce.audit.menu`).
+- **`hyva_media.image.replace` needs `"confirm": true` for every scope.** With one content type (`cms_page`,
+  `cms_block`, `menu`) it saved the drafts on the first call (`dry_run: false`). Without `confirm` it now writes
+  nothing and returns the preview (`action: "replace_image"`), as `scope=global` already did. A call with nothing to
+  change still answers with the soft error at once.
 - **`hyva_menu.create` with `is_active: true` needs `"confirm": true`.** Without it nothing is created and the reply is
   the preview (`action: "create_active"`), as for pages and blocks. An inactive create is unchanged.
 - **`hyva_email.template.send_test` mail failures are soft errors.** A transport failure was JSON-RPC error `-32011`.

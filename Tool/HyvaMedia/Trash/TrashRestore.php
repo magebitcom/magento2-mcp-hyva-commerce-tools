@@ -30,8 +30,8 @@ class TrashRestore extends AbstractMediaGalleryTool
     public const NEW_ID_NOTE = 'A restored asset gets a new asset id (asset_id): Hyvä keeps no id in the trash. '
         . 'Image fields that held the old id are stale: they still render (Hyvä falls back to the stored path) but '
         . 'lose the link to the asset. Find them with hyva_media_audit_literal_urls (category stale_asset_id) and '
-        . 're-link them with hyva_media_image_replace using the same path as old_path and new_path (saves drafts '
-        . 'with the new id; publish them).';
+        . 're-link them with hyva_media_image_replace using the same path as old_path and new_path and confirm '
+        . 'true (saves drafts with the new id; publish them).';
 
     /**
      * @inheritDoc

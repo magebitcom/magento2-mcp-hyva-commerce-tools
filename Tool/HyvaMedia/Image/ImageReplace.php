@@ -69,11 +69,9 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
     {
         return 'Replace an image path with another in Hyvä CMS pages, blocks and menus. Changes are saved as DRAFTS '
             . '(component structure kept; optional new alt text) and go live only with hyva_cms_publish. Usages in '
-            . 'Magento CMS content or product/category descriptions are reported, not changed. "confirm": true is '
-            . 'needed only for scope=global (every Hyvä entity): without it nothing changes and the reply lists the '
-            . 'entities it would change (dry_run: true). A scope naming one content type (cms_page, cms_block, menu) '
-            . 'writes the drafts on the first call and says dry_run: false. Either way the result is a draft: '
-            . 'publish each entity with hyva_cms_publish.';
+            . 'Magento CMS content or product/category descriptions are reported, not changed. Without "confirm": '
+            . 'true nothing changes and the reply lists the entities it would change (dry_run: true); call again '
+            . 'with confirm to save the drafts. The result is a draft: publish each entity with hyva_cms_publish.';
     }
 
     /**
@@ -94,7 +92,9 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
                 ->ofIntegers()
                 ->description('Limit to these ids of the scoped type.'))
             ->string('alt', fn (StringBuilder $s) => $s->description('Alt text for the replaced image fields.'))
-            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description('Required only for scope=global.'))
+            ->boolean('confirm', fn (BooleanBuilder $b) => $b->description(
+                'Save the drafts. Without it the call is a dry run that writes nothing.'
+            ))
             ->toArray();
     }
 
@@ -127,18 +127,11 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
             'usages_hidden_by_permissions',
             $notEditable['hidden']
         );
-        if ($scope === 'global' && !$this->boolArg($arguments, 'confirm')) {
-            $preview = $this->groupByEntity($targets['editable'], $targets['not_editable']);
-            return $this->confirmationRequired(
-                'replace_image_globally',
-                $preview['affected'],
-                ['not_editable_usages' => $preview['not_editable']] + $outOfScope,
-                null,
-                'Confirming saves the replacement as a DRAFT of each affected entity; nothing changes on the '
-                    . 'storefront until each one is published with hyva_cms_publish. Usages under '
-                    . 'not_editable_usages (also those of an affected entity, e.g. its Magento CMS content) are '
-                    . 'reported, not changed.'
-            );
+        // T-168: without confirm nothing is written for any scope. A global call previews even with no editable
+        // target (to show the usages it cannot change); a one-type call with none says so at once.
+        $confirmed = $this->boolArg($arguments, 'confirm');
+        if ($scope === 'global' && !$confirmed) {
+            return $this->preview('replace_image_globally', $targets, $outOfScope);
         }
         if ($targets['editable'] === []) {
             return $this->softError(
@@ -147,6 +140,9 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
                     : sprintf('"%s" is not used in any %s Hyvä content.', $old, $scope),
                 ['not_editable_usages' => $targets['not_editable']] + $outOfScope
             );
+        }
+        if (!$confirmed) {
+            return $this->preview('replace_image', $targets, $outOfScope);
         }
         $results = $this->editor->rewrite(
             $targets['editable'],
@@ -164,6 +160,32 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
         ] + $outOfScope + [
             'next_step' => 'Review the drafts and publish each entity with hyva_cms_publish.',
         ], ['old_path' => $old, 'new_path' => $new, 'entities' => count($results)]);
+    }
+
+    /**
+     * Dry run: the entities a confirmed call would save a draft of, and the usages it would only report.
+     *
+     * @param string $action
+     * @param array $targets
+     * @param array $outOfScope
+     * @return ToolResultInterface
+     * @phpstan-param array{editable: list<array{entity_type: string, id: int, identifier: string}>,
+     *     not_editable: list<ImageUsage>} $targets
+     * @phpstan-param array<string, mixed> $outOfScope
+     */
+    private function preview(string $action, array $targets, array $outOfScope): ToolResultInterface
+    {
+        $preview = $this->groupByEntity($targets['editable'], $targets['not_editable']);
+        return $this->confirmationRequired(
+            $action,
+            $preview['affected'],
+            ['not_editable_usages' => $preview['not_editable']] + $outOfScope,
+            null,
+            'Confirming saves the replacement as a DRAFT of each affected entity; nothing changes on the '
+                . 'storefront until each one is published with hyva_cms_publish. Usages under '
+                . 'not_editable_usages (also those of an affected entity, e.g. its Magento CMS content) are '
+                . 'reported, not changed.'
+        );
     }
 
     /**

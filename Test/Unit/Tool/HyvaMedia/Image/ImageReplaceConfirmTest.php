@@ -21,7 +21,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
- * hyva_media.image.replace with scope=global rewrites drafts only after confirm (AC15).
+ * hyva_media.image.replace rewrites drafts only after confirm: scope=global (AC15) and, since T-168, every scope.
  */
 class ImageReplaceConfirmTest extends TestCase
 {
@@ -79,9 +79,14 @@ class ImageReplaceConfirmTest extends TestCase
         $this->assertFalse($payload['published'] ?? null);
     }
 
-    public function testAOneTypeScopeWritesOnTheFirstCallAndSaysSo(): void
+    /**
+     * T-168: a one-type scope without confirm is a dry run too; before, it wrote the drafts on the first call.
+     *
+     * @return void
+     */
+    public function testAOneTypeScopeWithoutConfirmWritesNothing(): void
     {
-        $this->editor->expects($this->once())->method('rewrite')->willReturn([]);
+        $this->editor->expects($this->never())->method('rewrite');
 
         $payload = $this->payload($this->tool()->execute([
             'old_path' => 'wysiwyg/old.jpg',
@@ -89,7 +94,26 @@ class ImageReplaceConfirmTest extends TestCase
             'scope' => 'cms_page',
         ]));
 
-        // T-152: no confirm needed (drafts only), and the reply says it wrote.
+        $this->assertTrue($payload['confirmation_required'] ?? null);
+        $this->assertTrue($payload['dry_run'] ?? null);
+        $this->assertSame('replace_image', $payload['action'] ?? null);
+        $this->assertSame(self::TARGETS, $payload['affected'] ?? null);
+        $this->assertStringContainsString('DRAFT', Cast::string($payload['hint'] ?? ''));
+    }
+
+    public function testAOneTypeScopeWithConfirmWritesAndSaysSo(): void
+    {
+        $this->editor->expects($this->once())->method('rewrite')
+            ->with(self::TARGETS, $this->isType('callable'), 'Image replaced (MCP)')
+            ->willReturn([]);
+
+        $payload = $this->payload($this->tool()->execute([
+            'old_path' => 'wysiwyg/old.jpg',
+            'new_path' => 'wysiwyg/new.jpg',
+            'scope' => 'cms_page',
+            'confirm' => true,
+        ]));
+
         $this->assertArrayNotHasKey('confirmation_required', $payload);
         $this->assertFalse($payload['dry_run'] ?? null);
         $this->assertFalse($payload['published'] ?? null);
