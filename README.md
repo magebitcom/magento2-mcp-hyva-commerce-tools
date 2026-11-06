@@ -131,8 +131,10 @@ Publishing a menu also activates it: Hyvä Menu Builder sets `is_active` when it
 takes the same path, so it also activates an inactive menu when it fires; the schedule reply's `warnings` list says
 so when the menu is inactive. Activating a menu that is not published yet (`hyva_menu.create` or
 `hyva_menu.update` with `is_active: true`) shows nothing until it is published and placed, and the confirm preview
-says so. Publishing a page or block
-leaves its active flag as it is; an inactive one stays hidden, and the reply's `note` names the update call.
+says so. A published, active menu also renders nowhere until it is placed: in the header or footer menu of the design
+configuration, or through a menu widget (CMS content or a widget instance). The tools do not look the placement up,
+so their replies still say the menu goes live; `hyva_menu.find_usage` shows where it is placed. Publishing a page or
+block leaves its active flag as it is; an inactive one stays hidden, and the reply's `note` names the update call.
 
 `settings` are different: they are Magento fields and apply at once. A `settings` change that affects the live
 storefront therefore needs `"confirm": true` (see the next section).
