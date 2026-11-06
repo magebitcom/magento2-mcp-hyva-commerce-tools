@@ -48,7 +48,8 @@ See [Hyvä Commerce 1.4 coverage](#hyvä-commerce-14-coverage) for the tools eac
 
 ## Requirements
 
-- `magebitcom/magento2-mcp-module` (`Magebit_Mcp`) `^1.3`
+- `magebitcom/magento2-mcp-module` (`Magebit_Mcp`) `^1.4` (its `ForbiddenException` carries the refusals, see
+  [Refusals](#refusals))
 - Hyvä Commerce 1.4:
   - Hyvä CMS 1.3 with Media Gallery (`hyva-themes/commerce-module-cms`)
   - Hyvä Admin Dashboard (`hyva-themes/commerce-module-admin-dashboard`,
@@ -91,6 +92,11 @@ From 1.0.0 the MCP tool contract is the stable API: tool names, input schemas, r
 resources. Breaking changes to it come only in a major release. The PHP classes and the `Api\*` interfaces are
 internal: they may gain methods in minor releases, so a module that implements or extends them may need changes on a
 minor upgrade.
+
+**From 0.x to 1.0.0.** Scope and permission refusals are JSON-RPC errors (`-32004`, see [Refusals](#refusals)), no
+longer a tool result with `status: 403`. A client that read `status` from the result must read `error.code` and
+`error.data.reason` instead. The audit log no longer has the `out_of_scope` and `status_403` summaries: the core logs
+these calls with error code `-32004`.
 
 ## Concepts
 
@@ -192,14 +198,33 @@ preview (nothing written), `false` in the reply of these calls, which wrote. `hy
 
 ### Refusals
 
-A refused call is a soft error (`isError: true`) with a `status`, not a JSON-RPC error. The refusal comes from Hyvä
-(a save it rejects) or from the module's own checks (store scope, in-use deletes, mail transport):
+**Scope and permission refusals** refuse the whole call with the JSON-RPC error `-32004`, the same code as the core's
+own ACL gate, so a client handles one shape. Nothing was written. `error.data.reason` says why:
+
+| `reason` | When | Other `error.data` keys | What to do |
+|---|---|---|---|
+| `scope` | The role's websites or store views (Hyvä Advanced Admin Permissions) exclude the entity, store view or website. | `denied_store_ids` (page and block create), `allowed_website_ids` (`hyva_store_credit.history.list` without `website_id`) | Work in the role's own store views or websites (see [Store scope](#store-scope)). |
+| `acl` | The role lacks a permission: a Hyvä verb, an admin delete permission, another admin's AI Worker job, saving drafts. | `resource`, the missing ACL resource, when the tool knows it; `resources` when several are missing (e.g. `hyva_media.image.replace` with `scope: global`) | Grant the permission (see [Role setup](#role-setup)). |
+
+```json
+{"jsonrpc": "2.0", "id": 7, "error": {"code": -32004, "message": "Your admin role may not delete CMS pages: it needs the Magento_Cms::page_delete permission.", "data": {"reason": "acl", "resource": "Magento_Cms::page_delete"}}}
+```
+
+Lists are not refused: they leave out what the role may not see and count it (`items_hidden_by_permissions`,
+`conflicts_hidden_by_permissions`), and `hyva_media.image.replace` / `update_alt` skip out-of-scope entities
+(`skipped_out_of_scope`). See [Tools that skip or hide content](#tools-that-skip-or-hide-content-outside-the-role).
+
+**Partial writes stay soft.** When an update tool already wrote part of the call (the settings, or the draft) and
+the rest is refused, the reply is a soft error that says what was written (`settings_applied`, `draft_saved`). When
+the cause is a scope or permission refusal it carries the same `reason`.
+
+**Other refusals** are soft errors (`isError: true`) with a `status`, not JSON-RPC errors. They come from Hyvä (a save
+it rejects) or from the module's own checks (in-use deletes, mail transport):
 
 | Status | When | What to do |
 |---|---|---|
 | 422 | A provider refuses content, or Hyvä's content guard rejects it (3 MB, 5000 components, depth 50). `field_errors` lists the problems per component uid and field. | Fix the fields and call again. |
 | 409 | The draft changed since you read it. Pass `base_version_uid` to the update tools to get this check. Also a confirmed delete of an entity still in use (`in_use`), and a `hyva_linked.group.save` that Hyvä refuses after the check passed (another save took the name or the products; `issues` code `save_refused`, Hyvä's message). | Reload and re-apply your change; never resubmit old content. For a delete, see [Confirm and force](#confirm-and-force). For a linked group, validate again and save again. |
-| 403 | Hyvä refuses a permission, or the role's store scope excludes the entity (audit summary `{"error": "out_of_scope"}`; a missing permission is `status_403`). | Grant the permission (see [Role setup](#role-setup)), or work in the role's own store views (see [Store scope](#store-scope)). |
 | `transport_error` | `hyva_email.template.send_test` could not hand the mail to Magento's mail transport. The reply has `sent: false`, `message`, `id` and `recipient`. | Check the store's mail settings. Nothing was sent. |
 
 ## ACL
@@ -222,6 +247,10 @@ see the draft, publish, import, restore and schedule tools, or `hyva_cms.migrati
 variants (`hyva_menu.publish`, `hyva_menu.schedule.*`, `hyva_menu.version.*`) follow the same rule on menus: they are
 listed only when the role holds every verb they need there, e.g. `hyva_menu.schedule.create` needs
 `menu_schedule_save` and `menu_view`.
+
+**Refusals at run time use the same code.** A permission the tool itself checks while it runs (delete permissions,
+draft saves, Hyvä's own checks) is refused with the same `-32004` as the core's gate, with `error.data.reason: "acl"`
+(see [Refusals](#refusals)).
 
 **Scheduling needs view.** The schedule tools need the content type's view verb next to its scheduling verb
 (`Hyva_Cms::page_view`, `Hyva_Cms::block_view`, `Hyva_MenuBuilder::menu_view`): Hyvä keeps them as siblings, so a
@@ -281,7 +310,7 @@ in the admin and the web API, not on the `/mcp` route. The module therefore appl
 
 | Entity | Read | Change |
 |---|---|---|
-| CMS pages, blocks, menus, forms | Outside the role's store views: hidden from the lists, and refused by every tool that reads one (status 403). | Outside the role's store views: refused (status 403). Changing one, or its store views, needs every store view it is assigned to. |
+| CMS pages, blocks, menus, forms | Outside the role's store views: hidden from the lists, and refused by every tool that reads one (`-32004`). | Outside the role's store views: refused (`-32004`). Changing one, or its store views, needs every store view it is assigned to. |
 | Email and newsletter templates, linked product groups, category positions | Allowed. They belong to no store view. | Refused for a restricted role. |
 | Store credit | Checked against the customer's website. | Checked against the customer's website. Hyvä's own store credit services do not check scope. |
 | Media Gallery files, folders, trash, sync status | Not scoped. | Not scoped. |
@@ -377,9 +406,10 @@ the Media Gallery trash.
 - The tool resources sit under *MCP Tools → Hyvä Commerce Tools*. The module grants them to no role. Only a role with
   *All* resources (Administrators) has them without being given them.
 - The core checks the tool resource and the "Listed with" resource on `tools/list` and `tools/call`.
-- The page and block tools check both admin delete permissions again and refuse with status 403.
+- The page and block tools check both admin delete permissions again and refuse with `-32004` (`reason: acl`,
+  `resource` names the missing one).
 - The email tools are hidden without Hyvä Email Templates. Email and newsletter templates belong to no store view, so
-  a role restricted to some websites is refused (status 403).
+  a role restricted to some websites is refused (`-32004`, `reason: scope`).
 - They are write tools, so the [write gate](#write-gate) applies.
 - Store scope is as for any change: every store view the entity is assigned to must be the role's, and store view 0
   needs all of them.

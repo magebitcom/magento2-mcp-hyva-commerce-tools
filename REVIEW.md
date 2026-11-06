@@ -6,6 +6,7 @@
 - `hyva_ai.*` is monitoring only and `hyva_admin_perm.*` read only, by design; no generation or permission writes through MCP.
 - Not covered on purpose (README "Not covered"): Image Editor, Admin Theme, Commerce Module, CMS Google Maps.
 - Tools with `entity_type` are listed for a role holding their verbs on at least one content type (`ContentAcl::listingResource()`, the core takes one resource and no arguments) and refused per call (`-32004`) on a type the role lacks. The core sets its caller only when it dispatches a tool, so `Plugin/JsonRpc/BindCallerContextPlugin` binds it before `tools/list` and the `tools/call` ACL gate (frontend area, where `/mcp` runs).
+- A scope or permission refusal inside a tool is thrown, not returned: `OutOfScopeException` (reason `scope`, extra `error.data` keys) or `AuthorizationException` / `AclRefusalException` (reason `acl`, `resource`). `AbstractTool::execute()` turns them into the core's `ForbiddenException` (`-32004`). A `catch (LocalizedException)` must rethrow `AuthorizationException` first, or the refusal becomes a plain soft error. Only a partial write (something already saved) answers a refusal softly, with `reason`.
 - Store scope: menus and forms are scoped by their store views although the Hyvä admin does not scope them; stricter on purpose.
 - Store scope: email/newsletter templates, linked groups and category positions have no store view; restricted roles read them, never write.
 - `hyva_media.trash.restore` has no confirm: it never overwrites (skips taken paths, as Hyvä's `TrashRepository` does).
