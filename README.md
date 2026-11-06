@@ -825,9 +825,10 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
   `stale_asset_id`, the old id in `asset_id`), then re-link them with `hyva_media.image.replace` using the same path
   as `old_path` and `new_path` and `"confirm": true`: it saves drafts that carry the new id.
 - **Symbolic links in pub/media.** Magento's media path validator checks paths lexically and does not resolve symbolic
-  links, so a link under `pub/media` that points elsewhere passes it. `hyva_media.asset.move` and
-  `hyva_media.asset.trash` resolve links and refuse a target folder or an asset file whose real path lies outside
-  `pub/media` (soft error; assets in `paths_outside_media`). Other media tools follow Magento's rule.
+  links, so a link under `pub/media` that points elsewhere passes it. `hyva_media.asset.move`,
+  `hyva_media.asset.trash` and `hyva_media.folder.create` resolve links and refuse a target folder, an asset file or
+  a new folder whose real path (or that of its nearest existing parent) lies outside `pub/media` (soft error; the
+  paths in `paths_outside_media`). Other media tools follow Magento's rule.
 - **Links in the literal-URL audit.** Link field values (`{type, value, src, ...}`) are not images: their `src` is the
   link target of a `custom_url` or `cms_page` link. `hyva_media.audit.literal_urls` skips them, so they are never
   counted as `literal_not_in_gallery`.
