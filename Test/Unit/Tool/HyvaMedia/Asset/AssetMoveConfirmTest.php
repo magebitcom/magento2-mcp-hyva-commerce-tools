@@ -13,6 +13,7 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
+use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content\ContentScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset\AssetMove;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -35,6 +36,11 @@ class AssetMoveConfirmTest extends TestCase
     private ImageUsageIndex&MockObject $usageIndex;
 
     /**
+     * @var MediaFileInfo&MockObject
+     */
+    private MediaFileInfo&MockObject $fileInfo;
+
+    /**
      * @var AssetMove
      */
     private AssetMove $tool;
@@ -53,13 +59,15 @@ class AssetMoveConfirmTest extends TestCase
             $this->asset(3, 'wysiwyg/c.jpg'),
         ]);
         $this->usageIndex = $this->createMock(ImageUsageIndex::class);
+        $this->fileInfo = $this->createMock(MediaFileInfo::class);
         $this->tool = new AssetMove(
             $featureChecker,
             $this->gallery,
             $this->createMock(ImageReferenceExtractor::class),
             $this->usageIndex,
             $this->createMock(CallerContext::class),
-            $this->contentScope(null)
+            $this->contentScope(null),
+            $this->fileInfo
         );
     }
 
@@ -97,6 +105,48 @@ class AssetMoveConfirmTest extends TestCase
         );
 
         $this->assertSame(3, $this->payloadAt($result, 'moved'));
+    }
+
+    /**
+     * T-143: a target folder that a symbolic link takes outside pub/media is refused, preview included.
+     *
+     * @return void
+     */
+    public function testATargetFolderOutsideMediaIsRefused(): void
+    {
+        $this->fileInfo->method('resolvesOutsideMedia')
+            ->willReturnCallback(static fn (string $path): bool => $path === 'wysiwyg/linked');
+        $this->gallery->expects($this->never())->method('move');
+
+        foreach ([false, true] as $confirm) {
+            $result = $this->tool->execute(['ids' => [1], 'target_folder' => 'wysiwyg/linked', 'confirm' => $confirm]);
+
+            $this->assertTrue($result->isError());
+            $this->assertSame(
+                'Folder "wysiwyg/linked" resolves outside pub/media through a symbolic link; assets are not moved '
+                    . 'there.',
+                $this->payloadAt($result, 'error')
+            );
+        }
+    }
+
+    /**
+     * T-143: assets whose file lies outside pub/media through a symbolic link are not moved.
+     *
+     * @return void
+     */
+    public function testAnAssetOutsideMediaIsRefused(): void
+    {
+        $this->fileInfo->method('resolvesOutsideMedia')
+            ->willReturnCallback(static fn (string $path): bool => $path === 'wysiwyg/b.jpg');
+        $this->gallery->expects($this->never())->method('move');
+
+        $result = $this->tool->execute(
+            ['ids' => [1, 2, 3], 'target_folder' => 'wysiwyg/campaigns', 'confirm' => true]
+        );
+
+        $this->assertTrue($result->isError());
+        $this->assertSame(['wysiwyg/b.jpg'], $this->payloadAt($result, 'paths_outside_media'));
     }
 
     /**

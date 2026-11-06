@@ -104,10 +104,42 @@ class MediaFileInfoTest extends TestCase
         $read->method('isFile')->willThrowException(new \RuntimeException('/var/www/pub/media/'));
         $filesystem = $this->createMock(Filesystem::class);
         $filesystem->method('getDirectoryRead')->willReturn($read);
-        $info = new MediaFileInfo($filesystem, $this->createMock(LoggerInterface::class));
+        $info = new MediaFileInfo($filesystem, $this->createMock(LoggerInterface::class), new File());
 
         $this->assertFalse($info->folderExists('-x'));
         $this->assertFalse($info->exists('-x.png'));
+    }
+
+    /**
+     * T-143: a symbolic link under pub/media that points outside it is not inside the media directory, whatever
+     * Magento's lexical path validator says; a link to a media folder and paths that do not exist yet are judged by
+     * where they really lead.
+     *
+     * @return void
+     */
+    public function testALinkOutOfMediaResolvesOutside(): void
+    {
+        $outside = dirname($this->media) . '/outside';
+        mkdir($outside);
+        symlink($outside, $this->media . '/wysiwyg/linked');
+        symlink($this->media . '/wysiwyg/banners', $this->media . '/wysiwyg/alias');
+        try {
+            $info = $this->info();
+
+            $this->assertTrue($info->folderExists('wysiwyg/linked'));
+            $this->assertTrue($info->resolvesOutsideMedia('wysiwyg/linked'));
+            $this->assertTrue($info->resolvesOutsideMedia('wysiwyg/linked/new/deeper'));
+            $this->assertTrue($info->resolvesOutsideMedia('/wysiwyg/linked/a.png'));
+            $this->assertFalse($info->resolvesOutsideMedia('wysiwyg/alias'));
+            $this->assertFalse($info->resolvesOutsideMedia('wysiwyg/banners/a.png'));
+            $this->assertFalse($info->resolvesOutsideMedia('wysiwyg/new-folder/x'));
+            $this->assertFalse($info->resolvesOutsideMedia('wysiwyg'));
+            $this->assertFalse($info->resolvesOutsideMedia('-x'));
+        } finally {
+            unlink($this->media . '/wysiwyg/alias');
+            unlink($this->media . '/wysiwyg/linked');
+            rmdir($outside);
+        }
     }
 
     /**
@@ -126,6 +158,6 @@ class MediaFileInfoTest extends TestCase
         );
         $filesystem = $this->createMock(Filesystem::class);
         $filesystem->method('getDirectoryRead')->willReturn($read);
-        return new MediaFileInfo($filesystem, $this->createMock(LoggerInterface::class));
+        return new MediaFileInfo($filesystem, $this->createMock(LoggerInterface::class), $driver);
     }
 }

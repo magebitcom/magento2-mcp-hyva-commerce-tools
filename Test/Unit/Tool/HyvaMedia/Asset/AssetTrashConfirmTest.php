@@ -13,6 +13,7 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
+use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content\ContentScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Asset\AssetTrash;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -35,6 +36,11 @@ class AssetTrashConfirmTest extends TestCase
     private ImageUsageIndex&MockObject $usageIndex;
 
     /**
+     * @var MediaFileInfo&MockObject
+     */
+    private MediaFileInfo&MockObject $fileInfo;
+
+    /**
      * @var AssetTrash
      */
     private AssetTrash $tool;
@@ -53,13 +59,15 @@ class AssetTrashConfirmTest extends TestCase
             $this->asset(3, 'wysiwyg/c.jpg'),
         ]);
         $this->usageIndex = $this->createMock(ImageUsageIndex::class);
+        $this->fileInfo = $this->createMock(MediaFileInfo::class);
         $this->tool = new AssetTrash(
             $featureChecker,
             $this->gallery,
             $this->createMock(ImageReferenceExtractor::class),
             $this->usageIndex,
             $this->createMock(CallerContext::class),
-            $this->contentScope(null)
+            $this->contentScope(null),
+            $this->fileInfo
         );
     }
 
@@ -100,6 +108,29 @@ class AssetTrashConfirmTest extends TestCase
         $this->assertSame(3, $this->payloadAt($result, 'trashed'));
         $this->assertFalse($this->payloadAt($result, 'in_use'));
         $this->assertSame(0, $this->payloadAt($result, 'in_use_count'));
+    }
+
+    /**
+     * T-143: assets whose file lies outside pub/media through a symbolic link are not trashed, preview included.
+     *
+     * @return void
+     */
+    public function testAnAssetOutsideMediaIsRefused(): void
+    {
+        $this->fileInfo->method('resolvesOutsideMedia')
+            ->willReturnCallback(static fn (string $path): bool => $path !== 'wysiwyg/a.jpg');
+        $this->gallery->expects($this->never())->method('trash');
+
+        foreach ([false, true] as $confirm) {
+            $result = $this->tool->execute(['ids' => [1, 2, 3], 'confirm' => $confirm]);
+
+            $this->assertTrue($result->isError());
+            $this->assertSame(['wysiwyg/b.jpg', 'wysiwyg/c.jpg'], $this->payloadAt($result, 'paths_outside_media'));
+            $this->assertSame(
+                'These assets resolve outside pub/media through a symbolic link; nothing was trashed.',
+                $this->payloadAt($result, 'error')
+            );
+        }
     }
 
     /**

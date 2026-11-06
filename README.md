@@ -817,6 +817,10 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
   restore). Find the image fields still holding an old id with `hyva_media.audit.literal_urls` (category
   `stale_asset_id`, the old id in `asset_id`), then re-link them with `hyva_media.image.replace` using the same path
   as `old_path` and `new_path` and `"confirm": true`: it saves drafts that carry the new id.
+- **Symbolic links in pub/media.** Magento's media path validator checks paths lexically and does not resolve symbolic
+  links, so a link under `pub/media` that points elsewhere passes it. `hyva_media.asset.move` and
+  `hyva_media.asset.trash` resolve links and refuse a target folder or an asset file whose real path lies outside
+  `pub/media` (soft error; assets in `paths_outside_media`). Other media tools follow Magento's rule.
 - **Links in the literal-URL audit.** Link field values (`{type, value, src, ...}`) are not images: their `src` is the
   link target of a `custom_url` or `cms_page` link. `hyva_media.audit.literal_urls` skips them; before, menu
   `custom_url` links showed up as `literal_not_in_gallery`.
@@ -877,6 +881,8 @@ Clients that parse replies:
 - **Menu tools are listed only with every verb they need.** `hyva_menu.schedule.create` / `.cancel` also need
   `Hyva_MenuBuilder::menu_view` to be listed, and `hyva_menu.version.restore` needs `menu_version_history` next to
   `menu_save`. Before, they were listed with their first verb and every call of a role missing the rest was refused.
+- **Media move and trash refuse paths outside `pub/media`.** A target folder or asset file that a symbolic link takes
+  outside `pub/media` is refused with a soft error, preview included; nothing is moved or trashed.
 - **Page and block scheduling needs view.** `hyva_cms.schedule.*` on a page or block also needs `Hyva_Cms::page_view` /
   `Hyva_Cms::block_view`, as menus already needed `Hyva_MenuBuilder::menu_view`. A role without it is refused
   (`-32004`) and no longer sees those items in the schedule list or conflicts. See [ACL](#acl).
