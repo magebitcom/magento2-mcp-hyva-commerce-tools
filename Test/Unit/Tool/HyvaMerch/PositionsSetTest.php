@@ -18,6 +18,7 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Merchandising\CategoryPositions;
 use Magebit\McpHyvaCommerceTools\Model\Security\AdminScopeGuard;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMerch\Category\PositionsSet;
+use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\User\Model\User;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -44,6 +45,15 @@ class PositionsSetTest extends TestCase
         $this->positions->expects($this->never())->method('save');
         $result = $this->tool(true)->execute(['category_id' => 6, 'top_skus' => ['A'], 'confirm' => true]);
         $this->assertTrue($result->isError());
+        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+    }
+
+    public function testAHyvaPermissionRefusalWhilePlanningStaysARefusal(): void
+    {
+        $this->positions = $this->createMock(CategoryPositions::class);
+        $this->positions->method('plan')->willThrowException(new AuthorizationException(__('Not allowed.')));
+        $this->positions->expects($this->never())->method('save');
+        $result = $this->tool(false)->execute(['category_id' => 6, 'top_skus' => ['A'], 'confirm' => true]);
         $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
     }
 

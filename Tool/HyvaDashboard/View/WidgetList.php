@@ -15,6 +15,7 @@ use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Dashboard\DashboardCatalog;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
+use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
 
 class WidgetList extends AbstractTool
@@ -79,6 +80,8 @@ class WidgetList extends AbstractTool
         }
         try {
             $result = $this->catalog->widgets($adminId, $this->intArg($arguments, 'view_id'));
+        } catch (AuthorizationException $e) {
+            throw $e;
         } catch (LocalizedException $e) {
             return $this->softError($e->getMessage());
         }

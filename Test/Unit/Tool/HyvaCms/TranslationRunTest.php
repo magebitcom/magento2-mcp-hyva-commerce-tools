@@ -18,6 +18,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\TranslationScanner;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Translation\TranslationRun;
+use Magento\Framework\Exception\AuthorizationException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -142,6 +143,15 @@ class TranslationRunTest extends TestCase
         $payload = $this->payload($this->tool()->execute([
             'entity_type' => 'cms_page', 'id' => 7, 'write_draft' => true,
         ]));
+        $this->assertSame(403, $payload['status']);
+    }
+
+    public function testAHyvaPermissionRefusalFromTheAiCallStaysARefusal(): void
+    {
+        $this->acl->method('isAllowed')->willReturn(true);
+        $this->gateway->method('translate')->willThrowException(new AuthorizationException(__('Not allowed.')));
+        $this->contentService->expects($this->never())->method('saveDraft');
+        $payload = $this->payload($this->tool()->execute(['entity_type' => 'cms_page', 'id' => 7]));
         $this->assertSame(403, $payload['status']);
     }
 

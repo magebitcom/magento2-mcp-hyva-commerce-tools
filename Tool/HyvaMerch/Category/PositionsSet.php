@@ -21,6 +21,7 @@ use Magebit\McpHyvaCommerceTools\Model\Security\AdminScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
 
 class PositionsSet extends AbstractTool
@@ -103,6 +104,8 @@ class PositionsSet extends AbstractTool
         ));
         try {
             $plan = $this->categoryPositions->plan($categoryId, $skus);
+        } catch (AuthorizationException $e) {
+            throw $e;
         } catch (LocalizedException $e) {
             return $this->softError($e->getMessage());
         }

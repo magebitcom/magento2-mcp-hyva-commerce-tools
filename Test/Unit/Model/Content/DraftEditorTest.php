@@ -11,6 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Content;
 use Hyva\CmsLiveviewEditor\Model\Component\Provider as ComponentProvider;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
+use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
 use PHPUnit\Framework\TestCase;
 
@@ -42,6 +43,14 @@ class DraftEditorTest extends TestCase
         $provider->method('getComponent')->willReturnCallback(static fn (string $n) => $components[$n] ?? null);
         $this->tree = new ComponentTree($provider);
         $this->editor = new DraftEditor($this->tree);
+    }
+
+    public function testAPermissionRefusalIsNotWrappedIntoAPlainError(): void
+    {
+        $tree = $this->createMock(ComponentTree::class);
+        $tree->method('moveNode')->willThrowException(new AuthorizationException(__('Not allowed.')));
+        $this->expectException(AuthorizationException::class);
+        (new DraftEditor($tree))->apply([], [['op' => 'move', 'uid' => 'r1']]);
     }
 
     public function testOperationsApplyInOrder(): void

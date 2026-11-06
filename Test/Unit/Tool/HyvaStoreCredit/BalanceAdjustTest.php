@@ -22,6 +22,7 @@ use Magebit\McpHyvaCommerceTools\Tool\HyvaStoreCredit\Balance\BalanceCredit;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaStoreCredit\Balance\BalanceDebit;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\CustomerInterface;
+use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\User\Model\User;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -151,6 +152,14 @@ class BalanceAdjustTest extends TestCase
         $payload = $this->payload($this->tool(BalanceCredit::class)->execute(['customer_id' => 1, 'amount' => 5,
             'reason' => 'goodwill', 'idempotency_key' => 'ticket-1234', 'confirm' => true]));
         $this->assertFalse($payload['replayed']);
+    }
+
+    public function testAHyvaPermissionRefusalOnWriteStaysARefusal(): void
+    {
+        $this->gateway->method('adjust')->willThrowException(new AuthorizationException(__('Not allowed.')));
+        $payload = $this->payload($this->tool(BalanceCredit::class)->execute(['customer_id' => 1, 'amount' => 5,
+            'reason' => 'goodwill', 'confirm' => true]));
+        $this->assertSame(403, $payload['status']);
     }
 
     public function testAConcurrentCallThatWonTheKeyIsReportedAsAClash(): void

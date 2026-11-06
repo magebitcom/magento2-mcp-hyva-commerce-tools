@@ -170,6 +170,8 @@ class TranslationRun extends AbstractTranslationTool
                     'targetStores' => $item['targetStores'],
                 ], $batch));
             }
+        } catch (AuthorizationException $e) {
+            throw $e;
         } catch (LocalizedException $e) {
             return $this->softError('The AI translation failed: ' . $e->getMessage() . ' Nothing was changed.');
         }
