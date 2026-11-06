@@ -57,8 +57,10 @@ abstract class AbstractContentTool extends AbstractTool implements ContextualAcl
      *
      * A generic tool is listed with a resource the caller holds when its CONTENT_VERBS (and extra resources) are
      * allowed on at least one content type, so a read-only role does not see a write tool it cannot use on any type.
-     * A fixed-type variant uses that type's first verb resource from Hyvä (e.g. Hyva_MenuBuilder::menu_publish);
-     * while the type's module is off Hyvä has no mapping for it and the variant is hidden from tools/list.
+     * A fixed-type variant follows the same rule on its own type (T-146: e.g. hyva_menu.schedule.create needs
+     * menu_schedule_save and menu_view) and is listed with its first verb resource (Hyva_MenuBuilder::menu_publish),
+     * which also stays the resource outside an MCP request; while the type's module is off Hyvä has no mapping for it
+     * and the variant is hidden from tools/list.
      *
      * @return string|null
      */
@@ -75,7 +77,16 @@ abstract class AbstractContentTool extends AbstractTool implements ContextualAcl
         if (!$this->contentAcl()->isMapped(static::FIXED_CONTENT_TYPE)) {
             return ContentAcl::UNAVAILABLE_RESOURCE;
         }
-        return $this->contentAcl()->resources([static::FIXED_CONTENT_TYPE], [static::CONTENT_VERBS[0]])[0] ?? null;
+        $first = $this->contentAcl()->resources([static::FIXED_CONTENT_TYPE], [static::CONTENT_VERBS[0]])[0] ?? null;
+        if ($first === null) {
+            return null;
+        }
+        return $this->contentAcl()->listingResource(
+            [static::FIXED_CONTENT_TYPE],
+            $this->contentVerbs([]),
+            $this->extraAclResources(),
+            $first
+        );
     }
 
     /**

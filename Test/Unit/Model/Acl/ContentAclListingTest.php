@@ -23,6 +23,12 @@ use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Migration\MigrationScan;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Version\VersionRestore;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateSendTest;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageReplace;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule\ScheduleCancel;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule\ScheduleCreate;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Schedule\ScheduleList;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuScheduleCancel;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuScheduleCreate;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Release\MenuVersionRestore;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -50,6 +56,9 @@ class ContentAclListingTest extends TestCase
             static fn (string $type, string $verb): string => 'Hyva::' . $type . '_' . $verb
         );
         $authorization->method('getContentTypes')->willReturn($mapped);
+        $authorization->method('isMapped')->willReturnCallback(
+            static fn (string $type): bool => in_array($type, $mapped, true)
+        );
         $caller = $this->createMock(CallerContext::class);
         $caller->method('isAllowed')->willReturnCallback(
             static fn (string $resource): ?bool => $granted === null ? null : in_array($resource, $granted, true)
@@ -176,6 +185,79 @@ class ContentAclListingTest extends TestCase
         $acl = $this->acl(['Hyva_Cms::cms', 'Hyva::menu_view']);
         $tool = $this->tool(MigrationScan::class, MigrationScan::class, $acl);
         $this->assertSame('Hyva::cms_page_view', $tool->getUnderlyingAclResource());
+    }
+
+    /**
+     * T-146: a fixed-type variant is listed only when every verb it needs on its type is allowed, view included.
+     *
+     * @return void
+     */
+    public function testAMenuScheduleVariantNeedsItsVerbsAndMenuView(): void
+    {
+        $scheduler = $this->acl(['Hyva_Cms::cms', 'Hyva::menu_schedule_save', 'Hyva::menu_schedule_cancel']);
+        $this->assertSame(
+            'Hyva::menu_view',
+            $this->tool(MenuScheduleCreate::class, ScheduleCreate::class, $scheduler)->getUnderlyingAclResource()
+        );
+        $this->assertSame(
+            'Hyva::menu_view',
+            $this->tool(MenuScheduleCancel::class, ScheduleCancel::class, $scheduler)->getUnderlyingAclResource()
+        );
+
+        $withView = $this->acl(['Hyva_Cms::cms', 'Hyva::menu_schedule_save', 'Hyva::menu_view']);
+        $this->assertSame(
+            'Hyva::menu_schedule_save',
+            $this->tool(MenuScheduleCreate::class, ScheduleCreate::class, $withView)->getUnderlyingAclResource()
+        );
+        $this->assertSame(
+            'Hyva::menu_schedule_cancel',
+            $this->tool(MenuScheduleCancel::class, ScheduleCancel::class, $withView)->getUnderlyingAclResource()
+        );
+    }
+
+    /**
+     * T-146 applied to every fixed-type variant: menu version restore needs save and version history.
+     *
+     * @return void
+     */
+    public function testAFixedTypeVariantNeedsEveryVerb(): void
+    {
+        $acl = $this->acl(array_merge(self::VIEWER, ['Hyva::menu_save']));
+        $this->assertSame(
+            'Hyva::menu_version_history',
+            $this->tool(MenuVersionRestore::class, VersionRestore::class, $acl)->getUnderlyingAclResource()
+        );
+
+        $acl = $this->acl(array_merge(self::VIEWER, ['Hyva::menu_save', 'Hyva::menu_version_history']));
+        $this->assertSame(
+            'Hyva::menu_save',
+            $this->tool(MenuVersionRestore::class, VersionRestore::class, $acl)->getUnderlyingAclResource()
+        );
+
+        $this->assertSame(
+            'Hyva::menu_schedule_save',
+            $this->tool(MenuScheduleCreate::class, ScheduleCreate::class, $this->acl(null))->getUnderlyingAclResource()
+        );
+    }
+
+    /**
+     * T-147: the generic schedule tools are listed for a role with scheduling and view on the same type.
+     *
+     * @return void
+     */
+    public function testTheGenericScheduleToolsNeedViewOnTheScheduledType(): void
+    {
+        $acl = $this->acl(['Hyva_Cms::cms', 'Hyva::cms_page_scheduling', 'Hyva::cms_block_view']);
+        $this->assertSame(
+            'Hyva::cms_page_view',
+            $this->tool(ScheduleList::class, ScheduleList::class, $acl)->getUnderlyingAclResource()
+        );
+
+        $acl = $this->acl(['Hyva_Cms::cms', 'Hyva::cms_page_scheduling', 'Hyva::cms_page_view']);
+        $this->assertSame(
+            'Hyva::cms_page_scheduling',
+            $this->tool(ScheduleList::class, ScheduleList::class, $acl)->getUnderlyingAclResource()
+        );
     }
 
     public function testEmailSendTestIsListedWithTheTemplateWriteVerb(): void

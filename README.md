@@ -209,7 +209,10 @@ A call passes three checks, all against the token's admin role:
 **Tools with `entity_type` in `tools/list`.** `tools/list` has no arguments, so it cannot check the verb per type.
 These tools are listed for a role that holds their verb on at least one content type ("the verb on any type" in the
 catalog). A call on a type the role lacks is refused with `-32004`. A role with only the view verbs therefore does not
-see the draft, publish, import, restore and schedule tools, or `hyva_cms.migration.convert_to_draft`.
+see the draft, publish, import, restore and schedule tools, or `hyva_cms.migration.convert_to_draft`. The menu
+variants (`hyva_menu.publish`, `hyva_menu.schedule.*`, `hyva_menu.version.*`) follow the same rule on menus: they are
+listed only when the role holds every verb they need there, e.g. `hyva_menu.schedule.create` needs
+`menu_schedule_save` and `menu_view`.
 
 **Scheduling needs view.** The schedule tools need the content type's view verb next to its scheduling verb
 (`Hyva_Cms::page_view`, `Hyva_Cms::block_view`, `Hyva_MenuBuilder::menu_view`): Hyvä keeps them as siblings, so a
@@ -606,14 +609,14 @@ with underscores (`hyva_cms_page_get`); `tools/call` accepts both forms.
 | `hyva_menu.preview` | read | `Hyva_MenuBuilder::menu_view` | version_id → version_history | Preview Hyvä Menu |
 | `hyva_menu.publish` | write | `Hyva_MenuBuilder::menu_publish` | entity_type → publish (+ version_history with version_id) | Publish Hyvä Menu |
 | `hyva_menu.render_check` | read | `Hyva_MenuBuilder::menu_view` |  | Check Hyvä Menu Rendering |
-| `hyva_menu.schedule.cancel` | write | `Hyva_MenuBuilder::menu_schedule_cancel` | entity_type → schedule_cancel + view | Cancel Hyvä Menu Schedule |
-| `hyva_menu.schedule.create` | write | `Hyva_MenuBuilder::menu_schedule_save` | entity_type → schedule_save + view (+ version_history with version_id) | Schedule Hyvä Menu |
+| `hyva_menu.schedule.cancel` | write | `Hyva_MenuBuilder::menu_schedule_cancel` + `menu_view` | entity_type → schedule_cancel + view | Cancel Hyvä Menu Schedule |
+| `hyva_menu.schedule.create` | write | `Hyva_MenuBuilder::menu_schedule_save` + `menu_view` | entity_type → schedule_save + view (+ version_history with version_id) | Schedule Hyvä Menu |
 | `hyva_menu.status` | read | `Hyva_Cms::cms` |  | Menu Builder Status |
 | `hyva_menu.delete` | write | `Hyva_MenuBuilder::menu_delete` |  | Delete Hyvä Menu (own resource *Delete Hyvä Menus via MCP*; confirm-gated) |
 | `hyva_menu.update` | write | `Hyva_MenuBuilder::menu_save` |  | Update Hyvä Menu |
 | `hyva_menu.validate` | read | `Hyva_MenuBuilder::menu_view` |  | Validate Hyvä Menu |
 | `hyva_menu.version.list` | read | `Hyva_MenuBuilder::menu_version_history` | entity_type → version_history | List Hyvä Menu Versions |
-| `hyva_menu.version.restore` | write | `Hyva_MenuBuilder::menu_save` | entity_type → save + version_history | Restore Hyvä Menu Version |
+| `hyva_menu.version.restore` | write | `Hyva_MenuBuilder::menu_save` + `menu_version_history` | entity_type → save + version_history | Restore Hyvä Menu Version |
 
 ### Hyvä Media (optimization tools need Hyva_MediaOptimization)
 
@@ -871,6 +874,9 @@ Clients that parse replies:
 - **`hyva_linked.group.save` answers a Hyvä refusal softly.** A save that Linked Products refuses after the check (a
   concurrent save took the name or the products; 1.0.2 says so in its own words) was a JSON-RPC error; it is now a
   soft error with status 409 and `issues` code `save_refused`.
+- **Menu tools are listed only with every verb they need.** `hyva_menu.schedule.create` / `.cancel` also need
+  `Hyva_MenuBuilder::menu_view` to be listed, and `hyva_menu.version.restore` needs `menu_version_history` next to
+  `menu_save`. Before, they were listed with their first verb and every call of a role missing the rest was refused.
 - **Page and block scheduling needs view.** `hyva_cms.schedule.*` on a page or block also needs `Hyva_Cms::page_view` /
   `Hyva_Cms::block_view`, as menus already needed `Hyva_MenuBuilder::menu_view`. A role without it is refused
   (`-32004`) and no longer sees those items in the schedule list or conflicts. See [ACL](#acl).

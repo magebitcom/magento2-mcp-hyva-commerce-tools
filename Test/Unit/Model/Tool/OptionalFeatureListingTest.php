@@ -196,6 +196,7 @@ class OptionalFeatureListingTest extends TestCase
     {
         $acl = $this->createMock(ContentAcl::class);
         $acl->method('resources')->willReturn(['Hyva_MenuBuilder::menu_publish']);
+        $acl->method('listingResource')->willReturnArgument(3);
         $acl->method('isMapped')->willReturnOnConsecutiveCalls(true, false);
         $tool = (new \ReflectionClass(MenuPublish::class))->newInstanceWithoutConstructor();
         (new \ReflectionProperty(Publish::class, 'contentAcl'))->setValue($tool, $acl);
