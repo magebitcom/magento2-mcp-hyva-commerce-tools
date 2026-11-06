@@ -12,6 +12,8 @@ use Magebit\Mcp\Api\FieldResolverInterface;
 
 /**
  * Contributes one key to the hyva_cms.page.get / hyva_cms.block.get / hyva_menu.get response.
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface ContentFieldResolverInterface extends FieldResolverInterface
 {

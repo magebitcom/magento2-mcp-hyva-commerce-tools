@@ -11,6 +11,8 @@ namespace Magebit\McpHyvaCommerceTools\Api\Adapter;
 /**
  * Hyvä Advanced Admin Permissions scope restriction. Only the adapter references Hyva\AdvancedAdminPermissionsScope
  * classes; use Model\Security\AdminScopeGuard, which checks the module is enabled first.
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface AdminScopeGatewayInterface
 {

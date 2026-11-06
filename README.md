@@ -9,6 +9,7 @@ and content health.
 - [What this module gives you](#what-this-module-gives-you)
 - [Requirements](#requirements)
 - [Install](#install)
+- [Stability](#stability)
 - [Concepts](#concepts)
 - [Safety model](#safety-model)
 - [ACL](#acl)
@@ -83,6 +84,13 @@ bin/magento setup:upgrade
 bin/magento setup:di:compile
 bin/magento cache:flush
 ```
+
+## Stability
+
+From 1.0.0 the MCP tool contract is the stable API: tool names, input schemas, reply shapes, error codes and ACL
+resources. Breaking changes to it come only in a major release. The PHP classes and the `Api\*` interfaces are
+internal: they may gain methods in minor releases, so a module that implements or extends them may need changes on a
+minor upgrade.
 
 ## Concepts
 

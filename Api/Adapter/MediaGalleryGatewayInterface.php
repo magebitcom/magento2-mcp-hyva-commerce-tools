@@ -16,6 +16,8 @@ use Magento\Framework\Exception\LocalizedException;
  *
  * @phpstan-type AssetRow array{id: int, path: string, title: string, content_type: string, width: int,
  *     height: int, size: int, updated_at: string}
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface MediaGalleryGatewayInterface
 {

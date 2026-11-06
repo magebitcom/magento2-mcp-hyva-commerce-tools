@@ -12,6 +12,8 @@ use Magebit\Mcp\Api\FieldResolverInterface;
 
 /**
  * Contributes one key to the hyva_media.image.get response.
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface ImageFieldResolverInterface extends FieldResolverInterface
 {

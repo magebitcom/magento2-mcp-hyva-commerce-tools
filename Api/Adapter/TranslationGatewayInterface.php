@@ -13,6 +13,8 @@ use Magento\Framework\Exception\LocalizedException;
 /**
  * Hyvä CMS AI Translations access. Only the adapter references Hyva\CmsAiTranslations classes; tools reach it
  * through a proxy, after the cms_ai_translations feature check.
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface TranslationGatewayInterface
 {

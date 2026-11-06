@@ -20,6 +20,8 @@ use Magento\Framework\Exception\ValidatorException;
  * @phpstan-type MemberRow array{product_id: int, sku: string, on_storefront: bool, not_shown_because: string|null,
  *     values: array<string, string>}
  * @phpstan-type Issue array{severity: string, code: string, message: string}
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface LinkedProductsGatewayInterface
 {

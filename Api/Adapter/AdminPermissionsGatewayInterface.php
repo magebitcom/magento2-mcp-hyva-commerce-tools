@@ -12,6 +12,8 @@ namespace Magebit\McpHyvaCommerceTools\Api\Adapter;
  * Hyvä Advanced Admin Permissions reads (effective permissions, role assignment audit). Only the adapter references
  * Hyva\AdvancedAdminPermissions classes; tools reach it through a proxy, after the admin_permissions feature check.
  * Scope restrictions go through AdminScopeGatewayInterface.
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface AdminPermissionsGatewayInterface
 {

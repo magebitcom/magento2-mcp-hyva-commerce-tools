@@ -17,6 +17,8 @@ use Magento\Framework\Exception\LocalizedException;
  * @phpstan-type EmailRow array{id: int, type: string, code: string, subject: string, orig_template_code: string,
  *     sender_name: string, sender_email: string, hyva_enabled: bool, has_draft: bool, has_published: bool,
  *     preheader: string, assigned_to: list<array{path: string, scope: string, scope_id: int}>}
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface EmailGatewayInterface
 {

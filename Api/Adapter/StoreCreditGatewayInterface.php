@@ -23,6 +23,8 @@ use Magento\Framework\Exception\LocalizedException;
  * @phpstan-type WebsiteStatus array{website_id: int, code: string, name: string, enabled: bool,
  *     history_visible: bool, email_enabled: bool, receive_email_enabled: bool, spend_email_enabled: bool,
  *     currency: string}
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface StoreCreditGatewayInterface
 {
