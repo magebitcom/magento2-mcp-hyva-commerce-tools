@@ -93,11 +93,6 @@ resources. Breaking changes to it come only in a major release. The PHP classes 
 internal: they may gain methods in minor releases, so a module that implements or extends them may need changes on a
 minor upgrade.
 
-**From 0.x to 1.0.0.** Scope and permission refusals are JSON-RPC errors (`-32004`, see [Refusals](#refusals)), no
-longer a tool result with `status: 403`. A client that read `status` from the result must read `error.code` and
-`error.data.reason` instead. The audit log no longer has the `out_of_scope` and `status_403` summaries: the core logs
-these calls with error code `-32004`.
-
 ## Concepts
 
 | Term | What it is |
