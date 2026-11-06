@@ -25,7 +25,7 @@ class ScheduleDetectConflicts extends AbstractContentTool
 {
     public const TOOL_NAME = 'hyva_cms.schedule.detect_conflicts';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_cms_schedule_detect_conflicts';
-    public const CONTENT_VERBS = [ContentAcl::VERB_SCHEDULING];
+    public const CONTENT_VERBS = [ContentAcl::VERB_SCHEDULING, ContentAcl::VERB_VIEW];
 
     /**
      * @param ConflictReport $conflictReport
@@ -85,14 +85,17 @@ class ScheduleDetectConflicts extends AbstractContentTool
         if ($type !== null && (isset($arguments['id']) || isset($arguments['identifier']))) {
             $entityId = $this->contentLocator->locate($type, $arguments)['id'];
         }
-        // Conflicts of content types the role may not schedule (or, for menus, view), or naming content outside its
+        // Conflicts of content types the role may not schedule or view (T-145, T-147), or naming content outside its
         // website/store view restriction, are hidden; release-level conflicts are judged by the release's items.
         $scoped = $this->conflictReport->getConflictsWithinCallerScope(
             $this->intArg($arguments, 'window_minutes', 60) ?? 60,
             $type,
             $entityId,
-            $this->contentScopeFilter->viewableTypes(
-                $this->contentAcl->allowedTypes(ContentLocator::TYPES, ContentAcl::VERB_SCHEDULING)
+            $this->contentAcl->allowedTypes(
+                $this->contentScopeFilter->viewableTypes(
+                    $this->contentAcl->allowedTypes(ContentLocator::TYPES, ContentAcl::VERB_SCHEDULING)
+                ),
+                ContentAcl::VERB_VIEW
             )
         );
         $conflicts = $scoped['conflicts'];
@@ -113,18 +116,5 @@ class ScheduleDetectConflicts extends AbstractContentTool
     protected function contentAcl(): ContentAcl
     {
         return $this->contentAcl;
-    }
-
-    /**
-     * Scheduling; a call about a menu also needs menu view.
-     *
-     * @param array $arguments
-     * @return array
-     * @phpstan-param array<string, mixed> $arguments
-     * @phpstan-return list<string>
-     */
-    protected function contentVerbs(array $arguments): array
-    {
-        return array_values(array_merge(parent::contentVerbs($arguments), $this->menuViewVerbs($arguments)));
     }
 }

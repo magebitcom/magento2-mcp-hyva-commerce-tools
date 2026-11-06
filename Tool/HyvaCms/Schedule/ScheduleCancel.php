@@ -26,7 +26,7 @@ class ScheduleCancel extends AbstractContentTool
     public const TOOL_NAME = 'hyva_cms.schedule.cancel';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_cms_schedule_cancel';
     public const IS_WRITE = true;
-    public const CONTENT_VERBS = [ContentAcl::VERB_SCHEDULE_CANCEL];
+    public const CONTENT_VERBS = [ContentAcl::VERB_SCHEDULE_CANCEL, ContentAcl::VERB_VIEW];
 
     /**
      * @param ScheduleService $scheduleService
@@ -100,11 +100,12 @@ class ScheduleCancel extends AbstractContentTool
             $itemIds,
             $releaseId,
             // A variant bound to one content type (hyva_menu.schedule.cancel) cancels nothing else; a role restricted
-            // to some websites or store views cancels only releases of content it may change; a role without
-            // menu_view cancels no menu.
+            // to some websites or store views cancels only releases of content it may change; a role cancels no item
+            // of a type it may not view (T-145, T-147).
             fn (string $type, int $entityId): bool => (static::FIXED_CONTENT_TYPE === ''
                     || $type === static::FIXED_CONTENT_TYPE)
                 && $this->contentAcl->isAllowed($type, ContentAcl::VERB_SCHEDULE_CANCEL)
+                && $this->contentAcl->isAllowed($type, ContentAcl::VERB_VIEW)
                 && $this->contentScopeFilter->viewableTypes([$type]) !== []
                 && $this->contentLocator->allowsWrite($type, $entityId)
         );
@@ -120,19 +121,6 @@ class ScheduleCancel extends AbstractContentTool
     protected function contentAcl(): ContentAcl
     {
         return $this->contentAcl;
-    }
-
-    /**
-     * Schedule cancel; the menu variant also needs menu view (the generic tool checks it per item in run()).
-     *
-     * @param array $arguments
-     * @return array
-     * @phpstan-param array<string, mixed> $arguments
-     * @phpstan-return list<string>
-     */
-    protected function contentVerbs(array $arguments): array
-    {
-        return array_values(array_merge(parent::contentVerbs($arguments), $this->menuViewVerbs($arguments)));
     }
 
     /**

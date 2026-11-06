@@ -211,6 +211,12 @@ These tools are listed for a role that holds their verb on at least one content 
 catalog). A call on a type the role lacks is refused with `-32004`. A role with only the view verbs therefore does not
 see the draft, publish, import, restore and schedule tools, or `hyva_cms.migration.convert_to_draft`.
 
+**Scheduling needs view.** The schedule tools need the content type's view verb next to its scheduling verb
+(`Hyva_Cms::page_view`, `Hyva_Cms::block_view`, `Hyva_MenuBuilder::menu_view`): Hyvä keeps them as siblings, so a
+role can schedule a type it may not read. A call on such a type is refused (`-32004`); `hyva_cms.schedule.list` and
+the conflict lists hide its items (`items_hidden_by_permissions`, `conflicts_hidden_by_permissions`), and
+`hyva_cms.schedule.cancel` refuses them per item.
+
 **Version history needs its own verb.** Reading a version also needs the type's `version_history` verb:
 
 | Argument | Tools |
@@ -573,10 +579,10 @@ with underscores (`hyva_cms_page_get`); `tools/call` accepts both forms.
 | `hyva_cms.permission.check` | read | `-` |  | Check Hyvä CMS Permissions |
 | `hyva_cms.preview` | read | the verb on any type | entity_type → view (+ version_history with version_id) | Preview Hyvä CMS Content |
 | `hyva_cms.publish` | write | the verb on any type | entity_type → publish (+ version_history with version_id) | Publish Hyvä CMS Content |
-| `hyva_cms.schedule.cancel` | write | the verb on any type | entity_type → schedule_cancel | Cancel Hyvä CMS Schedule |
-| `hyva_cms.schedule.create` | write | the verb on any type | entity_type → schedule_save (+ version_history with version_id) | Schedule Hyvä CMS Content |
-| `hyva_cms.schedule.detect_conflicts` | read | the verb on any type | entity_type → scheduling | Detect Hyvä CMS Schedule Conflicts |
-| `hyva_cms.schedule.list` | read | the verb on any type | entity_type → scheduling | List Hyvä CMS Schedules |
+| `hyva_cms.schedule.cancel` | write | the verbs on any type | per item: schedule_cancel + view | Cancel Hyvä CMS Schedule |
+| `hyva_cms.schedule.create` | write | the verbs on any type | entity_type → schedule_save + view (+ version_history with version_id) | Schedule Hyvä CMS Content |
+| `hyva_cms.schedule.detect_conflicts` | read | the verbs on any type | entity_type → scheduling + view | Detect Hyvä CMS Schedule Conflicts |
+| `hyva_cms.schedule.list` | read | the verbs on any type | entity_type → scheduling + view | List Hyvä CMS Schedules |
 | `hyva_cms.tailwind.status` | read | `Magento_Config::config_system` |  | Hyvä CMS Tailwind Status (compiler daemon health, strategy, `reason`; hint per strategy) |
 | `hyva_cms.translation.run` | write | the verb on any type | entity_type → view + `Hyva_CmsAiTranslations::translate` | Run Hyvä CMS AI Translation |
 | `hyva_cms.translation.status` | read | the verb on any type | entity_type → view | Hyvä CMS Translation Status |
@@ -600,8 +606,8 @@ with underscores (`hyva_cms_page_get`); `tools/call` accepts both forms.
 | `hyva_menu.preview` | read | `Hyva_MenuBuilder::menu_view` | version_id → version_history | Preview Hyvä Menu |
 | `hyva_menu.publish` | write | `Hyva_MenuBuilder::menu_publish` | entity_type → publish (+ version_history with version_id) | Publish Hyvä Menu |
 | `hyva_menu.render_check` | read | `Hyva_MenuBuilder::menu_view` |  | Check Hyvä Menu Rendering |
-| `hyva_menu.schedule.cancel` | write | `Hyva_MenuBuilder::menu_schedule_cancel` | entity_type → schedule_cancel | Cancel Hyvä Menu Schedule |
-| `hyva_menu.schedule.create` | write | `Hyva_MenuBuilder::menu_schedule_save` | entity_type → schedule_save (+ version_history with version_id) | Schedule Hyvä Menu |
+| `hyva_menu.schedule.cancel` | write | `Hyva_MenuBuilder::menu_schedule_cancel` | entity_type → schedule_cancel + view | Cancel Hyvä Menu Schedule |
+| `hyva_menu.schedule.create` | write | `Hyva_MenuBuilder::menu_schedule_save` | entity_type → schedule_save + view (+ version_history with version_id) | Schedule Hyvä Menu |
 | `hyva_menu.status` | read | `Hyva_Cms::cms` |  | Menu Builder Status |
 | `hyva_menu.delete` | write | `Hyva_MenuBuilder::menu_delete` |  | Delete Hyvä Menu (own resource *Delete Hyvä Menus via MCP*; confirm-gated) |
 | `hyva_menu.update` | write | `Hyva_MenuBuilder::menu_save` |  | Update Hyvä Menu |
@@ -865,6 +871,9 @@ Clients that parse replies:
 - **`hyva_linked.group.save` answers a Hyvä refusal softly.** A save that Linked Products refuses after the check (a
   concurrent save took the name or the products; 1.0.2 says so in its own words) was a JSON-RPC error; it is now a
   soft error with status 409 and `issues` code `save_refused`.
+- **Page and block scheduling needs view.** `hyva_cms.schedule.*` on a page or block also needs `Hyva_Cms::page_view` /
+  `Hyva_Cms::block_view`, as menus already needed `Hyva_MenuBuilder::menu_view`. A role without it is refused
+  (`-32004`) and no longer sees those items in the schedule list or conflicts. See [ACL](#acl).
 - **A menu `identifier` with `store_id` finds inactive and unpublished menus.** It was resolved by Hyvä's storefront
   loader, so it only found active menus, and `store_id: 0` matched a menu of any store view. It now takes the menu
   assigned to that store view, else one for all store views, active or not; `store_id: 0` matches only the latter.
