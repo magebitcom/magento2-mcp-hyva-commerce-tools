@@ -21,6 +21,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Exception\AclRefusalException;
+use Magebit\McpHyvaCommerceTools\Exception\PartialRewriteException;
 
 /**
  * `hyva_media.image.update_alt` MCP tool.
@@ -122,11 +123,15 @@ class ImageUpdateAlt extends AbstractMediaTool implements ContextualAclAwareInte
                 ['not_editable_usages' => $targets['not_editable']] + $outOfScope
             );
         }
-        $results = $this->editor->rewrite(
-            $targets['editable'],
-            $this->editor->altRewrite($path, $this->requireString($arguments, 'alt')),
-            'Alt text updated (MCP)'
-        );
+        try {
+            $results = $this->editor->rewrite(
+                $targets['editable'],
+                $this->editor->altRewrite($path, $this->requireString($arguments, 'alt')),
+                'Alt text updated (MCP)'
+            );
+        } catch (PartialRewriteException $exception) {
+            return $this->partialRewriteError($exception);
+        }
         return $this->jsonResult(
             [
                 'dry_run' => false,

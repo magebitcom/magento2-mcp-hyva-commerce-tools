@@ -10,12 +10,15 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\Image;
 
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\Mcp\Api\ToolResultInterface;
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
+use Magebit\McpHyvaCommerceTools\Exception\PartialRewriteException;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageContentEditor;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageUpdateAlt;
+use Magento\Framework\Exception\LocalizedException;
 use PHPUnit\Framework\MockObject\MockObject;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
@@ -62,6 +65,73 @@ class ImageUpdateAltTest extends TestCase
         );
         $this->assertSame('Your role may not save cms_page drafts.', $refusal->getMessage());
         $this->assertSame('Hyva_Cms::page_save', $refusal->getData()['resource'] ?? null);
+    }
+
+    /**
+     * T-172: a scope refusal after a draft was saved answers softly, naming the saved draft, with reason "scope".
+     */
+    public function testARefusalAfterADraftWasSavedAnswersSoftlyWithTheReason(): void
+    {
+        $saved = [['entity_type' => 'cms_page', 'id' => 13, 'identifier' => 'sale', 'changed' => true,
+            'version_id' => 5]];
+        $failed = ['entity_type' => 'cms_block', 'id' => 4, 'identifier' => 'promo'];
+        $editor = $this->editor();
+        $editor->method('rewrite')->willThrowException(new PartialRewriteException(
+            __('Out of scope (at cms_block #4). Drafts already rewritten before the failure: cms_page #13 (version 5).'),
+            new OutOfScopeException(__('Out of scope.'), ['denied_store_ids' => [2]]),
+            $failed,
+            $saved
+        ));
+
+        $result = $this->tool($editor)->execute(['path' => 'wysiwyg/a.jpg', 'alt' => 'A', 'scope' => 'all']);
+        $payload = $this->payload($result);
+
+        $this->assertTrue($result->isError());
+        $this->assertStringContainsString('cms_page #13 (version 5)', Cast::string($payload['error'] ?? ''));
+        $this->assertSame('scope', $payload['reason'] ?? null);
+        $this->assertSame([2], $payload['denied_store_ids'] ?? null);
+        $this->assertSame($saved, $payload['drafts_saved'] ?? null);
+        $this->assertSame($failed, $payload['failed_at'] ?? null);
+        $this->assertFalse($payload['published'] ?? null);
+    }
+
+    /**
+     * A non-refusal failure after a draft was saved answers softly too, without a reason.
+     */
+    public function testAFailureAfterADraftWasSavedAnswersSoftlyWithoutAReason(): void
+    {
+        $editor = $this->editor();
+        $editor->method('rewrite')->willThrowException(new PartialRewriteException(
+            __('Locked (at cms_block #4). Drafts already rewritten before the failure: cms_page #13 (version 5).'),
+            new LocalizedException(__('Locked.')),
+            ['entity_type' => 'cms_block', 'id' => 4, 'identifier' => 'promo'],
+            [['entity_type' => 'cms_page', 'id' => 13, 'identifier' => 'sale', 'changed' => true, 'version_id' => 5]]
+        ));
+
+        $result = $this->tool($editor)->execute(['path' => 'wysiwyg/a.jpg', 'alt' => 'A', 'scope' => 'all']);
+        $payload = $this->payload($result);
+
+        $this->assertTrue($result->isError());
+        $this->assertArrayNotHasKey('reason', $payload);
+        $this->assertCount(1, Cast::array($payload['drafts_saved'] ?? null));
+    }
+
+    /**
+     * Nothing saved: the refusal stays a hard -32004 with its reason.
+     */
+    public function testARefusalBeforeAnyDraftWasSavedIsAHardRefusal(): void
+    {
+        $editor = $this->editor();
+        $editor->method('rewrite')->willThrowException(
+            new OutOfScopeException(__('Out of scope.'), ['denied_store_ids' => [2]])
+        );
+        $tool = $this->tool($editor);
+
+        $refusal = $this->assertRefused(
+            fn () => $tool->execute(['path' => 'wysiwyg/a.jpg', 'alt' => 'A', 'scope' => 'all']),
+            'scope'
+        );
+        $this->assertSame([2], $refusal->getData()['denied_store_ids'] ?? null);
     }
 
     public function testTheSchemaAcceptsConfirmSoAPreviewMindedCallIsNoSchemaError(): void

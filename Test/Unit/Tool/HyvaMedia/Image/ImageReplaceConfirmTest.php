@@ -10,6 +10,8 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\Image;
 
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\Mcp\Api\ToolResultInterface;
+use Magebit\McpHyvaCommerceTools\Exception\AclRefusalException;
+use Magebit\McpHyvaCommerceTools\Exception\PartialRewriteException;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
@@ -137,8 +139,33 @@ class ImageReplaceConfirmTest extends TestCase
     }
 
     /**
-     * T-89: page 7 uses the image in its Hyvä content and its Magento CMS content; it is listed once, under affected.
+     * T-172: an ACL refusal after a draft was saved answers softly with reason "acl" and the saved drafts.
      */
+    public function testARefusalAfterADraftWasSavedAnswersSoftlyWithTheReason(): void
+    {
+        $saved = [self::TARGETS[0] + ['changed' => true, 'version_id' => 9]];
+        $this->editor->method('rewrite')->willThrowException(new PartialRewriteException(
+            __('No permission (at cms_block #3). Drafts already rewritten before the failure: cms_page #7 (version 9).'),
+            new AclRefusalException(__('No permission.'), 'Hyva_Cms::block_save'),
+            self::TARGETS[1],
+            $saved
+        ));
+
+        $result = $this->tool()->execute([
+            'old_path' => 'wysiwyg/old.jpg',
+            'new_path' => 'wysiwyg/new.jpg',
+            'scope' => 'global',
+            'confirm' => true,
+        ]);
+        $payload = $this->payload($result);
+
+        $this->assertTrue($result->isError());
+        $this->assertSame('acl', $payload['reason'] ?? null);
+        $this->assertSame('Hyva_Cms::block_save', $payload['resource'] ?? null);
+        $this->assertSame($saved, $payload['drafts_saved'] ?? null);
+        $this->assertSame(self::TARGETS[1], $payload['failed_at'] ?? null);
+    }
+
     public function testARoleThatMayNotSaveAnyTypeIsRefusedWithEveryResource(): void
     {
         $this->editor->expects($this->never())->method('rewrite');
@@ -156,6 +183,9 @@ class ImageReplaceConfirmTest extends TestCase
         $this->assertSame(['Hyva_Cms::page_save', 'Hyva_Cms::block_save'], $refusal->getData()['resources'] ?? null);
     }
 
+    /**
+     * T-89: page 7 uses the image in its Hyvä content and its Magento CMS content; it is listed once, under affected.
+     */
     public function testTheGlobalPreviewListsEachEntityOnce(): void
     {
         $magentoUsage = $this->usage('magento_cms', 'cms_page', 7, 'sale');

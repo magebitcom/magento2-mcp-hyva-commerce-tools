@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Media;
 
+use Magebit\McpHyvaCommerceTools\Exception\PartialRewriteException;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
@@ -85,7 +86,8 @@ class ImageContentEditor
      * @param callable $rewrite
      * @param string $versionName
      * @return array
-     * @throws LocalizedException
+     * @throws PartialRewriteException When a target fails after earlier drafts were saved.
+     * @throws LocalizedException When the first changed target fails (nothing saved).
      * @phpstan-param list<array{entity_type: string, id: int, identifier: string}> $targets
      * @phpstan-param callable(array<string, mixed>): array<string, mixed> $rewrite
      * @phpstan-return list<array{entity_type: string, id: int, identifier: string, changed: bool,
@@ -110,11 +112,11 @@ class ImageContentEditor
                 }
             } catch (LocalizedException $e) {
                 // Drafts saved before the failure stay saved: name them so the caller can review or revert them.
-                $saved = array_filter($results, static fn (array $result): bool => $result['changed']);
+                $saved = array_values(array_filter($results, static fn (array $result): bool => $result['changed']));
                 if ($saved === []) {
                     throw $e;
                 }
-                throw new LocalizedException(__(
+                throw new PartialRewriteException(__(
                     '%1 (at %2 #%3). Drafts already rewritten before the failure: %4.',
                     $e->getMessage(),
                     $target['entity_type'],
@@ -128,7 +130,7 @@ class ImageContentEditor
                         ),
                         $saved
                     ))
-                ), $e);
+                ), $e, $target, $saved);
             }
             $results[] = $target + ['changed' => $changed, 'version_id' => $versionId];
         }

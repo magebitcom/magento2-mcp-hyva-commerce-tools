@@ -23,6 +23,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Exception\AclRefusalException;
+use Magebit\McpHyvaCommerceTools\Exception\PartialRewriteException;
 
 /**
  * `hyva_media.image.replace` MCP tool.
@@ -148,11 +149,15 @@ class ImageReplace extends AbstractMediaTool implements ContextualAclAwareInterf
         if (!$confirmed) {
             return $this->preview('replace_image', $targets, $outOfScope);
         }
-        $results = $this->editor->rewrite(
-            $targets['editable'],
-            $this->editor->replaceRewrite($old, $new, $this->stringArg($arguments, 'alt')),
-            'Image replaced (MCP)'
-        );
+        try {
+            $results = $this->editor->rewrite(
+                $targets['editable'],
+                $this->editor->replaceRewrite($old, $new, $this->stringArg($arguments, 'alt')),
+                'Image replaced (MCP)'
+            );
+        } catch (PartialRewriteException $exception) {
+            return $this->partialRewriteError($exception);
+        }
         return $this->jsonResult([
             'dry_run' => false,
             'old_path' => $old,

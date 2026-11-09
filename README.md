@@ -210,8 +210,9 @@ Lists are not refused: they leave out what the role may not see and count it (`i
 (`skipped_out_of_scope`). See [Tools that skip or hide content](#tools-that-skip-or-hide-content-outside-the-role).
 
 **Partial writes stay soft.** When an update tool already wrote part of the call (the settings, or the draft) and
-the rest is refused, the reply is a soft error that says what was written (`settings_applied`, `draft_saved`). When
-the cause is a scope or permission refusal it carries the same `reason`.
+the rest is refused, the reply is a soft error that says what was written (`settings_applied`, `draft_saved`).
+`hyva_media.image.replace` and `update_alt` do the same when a later entity fails after earlier drafts were saved
+(`drafts_saved`, `failed_at`). When the cause is a scope or permission refusal it carries the same `reason`.
 
 **Other refusals** are soft errors (`isError: true`) with a `status`, not JSON-RPC errors. They come from Hyvä (a save
 it rejects) or from the module's own checks (in-use deletes, mail transport):
