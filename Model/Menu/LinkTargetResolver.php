@@ -11,6 +11,7 @@ namespace Magebit\McpHyvaCommerceTools\Model\Menu;
 use Magebit\McpHyvaCommerceTools\Api\LinkTargetResolverInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentIndex;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
+use Magebit\McpHyvaCommerceTools\Model\Merchandising\CategoryPositions;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Catalog\Model\ResourceModel\Category\CollectionFactory as CategoryCollectionFactory;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
@@ -85,6 +86,9 @@ class LinkTargetResolver implements LinkTargetResolverInterface
             return $result;
         }
         $collection = $this->productCollectionFactory->create();
+        // As in CategoryPositions: in the frontend area MCP runs in, Magento_CatalogInventory would drop out-of-stock
+        // products and those not in the stock index yet (disabled or new), and they would be reported as missing.
+        $collection->setFlag(CategoryPositions::STOCK_FILTER_FLAG, true);
         $collection->setStoreId($storeId)->addAttributeToSelect(['name', 'status'])->addFieldToFilter(
             'sku',
             ['in' => $skus]
