@@ -446,7 +446,7 @@ find-usage tools already return, so they are not unified.
 
 | Tool | List keys in `details.usage` |
 |---|---|
-| `hyva_cms.page.delete` | `store_config` (home / 404 / cookies page configuration), `links` (links in Hyvä CMS content and menu items) |
+| `hyva_cms.page.delete` | `store_config` (home / 404 / cookies page configuration), `links` (links in Hyvä CMS content and menu items, and Form Builder forms whose success redirect URL is this page: `entity_type: form` with the form's `store_ids`, draft or published) |
 | `hyva_cms.block.delete` | `hyva_content` (Hyvä CMS components, and Form Builder forms whose success content block is this block: `entity_type: form` with the form's `store_ids`, draft or published), `magento_content` (widget directives in Magento content), `widget_instances` |
 | `hyva_menu.delete` | `design_config` (header/footer design configuration), `hyva_cms_content` and `magento_cms_content` (menu widgets in content), `widget_instances`, `layout_and_templates`; also `identifier`, as `hyva_menu.find_usage` |
 | `hyva_form.form.delete` | `hyva_content` (Hyvä form widgets), `magento_content` (form widget directives in Magento content), `widget_instances`, all matched by the form identifier. Another form with the same identifier on other store views is named in `details.identifier_shared_with`: widgets there render that form. |
@@ -457,7 +457,7 @@ For a role restricted to some websites, `usages_hidden_by_permissions` counts th
 
 The page and block tools also check menus when the role may not view them (`Hyva_MenuBuilder::menu_view`). Those
 usages are not listed; `usages_hidden_by_permissions` counts them, and they still set `used`, so `force` is needed.
-The block tool does the same with forms when the role may not view them (Form Builder).
+The page and block tools do the same with forms when the role may not view them (Form Builder).
 
 ## Replies
 

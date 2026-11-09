@@ -22,7 +22,7 @@ use Magento\Store\Model\StoreManagerInterface;
  * see, the rest is counted in usages_hidden_by_permissions (as the find-usage tools do), so content used only
  * elsewhere is never shown as unused. Menus are scanned even when the caller may not view them
  * (Hyva_MenuBuilder::menu_view); their usages count in `used`, and ContentScopeFilter moves them from the lists to
- * usages_hidden_by_permissions.
+ * usages_hidden_by_permissions. Form Builder forms are treated the same way.
  */
 class DeletionUsage
 {
@@ -34,6 +34,11 @@ class DeletionUsage
         'web/default/cms_no_route' => '404 (no route) page',
         'web/default/cms_no_cookies' => 'cookies disabled page',
     ];
+
+    /**
+     * The Form Builder form root field holding the link a form redirects to after a successful submission.
+     */
+    public const FORM_REDIRECT_KEY = 'success_redirect_url';
 
     /**
      * @param UsageFinder $usageFinder
@@ -54,9 +59,11 @@ class DeletionUsage
     }
 
     /**
-     * Usage of a CMS page: store configuration per store view and links to it in content and menus
+     * Usage of a CMS page: store configuration per store view and links to it in content, menus and forms
      *
-     * Store configuration: the home, 404 and cookies disabled page; links: Hyvä CMS content and menu items.
+     * Store configuration: the home, 404 and cookies disabled page; links: Hyvä CMS content and menu items, and Form
+     * Builder forms redirecting to the page after a successful submission (entity_type form, with store_ids). A link
+     * names the page by id or identifier; Form Builder also accepts the identifier with a leading slash.
      *
      * @param int $id
      * @param string $identifier
@@ -70,13 +77,18 @@ class DeletionUsage
     {
         $config = $this->pageConfig($id, $identifier, $storeIds);
         $refs = [(string) $id, $identifier];
-        $links = $this->contentScanner->findNodes(static function (array $node) use ($refs): bool {
-            $link = $node['link'] ?? null;
-            return is_array($link)
-                && ($link['type'] ?? null) === 'cms_page'
-                && is_scalar($link['value'] ?? null)
-                && in_array((string) $link['value'], $refs, true);
-        }, ContentLocator::TYPES, true);
+        $linksPage = static fn (mixed $link): bool => is_array($link)
+            && ($link['type'] ?? null) === 'cms_page'
+            && is_scalar($link['value'] ?? null)
+            && in_array(ltrim((string) $link['value'], '/'), $refs, true);
+        $links = $this->contentScanner->findNodes(
+            static fn (array $node): bool => $linksPage($node['link'] ?? null),
+            ContentLocator::TYPES,
+            true
+        );
+        array_push($links, ...$this->contentScanner->findFormNodes(
+            static fn (array $node): bool => $linksPage($node[self::FORM_REDIRECT_KEY] ?? null)
+        ));
         $total = count($config) + count($links);
         $report = $this->scopeFilter->filterUsageReport(
             ['used' => $total > 0, 'total' => $total, 'store_config' => $config, 'links' => $links],
