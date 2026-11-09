@@ -226,7 +226,7 @@ class BindCallerContextPluginTest extends TestCase
     }
 
     /**
-     * @param \ReflectionClass<object> $reflection
+     * @param \ReflectionClass<ToolInterface> $reflection
      * @return \ReflectionProperty|null
      */
     private function contentAclProperty(\ReflectionClass $reflection): ?\ReflectionProperty
