@@ -93,7 +93,8 @@ class DeletionUsage
     }
 
     /**
-     * Usage of a CMS block: Hyvä CMS components, Magento CMS widget directives and widget instances
+     * Usage of a CMS block: Hyvä CMS components, Form Builder success content blocks, Magento CMS widget directives
+     * and widget instances
      *
      * @param int $id
      * @param string $identifier

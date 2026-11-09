@@ -46,6 +46,11 @@ class UsageFinder
     /**
      * Find block usage.
      *
+     * The cms_block component's block_identifier is an entity picker value (object, list or legacy string) whose id
+     * is the block id, see EntityPickerReference. Form Builder forms (draft and published) name a block the same way
+     * in success_content_block (form root metadata); those usages are listed in hyva_content with entity_type form
+     * and the form's store_ids, whatever the form's success_content_type, as switching it back shows the block again.
+     *
      * @param int $blockId
      * @param string $identifier
      * @param bool $ignoreMenuAcl Also scan menus the caller may not view (in-use decisions), see ContentScanner.
@@ -55,12 +60,12 @@ class UsageFinder
      */
     public function findBlockUsage(int $blockId, string $identifier, bool $ignoreMenuAcl = false): array
     {
-        $refs = array_filter([(string) $blockId, $identifier], static fn (string $v): bool => $v !== '');
-        $hyva = $this->contentScanner->findNodes(static function (array $node) use ($refs): bool {
+        $refs = array_values(array_filter([(string) $blockId, $identifier], static fn (string $v): bool => $v !== ''));
+        $picker = $this->entityPicker;
+        $hyva = $this->contentScanner->findNodes(static function (array $node) use ($refs, $picker): bool {
             $component = $node['component'] ?? null;
             if ($component === 'cms_block') {
-                $value = $node['block_identifier'] ?? null;
-                return is_scalar($value) && in_array((string) $value, $refs, true);
+                return $picker->references($node['block_identifier'] ?? null, 'cms_block', $refs);
             }
             if ($component === 'widget') {
                 $encoded = (string) json_encode($node['widget'] ?? null);
@@ -76,6 +81,11 @@ class UsageFinder
             }
             return false;
         }, ContentLocator::TYPES, $ignoreMenuAcl);
+        $forms = $this->contentScanner->findFormNodes(
+            static fn (array $node): bool => array_key_exists('success_content_block', $node)
+                && $picker->references($node['success_content_block'], 'cms_block', $refs)
+        );
+        array_push($hyva, ...$forms);
 
         $magento = [];
         foreach ($refs as $ref) {

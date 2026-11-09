@@ -24,7 +24,8 @@ use PHPUnit\Framework\TestCase;
 /**
  * T-22: the delete preview of a CMS page finds the store views using it as home / 404 page and links to it.
  * PR #2 review: menus count for the in-use decision even when the caller may not view them, without being listed.
- * T-181: the same report for forms.
+ * T-181: the same report for forms. T-183: a form using the block as its success content block is a usage, hidden
+ * from a caller outside the form's store views or not allowed to view forms, and still in use for both.
  */
 class DeletionUsageTest extends TestCase
 {
@@ -159,6 +160,51 @@ class DeletionUsageTest extends TestCase
         $this->assertSame([2], array_column(Cast::array($report['hyva_content']), 'id'));
         $this->assertSame([], $report['widget_instances']);
         $this->assertSame(2, $report['usages_hidden_by_permissions']);
+    }
+
+    public function testAFormOutsideTheCallersStoreViewsKeepsTheBlockInUseWithTheFormHidden(): void
+    {
+        $scope = $this->contentScope([1], [ContentLocator::TYPE_PAGE => [2 => [1]]]);
+        $finder = $this->createMock(UsageFinder::class);
+        $finder->method('findBlockUsage')->willReturn([
+            'hyva_content' => [['entity_type' => ContentLocator::TYPE_PAGE, 'id' => 2],
+                ['entity_type' => ContentScanner::TYPE_FORM, 'id' => 8, 'store_ids' => [2]],
+                ['entity_type' => ContentScanner::TYPE_FORM, 'id' => 9, 'store_ids' => [0]]],
+            'magento_content' => [],
+            'widget_instances' => [],
+            'total' => 3,
+        ]);
+
+        $report = $this->usage(true, $scanned, $finder, $scope)->forBlock(3, 'promo');
+
+        $this->assertTrue($report['used']);
+        $this->assertSame(2, $report['total']);
+        $this->assertSame([2, 9], array_column(Cast::array($report['hyva_content']), 'id'));
+        $this->assertSame(1, $report['usages_hidden_by_permissions']);
+    }
+
+    public function testABlockUsedOnlyByAFormTheCallerMayNotViewIsStillInUse(): void
+    {
+        $features = $this->createMock(FeatureCheckerInterface::class);
+        $features->method('isAvailable')->willReturnCallback(
+            static fn (string $feature): bool => $feature !== FeatureCheckerInterface::FORM_BUILDER
+        );
+        $features->method('isInstalledAndEnabled')->willReturn(true);
+        $finder = $this->createMock(UsageFinder::class);
+        $finder->method('findBlockUsage')->willReturn([
+            'hyva_content' => [['entity_type' => ContentScanner::TYPE_FORM, 'id' => 8, 'store_ids' => [1]]],
+            'magento_content' => [],
+            'widget_instances' => [],
+            'total' => 1,
+        ]);
+        $scope = $this->contentScope(null, [], null, [], null, $features);
+
+        $report = $this->usage(true, $scanned, $finder, $scope)->forBlock(3, 'promo');
+
+        $this->assertTrue($report['used']);
+        $this->assertSame(0, $report['total']);
+        $this->assertSame([], $report['hyva_content']);
+        $this->assertSame(1, $report['usages_hidden_by_permissions']);
     }
 
     public function testAnUnembeddedFormIsNotInUse(): void
