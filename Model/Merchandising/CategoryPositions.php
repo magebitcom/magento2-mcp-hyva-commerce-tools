@@ -32,6 +32,11 @@ use Magento\Framework\Module\Manager as ModuleManager;
 class CategoryPositions
 {
     /**
+     * Collection flag that Magento\CatalogInventory\Helper\Stock::addIsInStockFilterToCollection() treats as done.
+     */
+    public const STOCK_FILTER_FLAG = 'has_stock_status_filter';
+
+    /**
      * Modules that take over storefront category sorting, so stored positions may not apply there.
      */
     private const SORT_OWNERS = ['Smile_ElasticsuiteCatalog' => 'ElasticSuite (Smile) sorts category pages itself '
@@ -219,8 +224,11 @@ class CategoryPositions
         if ($positions === []) {
             return [];
         }
-        $collection = $this->productCollectionFactory->create()
-            ->addAttributeToSelect(['name', 'status', 'visibility'])
+        $collection = $this->productCollectionFactory->create();
+        // The MCP endpoint runs in the frontend area, where Magento_CatalogInventory joins the stock index into every
+        // product collection and drops out-of-stock products and those not indexed yet (disabled or new ones).
+        $collection->setFlag(self::STOCK_FILTER_FLAG, true);
+        $collection->addAttributeToSelect(['name', 'status', 'visibility'])
             ->addIdFilter(array_keys($positions));
         $details = [];
         foreach ($collection->getItems() as $product) {
