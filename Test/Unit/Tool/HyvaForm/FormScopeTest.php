@@ -13,8 +13,10 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
+use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Model\Form\FormRules;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormCreate;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormUpdateDraft;
 use PHPUnit\Framework\MockObject\MockObject;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
@@ -46,7 +48,37 @@ class FormScopeTest extends TestCase
         $this->gateway($this->form([1]));
         $this->gateway->expects($this->never())->method('update');
         $tool = $this->tool([1]);
-        $this->assertRefused(fn () => $tool->execute(['id' => 3, 'store_ids' => [0]]), 'scope');
+        $refusal = $this->assertRefused(fn () => $tool->execute(['id' => 3, 'store_ids' => [0]]), 'scope');
+        $this->assertSame([0], $refusal->getData()['denied_store_ids'] ?? null, 'T-179');
+    }
+
+    /**
+     * T-179: a new form outside the caller's store views names the requested store views it may not use.
+     */
+    public function testANewFormOutsideTheCallersScopeNamesTheDeniedStoreViews(): void
+    {
+        $this->gateway([]);
+        $this->gateway->expects($this->never())->method('create');
+        $features = $this->createMock(FeatureCheckerInterface::class);
+        $features->method('isAvailable')->willReturn(true);
+        $tool = new FormCreate(
+            $features,
+            $this->gateway,
+            $this->createMock(ContentService::class),
+            new FormRules($this->createMock(ComponentTree::class)),
+            $this->storeScope([1]),
+            $this->createMock(ComponentTree::class),
+            $this->createMock(DraftEditor::class),
+            $this->createMock(PreviewService::class)
+        );
+
+        $refusal = $this->assertRefused(
+            fn () => $tool->execute(['title' => 'Contact', 'store_ids' => [1, 2]]),
+            'scope'
+        );
+        $this->assertSame([2], $refusal->getData()['denied_store_ids'] ?? null);
+        $refusal = $this->assertRefused(fn () => $tool->execute(['title' => 'Contact']), 'scope');
+        $this->assertSame([0], $refusal->getData()['denied_store_ids'] ?? null);
     }
 
     public function testAFormOfTheOwnStoreViewIsChanged(): void

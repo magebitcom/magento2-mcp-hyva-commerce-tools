@@ -342,14 +342,37 @@ class StoreScopeGuard
     public function assertAssignable(string $label, array $currentStoreIds, array $newStoreIds): void
     {
         if (!$this->allowsAssignment($currentStoreIds, $newStoreIds)) {
+            $denied = $this->deniedStoreIds($newStoreIds);
             throw new OutOfScopeException(__(
                 '%1 and may not assign %2 to %3: %4.',
                 self::RESTRICTED,
                 $label,
                 $this->describeStoreViews($newStoreIds),
                 $this->assignmentRefusalReason($currentStoreIds, $newStoreIds)
-            ));
+            ), $denied !== [] ? ['denied_store_ids' => $denied] : []);
         }
+    }
+
+    /**
+     * Requested store views the caller may not assign an entity to (each one judged alone by allowsWrite())
+     *
+     * Store view 0 ("All Store Views") is listed unless the role holds every store view. A move refused only for
+     * the store views it removes has no denied requested store view: the result is empty then.
+     *
+     * @param array $storeIds
+     * @return array
+     * @phpstan-param list<int> $storeIds
+     * @phpstan-return list<int>
+     */
+    public function deniedStoreIds(array $storeIds): array
+    {
+        if ($this->restrictedStoreIds() === null) {
+            return [];
+        }
+        return array_values(array_filter(
+            array_values(array_unique($storeIds)),
+            fn (int $id): bool => !$this->allowsWrite([$id])
+        ));
     }
 
     /**

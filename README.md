@@ -200,7 +200,7 @@ own ACL gate, so a client handles one shape. Nothing was written. Only a refusal
 
 | `reason` | When | Other `error.data` keys | What to do |
 |---|---|---|---|
-| `scope` | The role's websites or store views (Hyvä Advanced Admin Permissions) exclude the entity, store view or website. | `denied_store_ids` (page and block create), `allowed_website_ids` (`hyva_store_credit.history.list` without `website_id`) | Work in the role's own store views or websites (see [Store scope](#store-scope)). |
+| `scope` | The role's websites or store views (Hyvä Advanced Admin Permissions) exclude the entity, store view or website. | `denied_store_ids`, the requested store views the role may not use (creating a page, block, menu or form, `hyva_cms.import` with `create_new`, moving a page, block or form to other store views; absent when only the store views a move removes are outside the role), `allowed_website_ids` (`hyva_store_credit.history.list` without `website_id`) | Work in the role's own store views or websites (see [Store scope](#store-scope)). |
 | `acl` | The role lacks a permission: a Hyvä verb, an admin delete permission, another admin's AI Worker job, saving drafts. | `resource`, the missing ACL resource, when the tool knows it; `resources` when several are missing (e.g. `hyva_media.image.replace` with `scope: global`) | Grant the permission (see [Role setup](#role-setup)). |
 
 ```json
