@@ -18,13 +18,17 @@ use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Merchandising\CategoryPositions;
 use Magebit\McpHyvaCommerceTools\Model\Security\AdminScopeGuard;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMerch\Category\PositionsSet;
+use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\User\Model\User;
 use PHPUnit\Framework\MockObject\MockObject;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 class PositionsSetTest extends TestCase
 {
+    use RefusalAssertTrait;
+
     /**
      * @var CategoryPositions&MockObject
      */
@@ -42,9 +46,23 @@ class PositionsSetTest extends TestCase
     public function testAScopeRestrictedRoleIsRefused(): void
     {
         $this->positions->expects($this->never())->method('save');
-        $result = $this->tool(true)->execute(['category_id' => 6, 'top_skus' => ['A'], 'confirm' => true]);
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        $tool = $this->tool(true);
+        $this->assertRefused(
+            fn () => $tool->execute(['category_id' => 6, 'top_skus' => ['A'], 'confirm' => true]),
+            'scope'
+        );
+    }
+
+    public function testAHyvaPermissionRefusalWhilePlanningStaysARefusal(): void
+    {
+        $this->positions = $this->createMock(CategoryPositions::class);
+        $this->positions->method('plan')->willThrowException(new AuthorizationException(__('Not allowed.')));
+        $this->positions->expects($this->never())->method('save');
+        $tool = $this->tool(false);
+        $this->assertRefused(
+            fn () => $tool->execute(['category_id' => 6, 'top_skus' => ['A'], 'confirm' => true]),
+            'acl'
+        );
     }
 
     public function testWithoutConfirmItIsAPreview(): void

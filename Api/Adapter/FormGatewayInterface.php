@@ -18,6 +18,8 @@ use Magento\Framework\Exception\LocalizedException;
  *     recipient_to: string, recipient_cc: string, recipient_bcc: string, subject_template: string,
  *     webhook_url: string, webhook_format: string, is_captcha_enabled: bool, preview_url_key: string,
  *     has_draft: bool, has_published: bool, updated_at: string}
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface FormGatewayInterface
 {

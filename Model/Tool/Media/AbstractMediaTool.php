@@ -8,9 +8,13 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Tool\Media;
 
+use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Exception\PartialRewriteException;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
+use Magento\Framework\Exception\AuthorizationException;
+use Magento\Framework\Exception\LocalizedException;
 
 /**
  * Base for hyva_media.* tools that read media (admin Media Gallery permission).
@@ -53,5 +57,27 @@ abstract class AbstractMediaTool extends AbstractTool
     protected function isMediaGalleryEnabled(): bool
     {
         return (bool) $this->featureChecker->getStatus(FeatureCheckerInterface::MEDIA_GALLERY)['enabled'];
+    }
+
+    /**
+     * Soft error for a draft rewrite that failed after some drafts were saved; a refusal keeps its `reason`.
+     *
+     * @param PartialRewriteException $exception
+     * @return ToolResultInterface
+     * @throws LocalizedException
+     */
+    protected function partialRewriteError(PartialRewriteException $exception): ToolResultInterface
+    {
+        $cause = $exception->getCause();
+        return $this->softError(
+            $exception->getMessage(),
+            ['drafts_saved' => $exception->getSaved(), 'failed_at' => $exception->getFailedTarget()]
+                + ($cause instanceof AuthorizationException ? $this->refusalData($cause) : [])
+                + [
+                    'published' => false,
+                    'next_step' => 'Review the drafts already saved (or restore their previous version), then '
+                        . 'repeat the call with entity_ids for the entities not yet changed.',
+                ]
+        );
     }
 }

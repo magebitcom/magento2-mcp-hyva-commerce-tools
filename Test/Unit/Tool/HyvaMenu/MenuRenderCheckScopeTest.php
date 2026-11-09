@@ -15,6 +15,7 @@ use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuRenderCheck;
 use Magento\Framework\Exception\AuthorizationException;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -22,6 +23,7 @@ use PHPUnit\Framework\TestCase;
  */
 class MenuRenderCheckScopeTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     /**
@@ -48,9 +50,9 @@ class MenuRenderCheckScopeTest extends TestCase
 
     public function testAnExplicitStoreViewOutsideTheRoleIsRefused(): void
     {
-        $result = $this->tool([1], [1, 2])->execute(['id' => 4, 'store_id' => 2]);
+        $tool = $this->tool([1], [1, 2]);
 
-        $this->assertTrue($result->isError());
+        $this->assertRefused(fn () => $tool->execute(['id' => 4, 'store_id' => 2]), 'acl');
         $this->assertSame([], $this->rendered);
     }
 
@@ -193,9 +195,7 @@ class MenuRenderCheckScopeTest extends TestCase
             ['id' => 6, 'identifier' => 'main', 'store_ids' => [2]],
         ], $located);
 
-        $result = $tool->execute(['identifier' => 'main', 'store_id' => 1]);
-
-        $this->assertTrue($result->isError());
+        $this->assertRefused(fn () => $tool->execute(['identifier' => 'main', 'store_id' => 1]), 'scope');
         $this->assertSame([['id' => 3]], $located);
         $this->assertSame([], $this->rendered);
     }

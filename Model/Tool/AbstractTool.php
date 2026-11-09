@@ -13,8 +13,10 @@ use Hyva\CmsConnect\Exception\UnprocessableContentException;
 use Magebit\Mcp\Api\ToolInterface;
 use Magebit\Mcp\Api\ToolResultInterface;
 use Magebit\Mcp\Api\UnderlyingAclAwareInterface;
+use Magebit\Mcp\Exception\ForbiddenException;
 use Magebit\Mcp\Model\Tool\ToolResult;
 use Magebit\Mcp\Model\Tool\WriteMode;
+use Magebit\McpHyvaCommerceTools\Exception\AclRefusalException;
 use Magebit\McpHyvaCommerceTools\Exception\FeatureUnavailableException;
 use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
 use Magento\Framework\Exception\AuthorizationException;
@@ -24,6 +26,9 @@ use Magento\Framework\Exception\SecurityViolationException;
 /**
  * Shared plumbing for every Hyvä Commerce MCP tool: name/ACL from class constants,
  * typed argument readers and JSON result encoding.
+ *
+ * A scope or permission refusal thrown inside the tool ({@see OutOfScopeException}, any AuthorizationException)
+ * leaves execute() as core's ForbiddenException: JSON-RPC -32004 with `error.data.reason` "scope" or "acl".
  */
 abstract class AbstractTool implements ToolInterface, UnderlyingAclAwareInterface
 {
@@ -81,6 +86,8 @@ abstract class AbstractTool implements ToolInterface, UnderlyingAclAwareInterfac
 
     /**
      * @inheritDoc
+     *
+     * @throws ForbiddenException When the caller's scope or permissions refuse the whole call.
      */
     public function execute(array $arguments): ToolResultInterface
     {
@@ -98,15 +105,26 @@ abstract class AbstractTool implements ToolInterface, UnderlyingAclAwareInterfac
                     . 'to it, passing its version uid as base_version_uid. Do not resubmit the content you read '
                     . 'before.',
             ]);
-        } catch (OutOfScopeException $e) {
-            // Audited with its reason, as the in-use refusal is (T-90); the caller sees the same soft 403.
-            return $this->softError($e->getMessage(), ['status' => 403], 'out_of_scope');
         } catch (AuthorizationException $e) {
-            return $this->softError($e->getMessage(), ['status' => 403]);
+            throw new ForbiddenException($e->getMessage(), $this->refusalData($e));
         } catch (SecurityViolationException $e) {
             // Hyvä's ContentDocumentGuard: size (3 MB), node count (5000), depth (50), uid format, unknown components.
             return $this->softError($e->getMessage(), ['status' => 422]);
         }
+    }
+
+    /**
+     * The JSON-RPC `error.data` of a refusal: its reason plus what the exception names.
+     *
+     * @param AuthorizationException $exception
+     * @return array<string, mixed>
+     */
+    protected function refusalData(AuthorizationException $exception): array
+    {
+        if ($exception instanceof OutOfScopeException) {
+            return ['reason' => 'scope'] + $exception->getData();
+        }
+        return ['reason' => 'acl'] + ($exception instanceof AclRefusalException ? $exception->getData() : []);
     }
 
     /**
@@ -188,6 +206,7 @@ abstract class AbstractTool implements ToolInterface, UnderlyingAclAwareInterfac
                 . ' Save the draft again in a separate call.',
             ['settings_applied' => true, 'draft_saved' => false]
                 + ($exception instanceof ConflictException ? ['status' => 409] : [])
+                + ($exception instanceof AuthorizationException ? $this->refusalData($exception) : [])
                 + $result
         );
     }

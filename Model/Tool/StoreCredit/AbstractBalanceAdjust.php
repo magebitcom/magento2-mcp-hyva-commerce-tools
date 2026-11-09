@@ -14,6 +14,7 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\NumberBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\StoreCreditGatewayInterface;
+use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
 
 /**
@@ -147,6 +148,8 @@ abstract class AbstractBalanceAdjust extends AbstractStoreCreditTool
                 $adminUserId,
                 $notify
             );
+        } catch (AuthorizationException $e) {
+            throw $e;
         } catch (LocalizedException $e) {
             // InsufficientBalanceException when the balance changed since the preview.
             return $this->softError($e->getMessage() . ' Nothing was changed.');

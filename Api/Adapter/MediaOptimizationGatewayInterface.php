@@ -11,6 +11,8 @@ namespace Magebit\McpHyvaCommerceTools\Api\Adapter;
 /**
  * Module-owned boundary to Hyva_MediaOptimization. Only the implementation may reference Hyva\MediaOptimization
  * classes.
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface MediaOptimizationGatewayInterface
 {

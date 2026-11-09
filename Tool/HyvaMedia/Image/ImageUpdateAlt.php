@@ -20,6 +20,8 @@ use Magebit\Mcp\Model\Tool\Schema\Builder\ArrayBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\BooleanBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Builder\StringBuilder;
 use Magebit\Mcp\Model\Tool\Schema\Schema;
+use Magebit\McpHyvaCommerceTools\Exception\AclRefusalException;
+use Magebit\McpHyvaCommerceTools\Exception\PartialRewriteException;
 
 /**
  * `hyva_media.image.update_alt` MCP tool.
@@ -97,7 +99,10 @@ class ImageUpdateAlt extends AbstractMediaTool implements ContextualAclAwareInte
         $requested = $scope === 'all' ? ContentLocator::TYPES : [$scope];
         $types = $this->contentAcl->allowedTypes($requested, ContentAcl::VERB_SAVE);
         if ($types === []) {
-            return $this->softError(sprintf('Your role may not save %s drafts.', implode(' / ', $requested)));
+            throw new AclRefusalException(
+                __('Your role may not save %1 drafts.', implode(' / ', $requested)),
+                $this->contentAcl->resources($requested, [ContentAcl::VERB_SAVE])
+            );
         }
         $targets = $this->editor->findTargets($path, $types, $this->intListArg($arguments, 'entity_ids'));
         // A role restricted to some websites or store views only changes the content it may change.
@@ -118,11 +123,15 @@ class ImageUpdateAlt extends AbstractMediaTool implements ContextualAclAwareInte
                 ['not_editable_usages' => $targets['not_editable']] + $outOfScope
             );
         }
-        $results = $this->editor->rewrite(
-            $targets['editable'],
-            $this->editor->altRewrite($path, $this->requireString($arguments, 'alt')),
-            'Alt text updated (MCP)'
-        );
+        try {
+            $results = $this->editor->rewrite(
+                $targets['editable'],
+                $this->editor->altRewrite($path, $this->requireString($arguments, 'alt')),
+                'Alt text updated (MCP)'
+            );
+        } catch (PartialRewriteException $exception) {
+            return $this->partialRewriteError($exception);
+        }
         return $this->jsonResult(
             [
                 'dry_run' => false,

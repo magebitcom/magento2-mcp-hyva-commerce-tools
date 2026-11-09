@@ -11,6 +11,8 @@ namespace Magebit\McpHyvaCommerceTools\Api\Adapter;
 /**
  * Hyvä CMS Tailwind compiler daemon status (read only). Only the adapter references Hyva\CmsTailwindCompiler classes;
  * tools reach it through a proxy, after the cms_tailwind feature check.
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface CmsTailwindGatewayInterface
 {

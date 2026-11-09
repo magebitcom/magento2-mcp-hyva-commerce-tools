@@ -15,6 +15,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\PreviewService;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateCreateDraft;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplatePublish;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -22,6 +23,7 @@ use PHPUnit\Framework\TestCase;
  */
 class TemplateScopeTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     public function testARestrictedRoleMayNotCreateOrPublishTemplates(): void
@@ -36,11 +38,10 @@ class TemplateScopeTest extends TestCase
         $previews = $this->createMock(PreviewService::class);
 
         foreach ([TemplateCreateDraft::class, TemplatePublish::class] as $class) {
-            $result = (new $class($features, $gateway, $contentService, $previews, $guard))->execute(
+            $tool = new $class($features, $gateway, $contentService, $previews, $guard);
+            $this->assertRefused(fn () => $tool->execute(
                 ['id' => 4, 'orig_template_code' => 'customer_create_account_email_template', 'confirm' => true]
-            );
-            $this->assertTrue($result->isError(), $class);
-            $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '', $class);
+            ), 'scope');
         }
     }
 }

@@ -10,6 +10,7 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaDashboard\Widget;
 
 use Hyva\AdminDashboardFramework\Api\V1\WidgetInstance\WidgetInstanceInterface;
 use Hyva\AdminDashboardFramework\Model\Cache\Type\AdminDashboard;
+use Magebit\Mcp\Model\Tool\WriteMode;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Dashboard\WidgetInstanceFactory;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\ToolPayloadTrait;
@@ -69,5 +70,23 @@ class WidgetRefreshTest extends TestCase
 
         $this->assertSame(1, $this->payloadAt($result, 'count'));
         $this->assertSame('magebit_content_health_widget', $this->payloadAt($result, 'refreshed.0.widget_type'));
+    }
+
+    /**
+     * T-174: a write tool listed with the dashboard save verb, not the view resource every dashboard reader holds.
+     *
+     * @return void
+     */
+    public function testItIsAWriteToolGatedByTheDashboardSaveVerb(): void
+    {
+        $tool = new WidgetRefresh(
+            $this->createMock(FeatureCheckerInterface::class),
+            $this->createMock(ResourceConnection::class),
+            $this->getMockBuilder(AdminDashboard::class)->disableOriginalConstructor()->getMock(),
+            $this->createMock(WidgetInstanceFactory::class)
+        );
+
+        $this->assertSame(WriteMode::WRITE, $tool->getWriteMode());
+        $this->assertSame('Hyva_AdminDashboardFramework::dashboard_views_save', $tool->getUnderlyingAclResource());
     }
 }

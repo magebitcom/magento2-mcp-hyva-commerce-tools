@@ -10,6 +10,8 @@ namespace Magebit\McpHyvaCommerceTools\Api;
 
 /**
  * Looks up the catalog / CMS entities that Hyvä CMS link fields point to.
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface LinkTargetResolverInterface
 {

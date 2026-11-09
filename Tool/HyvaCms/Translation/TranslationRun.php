@@ -22,6 +22,7 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\Translation\AbstractTranslationTool;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
+use Magebit\McpHyvaCommerceTools\Exception\AclRefusalException;
 
 /**
  * @phpstan-type TranslationItem array{fieldId: string, originalText: string, uid: string, field: string,
@@ -106,8 +107,13 @@ class TranslationRun extends AbstractTranslationTool
         $entity = $this->contentLocator->locateForWrite($this->requireString($arguments, 'entity_type'), $arguments);
         $writeDraft = $this->boolArg($arguments, 'write_draft');
         if ($writeDraft && !$this->contentAcl->isAllowed($entity['type'], ContentAcl::VERB_SAVE)) {
-            throw new AuthorizationException(__('Your admin role may not save %1 drafts; run without write_draft '
-                . 'to get the proposals only.', $entity['type']));
+            throw new AclRefusalException(
+                __(
+                    'Your admin role may not save %1 drafts; run without write_draft to get the proposals only.',
+                    $entity['type']
+                ),
+                $this->contentAcl->resources([$entity['type']], [ContentAcl::VERB_SAVE])
+            );
         }
         $settings = $this->translations->settings();
         if (!$settings['enabled']) {
@@ -170,6 +176,8 @@ class TranslationRun extends AbstractTranslationTool
                     'targetStores' => $item['targetStores'],
                 ], $batch));
             }
+        } catch (AuthorizationException $e) {
+            throw $e;
         } catch (LocalizedException $e) {
             return $this->softError('The AI translation failed: ' . $e->getMessage() . ' Nothing was changed.');
         }

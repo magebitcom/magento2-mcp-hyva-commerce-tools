@@ -10,6 +10,8 @@ namespace Magebit\McpHyvaCommerceTools\Api;
 
 /**
  * Reports whether a Hyvä Commerce feature is installed, enabled and allowed for the caller.
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface FeatureCheckerInterface
 {

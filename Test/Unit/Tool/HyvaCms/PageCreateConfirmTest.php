@@ -21,10 +21,12 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Block\BlockCreate;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Page\PageCreate;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 class PageCreateConfirmTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     public function testAnActiveCreateWithoutConfirmWritesNothing(): void
@@ -114,14 +116,12 @@ class PageCreateConfirmTest extends TestCase
         $writer->expects($this->never())->method('create');
         $scopes = [1];
 
-        $result = $this->tool($writer, $this->contentService(), $scopes)->execute([
+        $tool = $this->tool($writer, $this->contentService(), $scopes);
+        $payload = $this->refusalPayload(fn () => $tool->execute([
             'title' => 'Sale',
             'identifier' => 'sale',
-        ]);
+        ]), 'scope');
 
-        $this->assertTrue($result->isError());
-        $payload = $this->payload($result);
-        $this->assertSame(403, $payload['status'] ?? null);
         $this->assertSame([0], $payload['denied_store_ids'] ?? null);
         // T-94: the shared scope refusal opening, then what was (not) done.
         $this->assertSame(
@@ -137,11 +137,12 @@ class PageCreateConfirmTest extends TestCase
         $writer->expects($this->never())->method('create');
         $scopes = [1];
 
-        $payload = $this->payload($this->tool($writer, $this->contentService(), $scopes)->execute([
+        $tool = $this->tool($writer, $this->contentService(), $scopes);
+        $payload = $this->refusalPayload(fn () => $tool->execute([
             'title' => 'Sale',
             'identifier' => 'sale',
             'store_ids' => [1, 2],
-        ]));
+        ]), 'scope');
 
         $this->assertSame([2], $payload['denied_store_ids'] ?? null);
         $this->assertSame(
@@ -156,11 +157,12 @@ class PageCreateConfirmTest extends TestCase
         $writer = $this->createMock(EntityWriter::class);
         $writer->expects($this->never())->method('create');
 
-        $payload = $this->payload($this->tool($writer, $this->contentService(), [1])->execute([
+        $tool = $this->tool($writer, $this->contentService(), [1]);
+        $payload = $this->refusalPayload(fn () => $tool->execute([
             'title' => 'Sale',
             'identifier' => 'sale',
             'store_ids' => [0, 2],
-        ]));
+        ]), 'scope');
 
         $this->assertSame([0, 2], $payload['denied_store_ids'] ?? null);
         $this->assertSame(

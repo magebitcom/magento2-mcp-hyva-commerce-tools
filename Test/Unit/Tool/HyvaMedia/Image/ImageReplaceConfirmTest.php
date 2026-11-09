@@ -10,6 +10,8 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMedia\Image;
 
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\Mcp\Api\ToolResultInterface;
+use Magebit\McpHyvaCommerceTools\Exception\AclRefusalException;
+use Magebit\McpHyvaCommerceTools\Exception\PartialRewriteException;
 use Magebit\McpHyvaCommerceTools\Model\Acl\ContentAcl;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentLocator;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentScopeFilter;
@@ -18,6 +20,7 @@ use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Image\ImageReplace;
 use PHPUnit\Framework\MockObject\MockObject;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -25,6 +28,8 @@ use PHPUnit\Framework\TestCase;
  */
 class ImageReplaceConfirmTest extends TestCase
 {
+    use RefusalAssertTrait;
+
     private const TARGETS = [
         ['entity_type' => 'cms_page', 'id' => 7, 'identifier' => 'sale'],
         ['entity_type' => 'cms_block', 'id' => 3, 'identifier' => 'promo'],
@@ -134,6 +139,51 @@ class ImageReplaceConfirmTest extends TestCase
     }
 
     /**
+     * T-172: an ACL refusal after a draft was saved answers softly with reason "acl" and the saved drafts.
+     */
+    public function testARefusalAfterADraftWasSavedAnswersSoftlyWithTheReason(): void
+    {
+        $saved = [self::TARGETS[0] + ['changed' => true, 'version_id' => 9]];
+        $this->editor->method('rewrite')->willThrowException(new PartialRewriteException(
+            __('No permission (at cms_block #3). Drafts already rewritten before the failure: cms_page #7 (version 9).'),
+            new AclRefusalException(__('No permission.'), 'Hyva_Cms::block_save'),
+            self::TARGETS[1],
+            $saved
+        ));
+
+        $result = $this->tool()->execute([
+            'old_path' => 'wysiwyg/old.jpg',
+            'new_path' => 'wysiwyg/new.jpg',
+            'scope' => 'global',
+            'confirm' => true,
+        ]);
+        $payload = $this->payload($result);
+
+        $this->assertTrue($result->isError());
+        $this->assertSame('acl', $payload['reason'] ?? null);
+        $this->assertSame('Hyva_Cms::block_save', $payload['resource'] ?? null);
+        $this->assertSame($saved, $payload['drafts_saved'] ?? null);
+        $this->assertSame(self::TARGETS[1], $payload['failed_at'] ?? null);
+    }
+
+    public function testARoleThatMayNotSaveAnyTypeIsRefusedWithEveryResource(): void
+    {
+        $this->editor->expects($this->never())->method('rewrite');
+        $acl = $this->createMock(ContentAcl::class);
+        $acl->method('allowedTypes')->willReturn([]);
+        $acl->method('resources')->willReturn(['Hyva_Cms::page_save', 'Hyva_Cms::block_save']);
+        $tool = $this->tool(false, $acl);
+
+        $refusal = $this->assertRefused(fn () => $tool->execute([
+            'old_path' => 'wysiwyg/old.jpg',
+            'new_path' => 'wysiwyg/new.jpg',
+            'scope' => 'global',
+            'confirm' => true,
+        ]), 'acl');
+        $this->assertSame(['Hyva_Cms::page_save', 'Hyva_Cms::block_save'], $refusal->getData()['resources'] ?? null);
+    }
+
+    /**
      * T-89: page 7 uses the image in its Hyvä content and its Magento CMS content; it is listed once, under affected.
      */
     public function testTheGlobalPreviewListsEachEntityOnce(): void
@@ -176,14 +226,17 @@ class ImageReplaceConfirmTest extends TestCase
      * Image replace for a caller allowed to save every content type; $readOnly = every target is outside its scope.
      *
      * @param bool $readOnly
+     * @param ContentAcl|null $acl Default: may save every content type
      * @return ImageReplace
      */
-    private function tool(bool $readOnly = false): ImageReplace
+    private function tool(bool $readOnly = false, ?ContentAcl $acl = null): ImageReplace
     {
         $files = $this->createMock(MediaFileInfo::class);
         $files->method('exists')->willReturn(true);
-        $acl = $this->createMock(ContentAcl::class);
-        $acl->method('allowedTypes')->willReturnArgument(0);
+        if ($acl === null) {
+            $acl = $this->createMock(ContentAcl::class);
+            $acl->method('allowedTypes')->willReturnArgument(0);
+        }
         $locator = $this->createMock(ContentLocator::class);
         $locator->method('partitionByScope')->willReturnCallback(
             static fn (array $targets): array => $readOnly

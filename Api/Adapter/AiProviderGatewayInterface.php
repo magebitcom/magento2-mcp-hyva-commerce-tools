@@ -11,6 +11,8 @@ namespace Magebit\McpHyvaCommerceTools\Api\Adapter;
 /**
  * Hyvä AI provider readiness (read only). Only the adapter references Hyva\Ai classes; tools reach it through a
  * proxy, after the ai_providers feature check. API keys are never read: only the providers' own "configured" flag.
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface AiProviderGatewayInterface
 {

@@ -16,7 +16,7 @@ use Magebit\McpHyvaCommerceTools\Model\Content\DeletionUsage;
 use Magebit\McpHyvaCommerceTools\Model\Content\EntityWriter;
 use Magebit\McpHyvaCommerceTools\Model\Content\PendingScheduleCleanup;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
-use Magento\Framework\Exception\AuthorizationException;
+use Magebit\McpHyvaCommerceTools\Exception\AclRefusalException;
 
 /**
  * hyva_cms.page.delete / hyva_cms.block.delete: confirm-gated delete of one CMS page or block.
@@ -204,17 +204,17 @@ abstract class AbstractEntityDelete extends AbstractTool
      * Refuse a role without the admin or Hyvä delete permission (the core gate checks one of them per role)
      *
      * @return void
-     * @throws AuthorizationException
+     * @throws AclRefusalException
      */
     private function assertDeletePermissions(): void
     {
         foreach ([static::ADMIN_DELETE_RESOURCE, static::HYVA_DELETE_RESOURCE] as $resource) {
             if ($this->callerContext->isAllowed($resource) === false) {
-                throw new AuthorizationException(__(
+                throw new AclRefusalException(__(
                     'Your admin role may not delete %1: it needs the %2 permission.',
                     'CMS ' . strtolower(static::ENTITY_LABEL_PLURAL),
                     $resource
-                ));
+                ), $resource);
             }
         }
     }

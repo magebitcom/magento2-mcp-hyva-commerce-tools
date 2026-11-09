@@ -10,6 +10,9 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Media;
 
 use Hyva\CmsLiveviewEditor\Api\ImageAssetPathResolverInterface;
 use Hyva\CmsLiveviewEditor\Model\Component\Provider as ComponentProvider;
+use Magebit\McpHyvaCommerceTools\Exception\AclRefusalException;
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
+use Magebit\McpHyvaCommerceTools\Exception\PartialRewriteException;
 use Magebit\McpHyvaCommerceTools\Model\Content\ComponentTree;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
@@ -22,6 +25,11 @@ use PHPUnit\Framework\TestCase;
 
 class ImageContentEditorTest extends TestCase
 {
+    private const TWO_PAGES = [
+        ['entity_type' => 'cms_page', 'id' => 1, 'identifier' => 'a'],
+        ['entity_type' => 'cms_page', 'id' => 2, 'identifier' => 'b'],
+    ];
+
     /**
      * @var ImageContentEditor
      */
@@ -158,38 +166,93 @@ class ImageContentEditorTest extends TestCase
 
     public function testAFailurePartWayNamesTheDraftsAlreadyRewritten(): void
     {
-        $tree = $this->createMock(ComponentTree::class);
-        $tree->method('mapNodes')->willReturn(['content' => ['rewritten']]);
-        $content = $this->createMock(ContentService::class);
-        $content->method('getWorkingDocument')->willReturn(['content' => []]);
-        $content->method('saveDraft')->willReturnCallback(
-            static function (string $type, int $id): array {
-                if ($id === 2) {
-                    throw new LocalizedException(__('Draft #2 is locked.'));
-                }
-                return ['version_id' => 11];
-            }
-        );
-        $editor = new ImageContentEditor(
-            $this->createMock(ImageUsageIndex::class),
-            $content,
-            $tree,
-            $this->createMock(ImageReferenceExtractor::class),
-            $this->createMock(Escaper::class)
-        );
+        $cause = new LocalizedException(__('Draft #2 is locked.'));
+        $editor = $this->failingEditor($cause, 2);
 
-        $this->expectException(LocalizedException::class);
-        $this->expectExceptionMessage('Drafts already rewritten before the failure: cms_page #1 (version 11).');
-        $editor->rewrite([
-            ['entity_type' => 'cms_page', 'id' => 1, 'identifier' => 'a'],
-            ['entity_type' => 'cms_page', 'id' => 2, 'identifier' => 'b'],
-        ], static fn (array $node): array => $node, 'Replace image');
+        try {
+            $editor->rewrite(self::TWO_PAGES, static fn (array $node): array => $node, 'Replace image');
+            $this->fail('Expected PartialRewriteException');
+        } catch (PartialRewriteException $e) {
+            $this->assertStringContainsString(
+                'Drafts already rewritten before the failure: cms_page #1 (version 11).',
+                $e->getMessage()
+            );
+            $this->assertSame($cause, $e->getCause());
+            $this->assertSame($cause, $e->getPrevious());
+            $this->assertSame(self::TWO_PAGES[1], $e->getFailedTarget());
+            $this->assertSame(
+                [['entity_type' => 'cms_page', 'id' => 1, 'identifier' => 'a', 'changed' => true, 'version_id' => 11]],
+                $e->getSaved()
+            );
+        }
+    }
+
+    /**
+     * T-172: a refusal after some drafts were saved is carried as the cause, not flattened into a plain error.
+     */
+    public function testARefusalPartWayKeepsTheRefusalAsTheCause(): void
+    {
+        $cause = new OutOfScopeException(__('Out of scope.'), ['denied_store_ids' => [1]]);
+        $editor = $this->failingEditor($cause, 2);
+
+        try {
+            $editor->rewrite(self::TWO_PAGES, static fn (array $node): array => $node, 'Replace image');
+            $this->fail('Expected PartialRewriteException');
+        } catch (PartialRewriteException $e) {
+            $this->assertSame($cause, $e->getCause());
+        }
+    }
+
+    /**
+     * Nothing saved yet: the refusal itself propagates, so the tool boundary answers -32004 with its reason.
+     */
+    public function testARefusalOnTheFirstTargetIsRethrownUnchanged(): void
+    {
+        $cause = new AclRefusalException(__('No save permission.'), 'Hyva_Cms::page_save');
+        $editor = $this->failingEditor($cause, 1);
+
+        try {
+            $editor->rewrite(self::TWO_PAGES, static fn (array $node): array => $node, 'Replace image');
+            $this->fail('Expected AclRefusalException');
+        } catch (AclRefusalException $e) {
+            $this->assertSame($cause, $e);
+        }
     }
 
     public function testNormalizeRejectsTraversal(): void
     {
         $this->expectException(LocalizedException::class);
         $this->editor->normalize('../wysiwyg/a.jpg');
+    }
+
+    /**
+     * Editor whose draft save fails with $exception for entity $failingId and saves version 11 otherwise.
+     *
+     * @param LocalizedException $exception
+     * @param int $failingId
+     * @return ImageContentEditor
+     */
+    private function failingEditor(LocalizedException $exception, int $failingId): ImageContentEditor
+    {
+        $tree = $this->createMock(ComponentTree::class);
+        $tree->method('mapNodes')->willReturn(['content' => ['rewritten']]);
+        $content = $this->createMock(ContentService::class);
+        $content->method('getWorkingDocument')->willReturn(['content' => []]);
+        $content->method('saveDraft')->willReturnCallback(
+            static function (string $type, int $id) use ($exception, $failingId): array {
+                if ($id === $failingId) {
+                    throw $exception;
+                }
+                return ['version_id' => 11, 'version_uid' => 'v11', 'warnings' => []];
+            }
+        );
+        return new ImageContentEditor(
+            $this->createMock(ImageUsageIndex::class),
+            $content,
+            $tree,
+            $this->createMock(ImageReferenceExtractor::class),
+            $this->createMock(Escaper::class)
+        );
     }
 
     /**

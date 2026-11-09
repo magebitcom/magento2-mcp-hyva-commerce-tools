@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Content;
 
+use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Exception\LocalizedException;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 
@@ -66,6 +67,8 @@ class DraftEditor
             }
             try {
                 [$document, $summary] = $this->applyOne($document, $op, $operation);
+            } catch (AuthorizationException $e) {
+                throw $e;
             } catch (LocalizedException $e) {
                 throw new LocalizedException(__('Operation #%1 (%2) failed: %3', $index, $op, $e->getMessage()));
             }

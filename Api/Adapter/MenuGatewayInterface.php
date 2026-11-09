@@ -17,6 +17,8 @@ use Magento\Framework\Exception\LocalizedException;
  * array{id: int, title: string, identifier: string, is_active: bool, store_ids: list<int>,
  *       preview_url_key: string|null, has_draft: bool, is_published: bool,
  *       draft_differs: bool, creation_time: string|null, update_time: string|null}
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface MenuGatewayInterface
 {

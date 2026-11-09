@@ -25,6 +25,7 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ContentSchema;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\EntityTarget;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
+use Magento\Framework\Exception\AuthorizationException;
 
 /**
  * Shared implementation of hyva_cms.page.update / hyva_cms.block.update.
@@ -209,7 +210,9 @@ abstract class AbstractEntityUpdate extends AbstractTool
                     // The draft is already saved: report it with the error instead of hiding a partial write.
                     return $this->softError(
                         'The draft was saved but the settings were not applied: ' . $exception->getMessage(),
-                        ['draft_saved' => true, 'settings_applied' => false] + $result
+                        ['draft_saved' => true, 'settings_applied' => false]
+                            + ($exception instanceof AuthorizationException ? $this->refusalData($exception) : [])
+                            + $result
                     );
                 }
             }

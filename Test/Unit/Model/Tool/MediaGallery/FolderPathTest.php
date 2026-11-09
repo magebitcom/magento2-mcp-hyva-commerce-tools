@@ -13,6 +13,7 @@ use Magebit\McpHyvaCommerceTools\Api\Adapter\MediaGalleryGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
 use Magebit\McpHyvaCommerceTools\Model\Content\ImageReferenceExtractor;
 use Magebit\McpHyvaCommerceTools\Model\Media\ImageUsageIndex;
+use Magebit\McpHyvaCommerceTools\Model\Media\MediaFileInfo;
 use Magebit\McpHyvaCommerceTools\Model\Tool\MediaGallery\AbstractMediaGalleryTool;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMedia\Folder\FolderCreate;
 use PHPUnit\Framework\TestCase;
@@ -53,7 +54,8 @@ class FolderPathTest extends TestCase
             $gallery,
             $this->createMock(ImageReferenceExtractor::class),
             $this->createMock(ImageUsageIndex::class),
-            $this->createMock(CallerContext::class)
+            $this->createMock(CallerContext::class),
+            $this->createMock(MediaFileInfo::class)
         );
         $method = new \ReflectionMethod(AbstractMediaGalleryTool::class, 'folderError');
 

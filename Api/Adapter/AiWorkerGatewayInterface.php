@@ -17,6 +17,8 @@ namespace Magebit\McpHyvaCommerceTools\Api\Adapter;
  *     model: string, items_total: int, items_complete: int, items_failed: int, error_code: string,
  *     error_message: string, pinned: bool, parent_job_id: string, created_at: string, started_at: string,
  *     finished_at: string, expires_at: string}
+ *
+ * @internal Implementations may gain methods in minor releases.
  */
 interface AiWorkerGatewayInterface
 {

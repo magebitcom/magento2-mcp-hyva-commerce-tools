@@ -27,6 +27,7 @@ use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Tool\AbstractTool;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Model\Tool\Schema\ContentSchema;
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
 
 /**
  * Shared implementation of hyva_cms.page.create / hyva_cms.block.create: creates the Magento entity and its first
@@ -160,14 +161,12 @@ abstract class AbstractEntityCreate extends AbstractTool implements ContextualAc
 
         $deniedStores = $this->deniedStoreIds($fields);
         if ($deniedStores !== []) {
-            return $this->softError(
-                StoreScopeGuard::RESTRICTED . ' and may not create content in '
-                    . $this->storeScopeGuard->describeStoreViews($deniedStores)
-                    . $this->allStoreViewsRule($deniedStores)
-                    . '. Nothing was created: pass store_ids within your scope.',
-                ['status' => 403, 'denied_store_ids' => $deniedStores],
-                'out_of_scope'
-            );
+            throw new OutOfScopeException(__(
+                '%1 and may not create content in %2%3. Nothing was created: pass store_ids within your scope.',
+                StoreScopeGuard::RESTRICTED,
+                $this->storeScopeGuard->describeStoreViews($deniedStores),
+                $this->allStoreViewsRule($deniedStores)
+            ), ['denied_store_ids' => $deniedStores]);
         }
 
         $copyFrom = $this->arrayArg($arguments, 'copy_from');

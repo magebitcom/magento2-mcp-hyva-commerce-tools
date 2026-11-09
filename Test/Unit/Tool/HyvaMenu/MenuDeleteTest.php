@@ -21,6 +21,7 @@ use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuDelete;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magento\Framework\Exception\LocalizedException;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -29,6 +30,7 @@ use PHPUnit\Framework\TestCase;
  */
 class MenuDeleteTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     /**
@@ -186,10 +188,9 @@ class MenuDeleteTest extends TestCase
         $gateway = $this->createMock(MenuGatewayInterface::class);
         $gateway->expects($this->never())->method('delete');
 
-        $result = $this->tool($gateway, [1], null, [0])->execute(['id' => 3, 'confirm' => true]);
+        $tool = $this->tool($gateway, [1], null, [0]);
 
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        $this->assertRefused(fn () => $tool->execute(['id' => 3, 'confirm' => true]), 'scope');
     }
 
     public function testItNeedsTheMenuBuilderDeletePermissionAndItsOwnResource(): void

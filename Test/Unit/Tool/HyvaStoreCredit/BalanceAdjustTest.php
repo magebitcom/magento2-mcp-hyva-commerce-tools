@@ -22,13 +22,17 @@ use Magebit\McpHyvaCommerceTools\Tool\HyvaStoreCredit\Balance\BalanceCredit;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaStoreCredit\Balance\BalanceDebit;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\CustomerInterface;
+use Magento\Framework\Exception\AuthorizationException;
 use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\User\Model\User;
 use PHPUnit\Framework\MockObject\MockObject;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 class BalanceAdjustTest extends TestCase
 {
+    use RefusalAssertTrait;
+
     /**
      * @var StoreCreditGatewayInterface&MockObject
      */
@@ -113,18 +117,18 @@ class BalanceAdjustTest extends TestCase
     {
         $this->scopeAllowsWrite = false;
         $this->gateway->expects($this->never())->method('adjust');
-        $payload = $this->payload($this->tool(BalanceCredit::class)->execute(['customer_id' => 1, 'amount' => 5,
-            'reason' => 'goodwill', 'confirm' => true]));
-        $this->assertSame(403, $payload['status']);
+        $tool = $this->tool(BalanceCredit::class);
+        $this->assertRefused(fn () => $tool->execute(['customer_id' => 1, 'amount' => 5, 'reason' => 'goodwill',
+            'confirm' => true]), 'scope');
     }
 
     public function testCustomerOutsideTheReadScopeIsNotRevealed(): void
     {
         $this->readableWebsites = [2];
         $this->gateway->expects($this->never())->method('getBalance');
-        $payload = $this->payload($this->tool(BalanceCredit::class)->execute(['customer_id' => 1, 'amount' => 5,
-            'reason' => 'goodwill']));
-        $this->assertSame(403, $payload['status']);
+        $tool = $this->tool(BalanceCredit::class);
+        $payload = $this->refusalPayload(fn () => $tool->execute(['customer_id' => 1, 'amount' => 5,
+            'reason' => 'goodwill']), 'scope');
         $this->assertArrayNotHasKey('affected', $payload);
     }
 
@@ -151,6 +155,14 @@ class BalanceAdjustTest extends TestCase
         $payload = $this->payload($this->tool(BalanceCredit::class)->execute(['customer_id' => 1, 'amount' => 5,
             'reason' => 'goodwill', 'idempotency_key' => 'ticket-1234', 'confirm' => true]));
         $this->assertFalse($payload['replayed']);
+    }
+
+    public function testAHyvaPermissionRefusalOnWriteStaysARefusal(): void
+    {
+        $this->gateway->method('adjust')->willThrowException(new AuthorizationException(__('Not allowed.')));
+        $tool = $this->tool(BalanceCredit::class);
+        $this->assertRefused(fn () => $tool->execute(['customer_id' => 1, 'amount' => 5, 'reason' => 'goodwill',
+            'confirm' => true]), 'acl');
     }
 
     public function testAConcurrentCallThatWonTheKeyIsReportedAsAClash(): void

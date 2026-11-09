@@ -11,6 +11,8 @@ namespace Magebit\McpHyvaCommerceTools\Test\Unit\Tool\HyvaMenu;
 use Hyva\CmsConnect\Exception\ConflictException;
 use Magebit\McpHyvaCommerceTools\Api\Adapter\MenuGatewayInterface;
 use Magebit\McpHyvaCommerceTools\Api\FeatureCheckerInterface;
+use Magebit\McpHyvaCommerceTools\Exception\AclRefusalException;
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
 use Magebit\McpHyvaCommerceTools\Model\Content\ContentService;
 use Magebit\McpHyvaCommerceTools\Model\Content\DraftEditor;
 use Magebit\McpHyvaCommerceTools\Model\Menu\MenuItemBuilder;
@@ -20,10 +22,12 @@ use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuUpdate;
 use Magento\Framework\Exception\LocalizedException;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 class MenuUpdateConfirmTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     public function testARestrictedRoleMayNotAssignAForeignStoreView(): void
@@ -31,14 +35,13 @@ class MenuUpdateConfirmTest extends TestCase
         $gateway = $this->createMock(MenuGatewayInterface::class);
         $gateway->expects($this->never())->method('update');
 
-        $result = $this->tool($gateway, $this->createMock(ContentService::class), [1])->execute([
+        $tool = $this->tool($gateway, $this->createMock(ContentService::class), [1]);
+
+        $this->assertRefused(fn () => $tool->execute([
             'id' => 3,
             'settings' => ['store_ids' => [2]],
             'confirm' => true,
-        ]);
-
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        ]), 'scope');
     }
 
     public function testRenamingAnActiveMenuWithoutConfirmWritesNothing(): void
@@ -254,14 +257,25 @@ class MenuUpdateConfirmTest extends TestCase
         $this->assertStringContainsString('Invalid document', Cast::string($payload['error'] ?? ''));
     }
 
-    public function testAFailingMenuSettingsSaveReportsTheAlreadySavedDraft(): void
-    {
-        // T-70: same soft error as pages and blocks, so the caller knows the draft half was written.
+    /**
+     * T-70: same soft error as pages and blocks, so the caller knows the draft half was written. A refusal keeps
+     * its reason (and resource) on that reply.
+     *
+     * @dataProvider settingsErrorProvider
+     * @param LocalizedException $settingsError
+     * @param string|null $reason
+     * @param string|null $resource
+     */
+    public function testAFailingMenuSettingsSaveReportsTheAlreadySavedDraft(
+        LocalizedException $settingsError,
+        ?string $reason,
+        ?string $resource
+    ): void {
         $contentService = $this->createMock(ContentService::class);
         $contentService->method('getWorkingDocument')->willReturn([]);
         $contentService->expects($this->once())->method('saveDraft')->willReturn(['version_uid' => 'v1']);
         $gateway = $this->createMock(MenuGatewayInterface::class);
-        $gateway->method('update')->willThrowException(new LocalizedException(__('Identifier already exists')));
+        $gateway->method('update')->willThrowException($settingsError);
 
         $result = $this->tool($gateway, $contentService)->execute([
             'id' => 3,
@@ -277,7 +291,25 @@ class MenuUpdateConfirmTest extends TestCase
         $this->assertTrue($payload['draft_saved'] ?? null);
         $this->assertFalse($payload['settings_applied'] ?? null);
         $this->assertSame(['version_uid' => 'v1'], $payload['draft'] ?? null);
-        $this->assertStringContainsString('Identifier already exists', Cast::string($payload['error'] ?? ''));
+        $this->assertStringContainsString($settingsError->getMessage(), Cast::string($payload['error'] ?? ''));
+        $this->assertSame($reason, $payload['reason'] ?? null);
+        $this->assertSame($resource, $payload['resource'] ?? null);
+    }
+
+    /**
+     * @return array<string, array{LocalizedException, string|null, string|null}>
+     */
+    public static function settingsErrorProvider(): array
+    {
+        return [
+            'plain error' => [new LocalizedException(__('Identifier already exists')), null, null],
+            'scope refusal' => [new OutOfScopeException(__('Outside.')), 'scope', null],
+            'acl refusal' => [
+                new AclRefusalException(__('Not allowed.'), 'Hyva_MenuBuilder::menu_save'),
+                'acl',
+                'Hyva_MenuBuilder::menu_save',
+            ],
+        ];
     }
 
     public function testAFailingMenuSettingsSaveWithoutADraftStaysAnError(): void

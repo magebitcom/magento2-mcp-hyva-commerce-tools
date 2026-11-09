@@ -21,6 +21,7 @@ use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaCms\Transfer\TransferImport;
 use Magento\Framework\Exception\AuthorizationException;
 use PHPUnit\Framework\MockObject\MockObject;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -28,6 +29,7 @@ use PHPUnit\Framework\TestCase;
  */
 class TransferImportScopeTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     private const PAYLOAD = ['draft_content' => ['content' => []], 'entity' => ['identifier' => 'x', 'title' => 'X']];
@@ -60,11 +62,10 @@ class TransferImportScopeTest extends TestCase
     {
         $this->writer->expects($this->never())->method('create');
         $this->contentService->expects($this->never())->method('saveDraft');
-        $result = $this->tool([1])->execute(
+        $tool = $this->tool([1]);
+        $this->assertRefused(fn () => $tool->execute(
             ['entity_type' => 'cms_page', 'payload' => self::PAYLOAD, 'create_new' => true]
-        );
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        ), 'scope');
     }
 
     public function testANewEntityForTheOwnStoreViewIsCreated(): void
@@ -82,9 +83,11 @@ class TransferImportScopeTest extends TestCase
         $this->locator->expects($this->once())->method('locateForWrite')
             ->willThrowException(new AuthorizationException(__('outside')));
         $this->contentService->expects($this->never())->method('saveDraft');
-        $result = $this->tool([1])->execute(['entity_type' => 'cms_page', 'payload' => self::PAYLOAD, 'id' => 2]);
-        $this->assertTrue($result->isError());
-        $this->assertStringContainsString('403', json_encode($result->getContent()) ?: '');
+        $tool = $this->tool([1]);
+        $this->assertRefused(
+            fn () => $tool->execute(['entity_type' => 'cms_page', 'payload' => self::PAYLOAD, 'id' => 2]),
+            'acl'
+        );
     }
 
     /**
