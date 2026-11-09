@@ -514,12 +514,12 @@ each of them.
 
 ## Optional features
 
-Tools for an optional Hyvä module stay registered when that module is missing, disabled, or not allowed for the
-token's admin role. What an agent sees depends on the module:
+Tools for an optional Hyvä module stay in the module's tool list when that module is missing, disabled, or not allowed
+for the token's admin role. What an agent sees depends on the module:
 
 | Hyvä module missing or disabled | Effect |
 |---|---|
-| Menu Builder, Media Optimization, Media Gallery, Form Builder, Email Templates, Store Credit, Linked Products, AI Worker | Their tools are hidden from `tools/list`. A call to a hidden tool is refused by the core (`-32004`). The status tools stay listed (below). Without Media Gallery this includes the image and media audit tools (`hyva_media.image.*`, `hyva_media.audit_*`): they are listed with a Media Gallery resource. |
+| Menu Builder, Media Optimization, Media Gallery, Form Builder, Email Templates, Store Credit, Linked Products, AI Worker | Their tools are hidden from `tools/list`. A call to one answers `-32010` (tool not found), like an unregistered tool. The status tools stay listed (below). Without Media Gallery this includes the image and media audit tools (`hyva_media.image.*`, `hyva_media.audit_*`): they are listed with a Media Gallery resource. |
 | Category Merchandiser, CMS AI Translations, Advanced Admin Permissions, the AI providers, the Tailwind compiler | Their tools stay listed and answer "not installed" per call. |
 
 The status tools stay listed:
