@@ -41,7 +41,8 @@ class FormList extends AbstractFormTool
     {
         return 'List Hyvä Form Builder forms (newest first) with identifier, title, enabled flag, store views, '
             . 'whether they have a draft and a published version, and where submissions go (recipients, webhook). '
-            . ListPagination::DESCRIPTION_NOTE;
+            . ListPagination::DESCRIPTION_NOTE . ' '
+            . sprintf(self::DELETE_TOOL_NOTE, 'a form', 'hyva_form_form_delete');
     }
 
     /**

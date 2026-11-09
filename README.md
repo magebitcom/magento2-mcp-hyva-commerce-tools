@@ -165,7 +165,7 @@ Without `"confirm": true` these calls write nothing and return a preview instead
 | `hyva_store_credit.balance.credit`, `hyva_store_credit.balance.debit` | Always. |
 | `hyva_linked.group.save` | Always. Without it the tool only validates and shows the result. |
 | `hyva_merch.category.positions_set` | Always. |
-| `hyva_cms.page.delete`, `hyva_cms.block.delete`, `hyva_menu.delete`, `hyva_email.template.delete`, `hyva_email.newsletter.delete` | Always; an entity in use also needs `"force": true`. See [Delete tools](#delete-tools). |
+| `hyva_cms.page.delete`, `hyva_cms.block.delete`, `hyva_menu.delete`, `hyva_form.form.delete`, `hyva_email.template.delete`, `hyva_email.newsletter.delete` | Always; an entity in use also needs `"force": true`. See [Delete tools](#delete-tools). |
 
 A call that changes `settings` writes nothing without confirm, not even the draft part of the call. Its preview lists
 each change with its storefront effect.
@@ -284,7 +284,7 @@ Give a role the Hyvä permissions that match what the agent should do. Existing 
 | publish | + `Hyva_Cms::page_publish`, `Hyva_Cms::block_publish`, `Hyva_MenuBuilder::menu_publish` |
 | schedule | + `*_scheduling`, `*_schedule_save`, `*_schedule_cancel` |
 | export / import | + `*_export` / `*_save` and `Hyva_Cms::transfer` (Transfer Center) |
-| delete pages, blocks, menus | see [Delete tools](#delete-tools) |
+| delete pages, blocks, menus, forms | see [Delete tools](#delete-tools) |
 | clear optimized images | + `Hyva_MediaGallery::asset_save` |
 | manage Media Gallery files | + `Hyva_MediaGallery::asset_save` (move), `asset_delete` (trash, restore), `folder_save` |
 | forms | `Hyva_FormBuilder::form_view`, `form_save`, `form_publish`, `form_version_history` |
@@ -376,17 +376,20 @@ Exceptions:
 
 ## Delete tools
 
-`hyva_cms.page.delete`, `hyva_cms.block.delete`, `hyva_menu.delete`, `hyva_email.template.delete` and
-`hyva_email.newsletter.delete` each delete one page, block, menu, email template or newsletter template.
+`hyva_cms.page.delete`, `hyva_cms.block.delete`, `hyva_menu.delete`, `hyva_form.form.delete`,
+`hyva_email.template.delete` and `hyva_email.newsletter.delete` each delete one page, block, menu, form, email
+template or newsletter template.
 
 - **Same path as the admin.** They use the repository the admin delete action uses: Magento's page or block repository
-  in the admin area, Hyvä's menu repository for menus, Magento's template models for email and newsletter templates.
+  in the admin area, Hyvä's menu and form repositories for menus and forms, Magento's template models for email and
+  newsletter templates.
 - **Hyvä data goes with it.** Hyvä drafts, version history and Tailwind CSS are deleted too, as in the admin (foreign
   keys with `ON DELETE CASCADE`).
 - **Pending scheduled items are cancelled.** `hyva_cms.page.delete`, `hyva_cms.block.delete` and `hyva_menu.delete`
   list the entity's pending scheduled items in the preview (`details.scheduled_items`) and cancel them with the delete
   (a release left without pending items is cancelled too), since an item whose entity is gone can never publish. The
-  admin delete leaves them pending.
+  admin delete leaves them pending. Form Builder 1.0 cannot schedule forms, so `hyva_form.form.delete` has none to
+  cancel.
 
 To remove a single menu item use `hyva_menu.item.remove`. To remove media files, `hyva_media.asset.trash` moves them to
 the Media Gallery trash.
@@ -398,6 +401,7 @@ the Media Gallery trash.
 | `hyva_cms.page.delete` | *Tool: Delete CMS Pages via MCP* | `Magento_Cms::page_delete` (the admin page Delete action) and `Hyva_Cms::page_delete` |
 | `hyva_cms.block.delete` | *Tool: Delete CMS Blocks via MCP* | `Magento_Cms::block` (Magento has no separate block delete permission) and `Hyva_Cms::block_delete` |
 | `hyva_menu.delete` | *Tool: Delete Hyvä Menus via MCP* | `Hyva_MenuBuilder::menu_delete` |
+| `hyva_form.form.delete` | *Tool: Delete Hyvä Forms via MCP* | `Hyva_FormBuilder::form_delete` (the Form Builder Delete action) |
 | `hyva_email.template.delete` | *Tool: Delete Email Templates via MCP* | `Magento_Email::template` (the admin Delete action) and `Hyva_EmailTemplates::email_template_delete` |
 | `hyva_email.newsletter.delete` | *Tool: Delete Newsletter Templates via MCP* | `Magento_Newsletter::template` (Hyvä has no newsletter delete permission) |
 
@@ -406,7 +410,7 @@ the Media Gallery trash.
 - The core checks the tool resource and the "Listed with" resource on `tools/list` and `tools/call`.
 - The page and block tools check both admin delete permissions again and refuse with `-32004` (`reason: acl`,
   `resource` names the missing one).
-- The email tools are hidden without Hyvä Email Templates. Email and newsletter templates belong to no store view, so
+- The form tool is hidden without Hyvä Form Builder, the email tools without Hyvä Email Templates. Email and newsletter templates belong to no store view, so
   a role restricted to some websites is refused (`-32004`, `reason: scope`).
 - They are write tools, so the [write gate](#write-gate) applies.
 - Store scope is as for any change: every store view the entity is assigned to must be the role's, and store view 0
@@ -422,7 +426,7 @@ the Media Gallery trash.
 
 The preview is the standard one:
 
-- `action`: `delete_cms_page`, `delete_cms_block`, `delete_menu`, `delete_email_template` or
+- `action`: `delete_cms_page`, `delete_cms_block`, `delete_menu`, `delete_form`, `delete_email_template` or
   `delete_newsletter_template`;
 - `affected`: the entity with its store views and `in_use`;
 - `details.usage`: where it is still used (see [Usage keys](#usage-keys)).
@@ -445,6 +449,7 @@ find-usage tools already return, so they are not unified.
 | `hyva_cms.page.delete` | `store_config` (home / 404 / cookies page configuration), `links` (links in Hyvä CMS content and menu items) |
 | `hyva_cms.block.delete` | `hyva_content` (Hyvä CMS components), `magento_content` (widget directives in Magento content), `widget_instances` |
 | `hyva_menu.delete` | `design_config` (header/footer design configuration), `hyva_cms_content` and `magento_cms_content` (menu widgets in content), `widget_instances`, `layout_and_templates`; also `identifier`, as `hyva_menu.find_usage` |
+| `hyva_form.form.delete` | `hyva_content` (Hyvä form widgets), `magento_content` (form widget directives in Magento content), `widget_instances`, all matched by the form identifier. Another form with the same identifier on other store views is named in `details.identifier_shared_with`: widgets there render that form. |
 | `hyva_email.template.delete` | `store_config`: configuration values at any scope on a path ending in `/template` or `_template` (e.g. `sales_email/order/template`) |
 | `hyva_email.newsletter.delete` | `queue`: newsletter queues not sent yet, sending or paused. Sent and cancelled queues are history: counted in `queue_history`, not in `used`. Magento deletes every queue of the template with it, history included. |
 
@@ -552,7 +557,7 @@ Hyvä Commerce 1.4.0 (Store Credit 1.0.1, Linked Products 1.0.0) works as well.
 | Media Gallery 1.0.0 | `hyva_media.asset.*`, `trash.*`, `folder.create`, `sync.status`, `audit.literal_urls` (9) | Asset ids in content (`imageOptions.id`), move, trash/restore, sync drift, literal-URL audit |
 | Media Optimization 1.1.0 | `hyva_media.optimization.*` (5) | Unchanged in 1.4 |
 | Image usage and audits (CMS + Media Gallery) | `hyva_media.image.*`, `hyva_media.audit_*`, `hyva_media.status` (10) | Find, replace and fix images across CMS content and menus |
-| Form Builder 1.0.2 | `hyva_form.*` (9) | Forms, drafts, publish, versions, delivery audit (recipients, webhook) |
+| Form Builder 1.0.2 | `hyva_form.*` (10) | Forms, drafts, publish, delete, versions, delivery audit (recipients, webhook) |
 | Email & Newsletter Templates 1.0.1 | `hyva_email.*` (16) | Transactional emails and newsletters: drafts, publish, render preview, test send, delete, coverage audit |
 | Store Credit 2.0.0 (1.0.1 works too) | `hyva_store_credit.*` (5) | Balances, history, credit/debit with preview and idempotency key. Its GraphQL API is for shoppers and has no admin use here. 2.0.0 only moves the storefront route to `store-credit/`; no tool builds a Store Credit URL |
 | Linked Products 1.0.2 | `hyva_linked.*` (4) | Groups, validation with storefront warnings, save with page cache refresh. See [Linked Products 1.0.1+ in the admin](#linked-products-101-in-the-admin) |
@@ -693,6 +698,7 @@ with underscores (`hyva_cms_page_get`); `tools/call` accepts both forms.
 |---|---|---|---|
 | `hyva_form.delivery.audit` | read | `Hyva_FormBuilder::form_view` | Audit Hyvä Form Delivery |
 | `hyva_form.form.create` | write | `Hyva_FormBuilder::form_save` | Create Hyvä Form |
+| `hyva_form.form.delete` | write | `Hyva_FormBuilder::form_delete` | Delete Hyvä Form (own resource *Delete Hyvä Forms via MCP*; confirm-gated) |
 | `hyva_form.form.get` | read | `Hyva_FormBuilder::form_view` | Get Hyvä Form |
 | `hyva_form.form.list` | read | `Hyva_FormBuilder::form_view` | List Hyvä Forms |
 | `hyva_form.form.publish` | write | `Hyva_FormBuilder::form_publish` | Publish Hyvä Form |

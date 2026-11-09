@@ -16,7 +16,7 @@ use Magento\Store\Model\ScopeInterface;
 use Magento\Store\Model\StoreManagerInterface;
 
 /**
- * Where a CMS page, CMS block or menu is still used, for the preview of the delete tools.
+ * Where a CMS page, CMS block, menu or form is still used, for the preview of the delete tools.
  *
  * `used` counts every usage; the lists and `total` hold only what the caller's website / store view restriction may
  * see, the rest is counted in usages_hidden_by_permissions (as the find-usage tools do), so content used only
@@ -126,6 +126,23 @@ class DeletionUsage
             ['hyva_cms_content', 'magento_cms_content'],
             ['widget_instances']
         ));
+    }
+
+    /**
+     * Usage of a form: Hyvä form widgets, Magento CMS widget directives and widget instances naming its identifier
+     *
+     * @param string $identifier
+     * @return array
+     * @phpstan-return array<string, mixed>
+     */
+    public function forForm(string $identifier): array
+    {
+        $report = $this->usageFinder->findFormReferences($identifier);
+        return ['used' => $report['total'] > 0] + $this->scopeFilter->filterUsageReport(
+            $report,
+            ['hyva_content', 'magento_content'],
+            ['widget_instances']
+        );
     }
 
     /**

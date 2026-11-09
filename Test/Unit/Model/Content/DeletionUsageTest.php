@@ -24,6 +24,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * T-22: the delete preview of a CMS page finds the store views using it as home / 404 page and links to it.
  * PR #2 review: menus count for the in-use decision even when the caller may not view them, without being listed.
+ * T-181: the same report for forms.
  */
 class DeletionUsageTest extends TestCase
 {
@@ -134,6 +135,44 @@ class DeletionUsageTest extends TestCase
         $this->assertSame(1, $report['total']);
         $this->assertSame([2], array_column(Cast::array($report['hyva_content']), 'id'));
         $this->assertSame(1, $report['usages_hidden_by_permissions']);
+    }
+
+    /**
+     * T-181: a form embedded only outside the caller's store views is still in use; the usage is counted, not listed.
+     */
+    public function testAFormEmbeddedOutsideTheCallersStoreViewsIsInUseWithTheUsageHidden(): void
+    {
+        $scope = $this->contentScope([1], [ContentLocator::TYPE_PAGE => [2 => [1], 7 => [2]]]);
+        $finder = $this->createMock(UsageFinder::class);
+        $finder->expects($this->once())->method('findFormReferences')->with('contact')->willReturn([
+            'hyva_content' => [['entity_type' => ContentLocator::TYPE_PAGE, 'id' => 2],
+                ['entity_type' => ContentLocator::TYPE_PAGE, 'id' => 7]],
+            'magento_content' => [],
+            'widget_instances' => [['instance_id' => 21, 'title' => 'Sidebar', 'theme_id' => 5, 'store_ids' => '2']],
+            'total' => 3,
+        ]);
+
+        $report = $this->usage(true, $scanned, $finder, $scope)->forForm('contact');
+
+        $this->assertTrue($report['used']);
+        $this->assertSame(1, $report['total']);
+        $this->assertSame([2], array_column(Cast::array($report['hyva_content']), 'id'));
+        $this->assertSame([], $report['widget_instances']);
+        $this->assertSame(2, $report['usages_hidden_by_permissions']);
+    }
+
+    public function testAnUnembeddedFormIsNotInUse(): void
+    {
+        $finder = $this->createMock(UsageFinder::class);
+        $finder->method('findFormReferences')->willReturn(
+            ['hyva_content' => [], 'magento_content' => [], 'widget_instances' => [], 'total' => 0]
+        );
+
+        $report = $this->usage(true, $scanned, $finder)->forForm('contact');
+
+        $this->assertFalse($report['used']);
+        $this->assertSame(0, $report['total']);
+        $this->assertArrayNotHasKey('usages_hidden_by_permissions', $report);
     }
 
     public function testAnUnusedPageIsNotInUse(): void
