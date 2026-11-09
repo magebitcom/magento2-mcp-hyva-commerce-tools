@@ -123,6 +123,18 @@ class FormGateway implements FormGatewayInterface
     /**
      * @inheritDoc
      */
+    public function delete(int $id): void
+    {
+        try {
+            $this->formRepository()->deleteById($id);
+        } catch (NoSuchEntityException) {
+            throw new LocalizedException(__('Form #%1 does not exist.', $id));
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function identifierError(string $identifier, array $storeIds, ?int $excludeId = null): ?string
     {
         try {

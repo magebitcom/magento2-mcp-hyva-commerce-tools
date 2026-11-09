@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security;
 
 use Magebit\McpHyvaCommerceTools\Api\Adapter\AdminScopeGatewayInterface;
+use Magebit\McpHyvaCommerceTools\Exception\OutOfScopeException;
 use Magebit\McpHyvaCommerceTools\Model\Auth\CallerContext;
 use Magebit\McpHyvaCommerceTools\Model\Security\AdminScopeGuard;
 use Magebit\McpHyvaCommerceTools\Model\Security\StoreScopeGuard;
@@ -192,22 +193,22 @@ class StoreScopeGuardTest extends TestCase
     }
 
     /**
-     * @return array<string, array{0: list<int>, 1: list<int>, 2: string}>
+     * @return array<string, array{0: list<int>, 1: list<int>, 2: string, 3: list<int>|null}>
      */
     public static function assignmentRefusalProvider(): array
     {
         $opening = StoreScopeGuard::RESTRICTED . ' and may not assign CMS page #22 to ';
         return [
             'all store views to one foreign' => [[0], [2],
-                $opening . 'store view 2: store view 2 is outside your role.'],
+                $opening . 'store view 2: store view 2 is outside your role.', [2]],
             'all store views to all store views' => [[0], [0],
-                $opening . 'store view 0 ("All Store Views"): it needs every store view.'],
+                $opening . 'store view 0 ("All Store Views"): it needs every store view.', [0]],
             'own to all store views and own' => [[1], [0, 1],
-                $opening . 'store views 0, 1: store view 0 ("All Store Views") needs every store view.'],
+                $opening . 'store views 0, 1: store view 0 ("All Store Views") needs every store view.', [0]],
             'own to own and foreign' => [[1], [1, 2],
-                $opening . 'store views 1, 2: store view 2 is outside your role.'],
+                $opening . 'store views 1, 2: store view 2 is outside your role.', [2]],
             'shared to own only' => [[1, 2], [1],
-                $opening . 'store view 1: that removes it from store view 2, which is outside your role.'],
+                $opening . 'store view 1: that removes it from store view 2, which is outside your role.', null],
         ];
     }
 
@@ -218,17 +219,33 @@ class StoreScopeGuardTest extends TestCase
      * @param list<int> $current
      * @param list<int> $new
      * @param string $message
+     * @param list<int>|null $denied Expected error.data denied_store_ids (null: the key is absent).
      */
-    public function testARefusedMoveNamesOnlyTheRuleItBroke(array $current, array $new, string $message): void
-    {
+    public function testARefusedMoveNamesOnlyTheRuleItBroke(
+        array $current,
+        array $new,
+        string $message,
+        ?array $denied
+    ): void {
         try {
             $this->storeScope([1])->assertAssignable('CMS page #22', $current, $new);
             $this->fail('The move must be refused.');
-        } catch (AuthorizationException $e) {
+        } catch (OutOfScopeException $e) {
             $this->assertSame($message, $e->getMessage());
+            // T-179: every assignment refusal names the requested store views the role may not use.
+            $this->assertSame($denied, $e->getData()['denied_store_ids'] ?? null);
             $this->assertSame(1, substr_count($e->getMessage(), StoreScopeGuard::RESTRICTED));
             $this->assertLessThanOrEqual(1, substr_count($e->getMessage(), 'All Store Views'));
         }
+    }
+
+    public function testDeniedStoreIdsListsEachRequestedStoreViewTheRoleMayNotUse(): void
+    {
+        $this->assertSame([], $this->storeScope(null)->deniedStoreIds([0, 2]));
+        $this->assertSame([], $this->storeScope([1])->deniedStoreIds([1]));
+        $this->assertSame([2], $this->storeScope([1])->deniedStoreIds([1, 2, 2]));
+        $this->assertSame([0, 2], $this->storeScope([1])->deniedStoreIds([0, 1, 2]));
+        $this->assertSame([], $this->storeScope([1, 2])->deniedStoreIds([0]));
     }
 
     public function testResolveStoreIdKeepsTheValueForAnUnrestrictedCaller(): void

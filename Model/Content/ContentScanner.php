@@ -15,12 +15,23 @@ use Magento\Framework\Exception\LocalizedException;
 
 /**
  * Iterates every stored Hyvä CMS document (pages, blocks and, when the table exists, menus; draft and published).
- * Menus are read with plain SQL so this class works without Hyva_MenuBuilder.
+ * Menus and Form Builder forms are read with plain SQL so this class works without Hyva_MenuBuilder and
+ * Hyva_FormBuilder.
  */
 class ContentScanner
 {
     public const EDITION_DRAFT = 'draft';
     public const EDITION_PUBLISHED = 'published';
+
+    /**
+     * Entity type of Form Builder forms in usage entries (Hyvä's content type of a form tree).
+     */
+    public const TYPE_FORM = 'form';
+
+    /**
+     * Forms read, parsed and walked per batch, so a store with many or large forms is never held in memory at once.
+     */
+    public const FORM_BATCH_SIZE = 100;
 
     /**
      * Magento CMS rows per type, loaded once per request for repeated content searches.
@@ -35,12 +46,14 @@ class ContentScanner
      * @param ComponentTree $componentTree
      * @param ResourceConnection $resourceConnection
      * @param FeatureCheckerInterface $featureChecker
+     * @param int $formBatchSize Forms per batch in findFormNodes()
      */
     public function __construct(
         private readonly ContentIndex $contentIndex,
         private readonly ComponentTree $componentTree,
         private readonly ResourceConnection $resourceConnection,
-        private readonly FeatureCheckerInterface $featureChecker
+        private readonly FeatureCheckerInterface $featureChecker,
+        private readonly int $formBatchSize = self::FORM_BATCH_SIZE
     ) {
     }
 
@@ -173,6 +186,93 @@ class ContentScanner
                 }
             });
         }
+        return $matches;
+    }
+
+    /**
+     * Nodes of Form Builder form trees (draft and published) matching a predicate, with the form and its store views.
+     *
+     * Forms are read whenever Form Builder is installed and enabled, whatever the caller's form permission: this
+     * serves in-use decisions, and ContentScopeFilter hides the forms the caller may not see. Every form is checked,
+     * in batches by id (keyset), each batch with only its own store links; only the matches are kept.
+     *
+     * @param callable $predicate
+     * @return array
+     * @phpstan-param callable(array<string, mixed>): bool $predicate
+     * @phpstan-return list<array{entity_type: string, id: int, identifier: string, title: string, edition: string,
+     *     uid: string|null, component: string|null, store_ids: list<int>}>
+     */
+    public function findFormNodes(callable $predicate): array
+    {
+        $status = $this->featureChecker->getStatus(FeatureCheckerInterface::FORM_BUILDER);
+        if (!$status['installed'] || !$status['enabled']) {
+            return [];
+        }
+        $connection = $this->resourceConnection->getConnection();
+        $table = $this->resourceConnection->getTableName('hyva_commerce_cms_form');
+        if (!$connection->isTableExists($table)) {
+            return [];
+        }
+        $storeTable = $this->resourceConnection->getTableName('hyva_commerce_cms_form_store');
+        $hasStoreTable = $connection->isTableExists($storeTable);
+        $batchSize = max(1, $this->formBatchSize);
+        $matches = [];
+        $lastId = 0;
+        do {
+            $select = $connection->select()
+                ->from($table, ['id', 'identifier', 'title', 'draft_content', 'published_content'])
+                ->where('id > ?', $lastId)
+                ->order('id ASC')
+                ->limit($batchSize);
+            $rows = [];
+            foreach ($connection->fetchAll($select) as $row) {
+                $rows[] = $row;
+            }
+            if ($rows === []) {
+                break;
+            }
+            $ids = [];
+            foreach ($rows as $row) {
+                $ids[] = Cast::int($row['id']);
+            }
+            $lastId = max($ids);
+            $storeIds = [];
+            if ($hasStoreTable) {
+                $links = $connection->fetchAll(
+                    $connection->select()
+                        ->from($storeTable, ['form_id', 'store_id'])
+                        ->where('form_id IN (?)', $ids)
+                );
+                foreach ($links as $link) {
+                    $storeIds[Cast::int($link['form_id'])][] = Cast::int($link['store_id']);
+                }
+            }
+            foreach ($this->documentsOfRows(self::TYPE_FORM, $rows) as $entry) {
+                if ($entry['document'] === null) {
+                    continue;
+                }
+                $this->componentTree->walk($entry['document'], static function (array $node) use (
+                    $predicate,
+                    $entry,
+                    $storeIds,
+                    &$matches
+                ): void {
+                    if ($predicate($node)) {
+                        $matches[] = [
+                            'entity_type' => $entry['entity_type'],
+                            'id' => $entry['id'],
+                            'identifier' => $entry['identifier'],
+                            'title' => $entry['title'],
+                            'edition' => $entry['edition'],
+                            'uid' => is_string($node['uid'] ?? null) ? $node['uid'] : null,
+                            'component' => is_string($node['component'] ?? null) ? $node['component'] : null,
+                            'store_ids' => $storeIds[$entry['id']] ?? [],
+                        ];
+                    }
+                });
+            }
+            unset($rows, $storeIds);
+        } while (count($ids) === $batchSize);
         return $matches;
     }
 

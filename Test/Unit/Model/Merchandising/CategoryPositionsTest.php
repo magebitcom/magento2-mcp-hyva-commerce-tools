@@ -34,6 +34,11 @@ class CategoryPositionsTest extends TestCase
      */
     private CategoryPositions $positions;
 
+    /**
+     * @var ProductCollection&MockObject
+     */
+    private ProductCollection $collection;
+
     protected function setUp(): void
     {
         $category = $this->createMock(Category::class);
@@ -42,7 +47,7 @@ class CategoryPositionsTest extends TestCase
         $this->resource = $this->createMock(CategoryResource::class);
         // Stored order: 30 (pos 0), 10 and 20 tied at 5 (id order), 40 (pos 9).
         $this->resource->method('getProductsPosition')->willReturn([10 => '5', 20 => '5', 30 => '0', 40 => '9']);
-        $collection = $this->createMock(ProductCollection::class);
+        $this->collection = $collection = $this->createMock(ProductCollection::class);
         $collection->method('addAttributeToSelect')->willReturnSelf();
         $collection->method('addIdFilter')->willReturnSelf();
         $collection->method('getItems')->willReturn(array_map(
@@ -77,6 +82,19 @@ class CategoryPositionsTest extends TestCase
         $result = $this->positions->get(6, 2);
         $this->assertSame(4, $result['category']['product_count']);
         $this->assertSame(['SKU-30', 'SKU-10'], array_column($result['products'], 'sku'));
+    }
+
+    /**
+     * T-180: the frontend-area stock filter must not drop products of the category (out of stock, disabled or not
+     * indexed yet), or their rows come back with an empty sku and name.
+     */
+    public function testTheStorefrontStockFilterIsSkippedSoEveryProductKeepsItsSkuAndName(): void
+    {
+        $this->collection->expects($this->once())->method('setFlag')
+            ->with(CategoryPositions::STOCK_FILTER_FLAG, true);
+        $this->collection->expects($this->once())->method('getItems');
+        $this->assertSame('has_stock_status_filter', CategoryPositions::STOCK_FILTER_FLAG);
+        $this->positions->get(6);
     }
 
     public function testOnlyProductsOfTheCategoryCanBeMoved(): void

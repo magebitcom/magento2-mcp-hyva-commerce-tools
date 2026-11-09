@@ -244,10 +244,7 @@ abstract class AbstractEntityCreate extends AbstractTool implements ContextualAc
         if ($this->storeScopeGuard->allowsAssignment([], $ids)) {
             return [];
         }
-        return array_values(array_filter(
-            $ids,
-            fn (int $id): bool => !$this->storeScopeGuard->allowsWrite([$id])
-        ));
+        return $this->storeScopeGuard->deniedStoreIds($ids);
     }
 
     /**

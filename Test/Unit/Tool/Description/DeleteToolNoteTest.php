@@ -21,6 +21,9 @@ use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Newsletter\NewsletterUpdateDraft
 use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateDelete;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateList;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaEmail\Template\TemplateUpdateDraft;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormDelete;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormList;
+use Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormUpdateDraft;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuDelete;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuList;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuUpdate;
@@ -28,7 +31,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * T-22: the page, block and menu list / update descriptions name the delete tool. T-80: the delete descriptions
- * name their usage keys. T-107: the same for email and newsletter templates.
+ * name their usage keys. T-107: the same for email and newsletter templates, T-181 for forms.
  */
 class DeleteToolNoteTest extends TestCase
 {
@@ -52,6 +55,8 @@ class DeleteToolNoteTest extends TestCase
                 'To delete a newsletter template use hyva_email_newsletter_delete'],
             'newsletter update' => [NewsletterUpdateDraft::class,
                 'To delete a newsletter template use hyva_email_newsletter_delete'],
+            'form list' => [FormList::class, 'To delete a form use hyva_form_form_delete'],
+            'form update' => [FormUpdateDraft::class, 'To delete a form use hyva_form_form_delete'],
         ];
     }
 
@@ -81,6 +86,8 @@ class DeleteToolNoteTest extends TestCase
                 'widget_instances', 'layout_and_templates']],
             'email template' => [TemplateDelete::class, ['store_config']],
             'newsletter template' => [NewsletterDelete::class, ['queue', 'queue_history']],
+            'form' => [FormDelete::class, ['hyva_content', 'magento_content', 'widget_instances',
+                'identifier_shared_with']],
         ];
     }
 

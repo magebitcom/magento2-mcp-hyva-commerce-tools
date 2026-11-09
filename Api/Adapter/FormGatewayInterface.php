@@ -96,6 +96,17 @@ interface FormGatewayInterface
     public function update(int $id, array $settings): array;
 
     /**
+     * Delete a form through Hyvä's form repository, as the Form Builder admin delete action does.
+     *
+     * Its drafts, version history and Tailwind CSS go with it (foreign keys with ON DELETE CASCADE).
+     *
+     * @param int $id
+     * @return void
+     * @throws LocalizedException
+     */
+    public function delete(int $id): void;
+
+    /**
      * Why the identifier cannot be used on these store views (Hyvä's own rules), or null.
      *
      * @param string $identifier

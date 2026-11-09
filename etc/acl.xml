@@ -250,6 +250,8 @@
                                           title="Tool: Delete Email Templates via MCP" sortOrder="253"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_email_newsletter_delete"
                                           title="Tool: Delete Newsletter Templates via MCP" sortOrder="254"/>
+                                <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_form_form_delete"
+                                          title="Tool: Delete Hyvä Forms via MCP" sortOrder="255"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_item_add"
                                           title="Tool: Add Hyvä Menu Item" sortOrder="233"/>
                                 <resource id="Magebit_McpHyvaCommerceTools::tool_hyva_menu_item_update"

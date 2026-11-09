@@ -63,9 +63,10 @@ class TransferImportScopeTest extends TestCase
         $this->writer->expects($this->never())->method('create');
         $this->contentService->expects($this->never())->method('saveDraft');
         $tool = $this->tool([1]);
-        $this->assertRefused(fn () => $tool->execute(
+        $refusal = $this->assertRefused(fn () => $tool->execute(
             ['entity_type' => 'cms_page', 'payload' => self::PAYLOAD, 'create_new' => true]
         ), 'scope');
+        $this->assertSame([0], $refusal->getData()['denied_store_ids'] ?? null, 'T-179');
     }
 
     public function testANewEntityForTheOwnStoreViewIsCreated(): void

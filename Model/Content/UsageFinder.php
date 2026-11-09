@@ -8,12 +8,13 @@ declare(strict_types=1);
 
 namespace Magebit\McpHyvaCommerceTools\Model\Content;
 
+use Hyva\FormBuilder\Block\Widget\Form as FormWidget;
 use Hyva\MenuBuilder\Block\Widget\Menu as MenuWidget;
 use Magento\Cms\Block\Widget\Block as BlockWidget;
 use Magento\Framework\App\ResourceConnection;
 
 /**
- * Finds where CMS blocks and menus are referenced: Hyvä CMS components, Magento CMS content
+ * Finds where CMS blocks, menus and forms are referenced: Hyvä CMS components, Magento CMS content
  * (widget directives) and widget instances.
  */
 class UsageFinder
@@ -27,20 +28,28 @@ class UsageFinder
     private ?array $menuWidgetNodes = null;
 
     public const MENU_WIDGET_CLASS = MenuWidget::class;
+    public const FORM_WIDGET_CLASS = FormWidget::class;
     private const BLOCK_WIDGET_CLASS = BlockWidget::class;
 
     /**
      * @param ContentScanner $contentScanner
      * @param ResourceConnection $resourceConnection
+     * @param EntityPickerReference $entityPicker
      */
     public function __construct(
         private readonly ContentScanner $contentScanner,
-        private readonly ResourceConnection $resourceConnection
+        private readonly ResourceConnection $resourceConnection,
+        private readonly EntityPickerReference $entityPicker
     ) {
     }
 
     /**
      * Find block usage.
+     *
+     * The cms_block component's block_identifier is an entity picker value (object, list or legacy string) whose id
+     * is the block id, see EntityPickerReference. Form Builder forms (draft and published) name a block the same way
+     * in success_content_block (form root metadata); those usages are listed in hyva_content with entity_type form
+     * and the form's store_ids, whatever the form's success_content_type, as switching it back shows the block again.
      *
      * @param int $blockId
      * @param string $identifier
@@ -51,12 +60,12 @@ class UsageFinder
      */
     public function findBlockUsage(int $blockId, string $identifier, bool $ignoreMenuAcl = false): array
     {
-        $refs = array_filter([(string) $blockId, $identifier], static fn (string $v): bool => $v !== '');
-        $hyva = $this->contentScanner->findNodes(static function (array $node) use ($refs): bool {
+        $refs = array_values(array_filter([(string) $blockId, $identifier], static fn (string $v): bool => $v !== ''));
+        $picker = $this->entityPicker;
+        $hyva = $this->contentScanner->findNodes(static function (array $node) use ($refs, $picker): bool {
             $component = $node['component'] ?? null;
             if ($component === 'cms_block') {
-                $value = $node['block_identifier'] ?? null;
-                return is_scalar($value) && in_array((string) $value, $refs, true);
+                return $picker->references($node['block_identifier'] ?? null, 'cms_block', $refs);
             }
             if ($component === 'widget') {
                 $encoded = (string) json_encode($node['widget'] ?? null);
@@ -72,6 +81,11 @@ class UsageFinder
             }
             return false;
         }, ContentLocator::TYPES, $ignoreMenuAcl);
+        $forms = $this->contentScanner->findFormNodes(
+            static fn (array $node): bool => array_key_exists('success_content_block', $node)
+                && $picker->references($node['success_content_block'], 'cms_block', $refs)
+        );
+        array_push($hyva, ...$forms);
 
         $magento = [];
         foreach ($refs as $ref) {
@@ -117,6 +131,44 @@ class UsageFinder
             'hyva_content' => $hyva,
             'magento_content' => $this->contentScanner->findInMagentoContent('menu_identifier="' . $identifier . '"'),
             'widget_instances' => $this->findWidgetInstances(self::MENU_WIDGET_CLASS, 'menu_identifier', [$identifier]),
+        ];
+    }
+
+    /**
+     * Find form references: Hyvä form widgets, widget directives in Magento content and widget instances
+     *
+     * Hyvä renders a form by identifier in the store view of the page, so every reference to the identifier counts.
+     * The widget's form_identifier is an entity picker value (object, list or legacy string), see
+     * EntityPickerReference.
+     * Menus are scanned whatever the caller's menu permission (in-use decisions), see ContentScanner.
+     *
+     * @param string $identifier
+     * @return array
+     * @phpstan-return array{hyva_content: list<array<string, mixed>>, magento_content: list<array<string, mixed>>,
+     *     widget_instances: list<array<string, mixed>>, total: int}
+     */
+    public function findFormReferences(string $identifier): array
+    {
+        $picker = $this->entityPicker;
+        $hyva = $this->contentScanner->findNodes(static function (array $node) use ($identifier, $picker): bool {
+            $component = $node['component'] ?? null;
+            if ($component === 'hyva_form_widget') {
+                return $picker->references($node['form_identifier'] ?? null, 'form', [$identifier]);
+            }
+            if ($component === 'widget') {
+                $encoded = (string) json_encode($node['widget'] ?? null);
+                return str_contains($encoded, 'form_identifier=\\"' . $identifier . '\\"')
+                    || str_contains($encoded, '"form_identifier":"' . $identifier . '"');
+            }
+            return false;
+        }, ContentLocator::TYPES, true);
+        $magento = $this->contentScanner->findInMagentoContent('form_identifier="' . $identifier . '"');
+        $widgets = $this->findWidgetInstances(self::FORM_WIDGET_CLASS, 'form_identifier', [$identifier]);
+        return [
+            'hyva_content' => $hyva,
+            'magento_content' => $magento,
+            'widget_instances' => $widgets,
+            'total' => count($hyva) + count($magento) + count($widgets),
         ];
     }
 

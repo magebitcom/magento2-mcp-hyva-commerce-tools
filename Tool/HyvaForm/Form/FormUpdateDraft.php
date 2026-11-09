@@ -67,7 +67,8 @@ class FormUpdateDraft extends AbstractFormTool
             . 'remove / '
             . 'move / set_field / set_fields / replace_node; uids from hyva_form_form_get with include_document). '
             . 'Settings (recipients, subject, webhook, title, store views, CAPTCHA) apply IMMEDIATELY. Publish with '
-            . 'hyva_form_form_publish. Problems Hyvä would refuse on publish come back in form_issues.';
+            . 'hyva_form_form_publish. Problems Hyvä would refuse on publish come back in form_issues. '
+            . sprintf(self::DELETE_TOOL_NOTE, 'a form', 'hyva_form_form_delete');
     }
 
     /**

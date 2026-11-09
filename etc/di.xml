@@ -428,6 +428,7 @@
                 <item name="hyva_form.form.create" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormCreate</item>
                 <item name="hyva_form.form.update_draft" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormUpdateDraft</item>
                 <item name="hyva_form.form.publish" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormPublish</item>
+                <item name="hyva_form.form.delete" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Form\FormDelete</item>
                 <item name="hyva_form.version.restore" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaForm\Version\VersionRestore</item>
                 <item name="hyva_commerce.audit.media" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCommerce\Audit\AuditMedia</item>
                 <item name="hyva_commerce.audit.menu" xsi:type="object">Magebit\McpHyvaCommerceTools\Tool\HyvaCommerce\Audit\AuditMenu</item>

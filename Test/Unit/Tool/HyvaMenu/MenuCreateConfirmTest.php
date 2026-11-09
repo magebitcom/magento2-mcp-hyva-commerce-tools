@@ -19,14 +19,16 @@ use Magebit\McpHyvaCommerceTools\Model\Menu\MenuService;
 use Magebit\McpHyvaCommerceTools\Model\Tool\LiveSettings;
 use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
 use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Security\StoreScopeStub;
+use Magebit\McpHyvaCommerceTools\Test\Unit\Model\Tool\RefusalAssertTrait;
 use Magebit\McpHyvaCommerceTools\Tool\HyvaMenu\Menu\MenuCreate;
 use PHPUnit\Framework\TestCase;
 
 /**
- * T-101 (D1): hyva_menu.create with is_active=true needs confirm, as page and block create do.
+ * T-101 (D1): hyva_menu.create with is_active=true needs confirm, as page and block create do; T-179 scope refusal.
  */
 class MenuCreateConfirmTest extends TestCase
 {
+    use RefusalAssertTrait;
     use StoreScopeStub;
 
     private const ARGUMENTS = ['title' => 'Main', 'identifier' => 'main', 'template' => 'empty', 'store_ids' => [1]];
@@ -88,6 +90,22 @@ class MenuCreateConfirmTest extends TestCase
         );
     }
 
+    /**
+     * T-179: the scope refusal names the requested store views the role may not use, as page and block create do.
+     */
+    public function testACreateOutsideTheCallersScopeNamesTheDeniedStoreViews(): void
+    {
+        $gateway = $this->createMock(MenuGatewayInterface::class);
+        $gateway->expects($this->never())->method('create');
+        $tool = $this->tool($gateway, $this->content(), [1]);
+
+        $refusal = $this->refusalPayload(fn () => $tool->execute(['store_ids' => [1, 2]] + self::ARGUMENTS), 'scope');
+        $this->assertSame([2], $refusal['denied_store_ids'] ?? null);
+
+        $refusal = $this->refusalPayload(fn () => $tool->execute(['store_ids' => [0]] + self::ARGUMENTS), 'scope');
+        $this->assertSame([0], $refusal['denied_store_ids'] ?? null);
+    }
+
     public function testTheSchemaAndDescriptionNameTheConfirm(): void
     {
         $tool = $this->tool($this->createMock(MenuGatewayInterface::class), $this->content());
@@ -117,10 +135,15 @@ class MenuCreateConfirmTest extends TestCase
      *
      * @param MenuGatewayInterface $gateway
      * @param ContentService $content
+     * @param array|null $allowedStoreIds Store views of a restricted caller (null = unrestricted).
      * @return MenuCreate
+     * @phpstan-param list<int>|null $allowedStoreIds
      */
-    private function tool(MenuGatewayInterface $gateway, ContentService $content): MenuCreate
-    {
+    private function tool(
+        MenuGatewayInterface $gateway,
+        ContentService $content,
+        ?array $allowedStoreIds = null
+    ): MenuCreate {
         $features = $this->createMock(FeatureCheckerInterface::class);
         $features->method('isAvailable')->willReturn(true);
         return new MenuCreate(
@@ -132,7 +155,7 @@ class MenuCreateConfirmTest extends TestCase
             $this->createMock(MenuItemBuilder::class),
             $this->createMock(DraftEditor::class),
             $this->createMock(PreviewService::class),
-            $this->storeScope(null),
+            $this->storeScope($allowedStoreIds),
             new LiveSettings()
         );
     }

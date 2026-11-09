@@ -17,13 +17,15 @@ use Magebit\McpHyvaCommerceTools\Model\Util\Cast;
  * Hides entities outside the caller's website/store view restriction from usage lists, audits and widgets, with
  * the read rules of StoreScopeGuard (Hyvä Advanced Admin Permissions):
  * - CMS pages, blocks, menus and widget instances: by their store views;
+ * - Form Builder forms (usage entries of ContentScanner::findFormNodes(), carrying store_ids): by their store views;
  * - products (product, catalog_product): by their websites, a product in no website stays visible;
  * - categories (category, catalog_category): by the root category of their tree.
  * Other entries (media files, configuration, ...) pass unchanged.
  *
  * Menus are hidden as well from a caller who may not view them (Hyva_MenuBuilder::menu_view, or Menu Builder not
  * installed and enabled), whatever the caller's website/store view restriction: everything that shows content goes
- * through this filter, while in-use decisions count every entry before filtering (DeletionUsage, `used`).
+ * through this filter, while in-use decisions count every entry before filtering (DeletionUsage, `used`). Forms are
+ * hidden the same way from a caller who may not view them (Form Builder feature check).
  *
  * Unrestricted callers who may view menus get their input back without any lookup. Restricted callers cost one query
  * per entity type and request (ContentLocator::prefetchScope(), CatalogScopeReader); entities that no longer exist
@@ -36,6 +38,7 @@ class ContentScopeFilter
     private const KIND_CONTENT = 'content';
     private const KIND_PRODUCT = 'product';
     private const KIND_CATEGORY = 'category';
+    private const KIND_FORM = 'form';
 
     /**
      * @var array<int, list<int>|null> Websites per product id read in this request; null = no such product.
@@ -136,7 +139,8 @@ class ContentScopeFilter
         $hidden = array_map(static fn (array $items): int => 0, $groups);
         $restricted = $this->isRestricted();
         $menusViewable = $this->menusViewable();
-        if (!$restricted && $menusViewable) {
+        $formsViewable = $this->formsViewable(array_merge([], ...array_values($groups)), $typeKey);
+        if (!$restricted && $menusViewable && $formsViewable) {
             return ['visible' => $groups, 'hidden' => $hidden];
         }
         if ($restricted) {
@@ -146,7 +150,7 @@ class ContentScopeFilter
         foreach ($groups as $key => $items) {
             $visible[$key] = [];
             foreach ($items as $item) {
-                if ($this->allowsItem($item, $typeKey, $idKey, $restricted, $menusViewable)) {
+                if ($this->allowsItem($item, $typeKey, $idKey, $restricted, $menusViewable, $formsViewable)) {
                     $visible[$key][] = $item;
                 } else {
                     $hidden[$key]++;
@@ -253,12 +257,12 @@ class ContentScopeFilter
     public function filterUsageReport(array $report, array $entityLists, array $storeLists = []): array
     {
         $restricted = $this->isRestricted();
-        if (!$restricted && $this->menusViewable()) {
-            return $report;
-        }
         $groups = [];
         foreach ($entityLists as $key) {
             $groups[$key] = $this->listOf($report[$key] ?? []);
+        }
+        if (!$restricted && $this->menusViewable() && $this->formsViewable(array_merge([], ...array_values($groups)))) {
+            return $report;
         }
         $filtered = $this->filterGrouped($groups);
         $hidden = array_sum($filtered['hidden']);
@@ -308,6 +312,9 @@ class ContentScopeFilter
                 if ($target === null) {
                     continue;
                 }
+                if ($target['kind'] === self::KIND_FORM) {
+                    continue;
+                }
                 if ($target['kind'] === self::KIND_CONTENT) {
                     $content[] = ['entity_type' => $target['entity_type'], 'id' => $target['id']];
                 } elseif ($target['kind'] === self::KIND_PRODUCT) {
@@ -337,14 +344,15 @@ class ContentScopeFilter
     /**
      * Whether the caller may see the entity an entry names (entries naming none are kept), after prefetch().
      *
-     * Menus are hidden from a caller who may not view them. For a restricted caller content entities, products and
-     * categories outside the restriction, or that no longer exist, count as hidden.
+     * Menus and forms are hidden from a caller who may not view them. For a restricted caller content entities,
+     * forms, products and categories outside the restriction, or that no longer exist, count as hidden.
      *
      * @param array $item
      * @param string $typeKey
      * @param string $idKey
      * @param bool $restricted
      * @param bool $menusViewable
+     * @param bool $formsViewable
      * @return bool
      * @phpstan-param array<string, mixed> $item
      */
@@ -353,7 +361,8 @@ class ContentScopeFilter
         string $typeKey,
         string $idKey,
         bool $restricted,
-        bool $menusViewable
+        bool $menusViewable,
+        bool $formsViewable = true
     ): bool {
         $target = $this->target($item, $typeKey, $idKey);
         if ($target === null) {
@@ -362,8 +371,14 @@ class ContentScopeFilter
         if (!$menusViewable && $target['entity_type'] === ContentLocator::TYPE_MENU) {
             return false;
         }
+        if ($target['kind'] === self::KIND_FORM && !$formsViewable) {
+            return false;
+        }
         if (!$restricted) {
             return true;
+        }
+        if ($target['kind'] === self::KIND_FORM) {
+            return $this->storeScopeGuard->allowsRead(Cast::intList($item['store_ids'] ?? []));
         }
         if ($target['kind'] === self::KIND_PRODUCT) {
             $websiteIds = $this->productWebsiteIds[$target['id']] ?? null;
@@ -387,7 +402,38 @@ class ContentScopeFilter
     }
 
     /**
-     * Scope target of an entry, or null when it names no content entity, product or category.
+     * Whether the caller may view the forms among these entries; checked only when one of them is a form.
+     *
+     * @param array $items
+     * @param string $typeKey
+     * @return bool
+     * @phpstan-param list<array<string, mixed>> $items
+     */
+    private function formsViewable(array $items, string $typeKey = 'entity_type'): bool
+    {
+        foreach ($items as $item) {
+            if ($this->isFormEntry($item, $typeKey)) {
+                return $this->featureChecker->isAvailable(FeatureCheckerInterface::FORM_BUILDER);
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether an entry names a Form Builder form with its store views (ContentScanner::findFormNodes()).
+     *
+     * @param array $item
+     * @param string $typeKey
+     * @return bool
+     * @phpstan-param array<string, mixed> $item
+     */
+    private function isFormEntry(array $item, string $typeKey): bool
+    {
+        return ($item[$typeKey] ?? null) === ContentScanner::TYPE_FORM && array_key_exists('store_ids', $item);
+    }
+
+    /**
+     * Scope target of an entry, or null when it names no content entity, form, product or category.
      *
      * @param array $item
      * @param string $typeKey
@@ -401,6 +447,9 @@ class ContentScopeFilter
         $type = $item[$typeKey] ?? null;
         if (!is_string($type)) {
             return null;
+        }
+        if ($this->isFormEntry($item, $typeKey)) {
+            return ['kind' => self::KIND_FORM, 'entity_type' => $type, 'id' => Cast::int($item[$idKey] ?? 0)];
         }
         $kind = match (true) {
             in_array($type, ContentLocator::TYPES, true) => self::KIND_CONTENT,
