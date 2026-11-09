@@ -194,7 +194,9 @@ preview (nothing written), `false` in the reply of these calls, which wrote. `hy
 ### Refusals
 
 **Scope and permission refusals** refuse the whole call with the JSON-RPC error `-32004`, the same code as the core's
-own ACL gate, so a client handles one shape. Nothing was written. `error.data.reason` says why:
+own ACL gate, so a client handles one shape. Nothing was written. Only a refusal by the tool while it runs carries
+`error.data.reason`; the core's checks before the tool runs (the token's tool scope, [ACL](#acl) checks 1 to 3) answer
+`-32004` without `error.data`. When it is present, `reason` says why:
 
 | `reason` | When | Other `error.data` keys | What to do |
 |---|---|---|---|
