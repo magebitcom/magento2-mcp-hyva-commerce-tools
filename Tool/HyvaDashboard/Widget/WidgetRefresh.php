@@ -33,7 +33,10 @@ class WidgetRefresh extends AbstractTool
 {
     public const TOOL_NAME = 'hyva_dashboard.widget.refresh';
     public const ACL_RESOURCE = 'Magebit_McpHyvaCommerceTools::tool_hyva_dashboard_widget_refresh';
-    public const UNDERLYING_ACL_RESOURCE = 'Hyva_AdminDashboardFramework::dashboard';
+    /**
+     * Hyvä's own widget cache refresh is a widget instance save (WidgetInstanceRepository), gated by this verb.
+     */
+    public const UNDERLYING_ACL_RESOURCE = 'Hyva_AdminDashboardFramework::dashboard_views_save';
     public const IS_WRITE = true;
 
     /**

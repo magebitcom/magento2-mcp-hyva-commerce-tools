@@ -293,7 +293,7 @@ Give a role the Hyvä permissions that match what the agent should do. Existing 
 | reorder category products | `Magento_Catalog::categories` (not for website-restricted roles: positions are global) |
 | monitor AI Worker | `Hyva_AiWorker::manage` (own jobs), `::jobs` (all jobs, usage, errors), `::config` (status) |
 | read admin permissions | `Magento_User::acl_users`; `Hyva_AdvancedAdminPermissions::audit` for the audit log |
-| list dashboard views and widgets | `Hyva_AdminDashboardFramework::dashboard` |
+| list dashboard views and widgets | `Hyva_AdminDashboardFramework::dashboard`; `dashboard_views_save` to refresh widget data |
 
 A role without `Hyva_Cms::cms` sees none of the Hyvä CMS, menu or media tools.
 
@@ -774,7 +774,7 @@ with underscores (`hyva_cms_page_get`); `tools/call` accepts both forms.
 | `hyva_commerce.audit.overview` | read | `-` |  | Audit Hyvä Commerce Installation |
 | `hyva_dashboard.view.list` | read | `Hyva_AdminDashboardFramework::dashboard` |  | List Hyvä Dashboard Views |
 | `hyva_dashboard.widget.list` | read | `Hyva_AdminDashboardFramework::dashboard` |  | List Hyvä Dashboard Widgets |
-| `hyva_dashboard.widget.refresh` | write | `Hyva_AdminDashboardFramework::dashboard` |  | Refresh Dashboard Widget Data |
+| `hyva_dashboard.widget.refresh` | write | `Hyva_AdminDashboardFramework::dashboard_views_save` |  | Refresh Dashboard Widget Data |
 
 ## Prompts
 
@@ -805,6 +805,8 @@ The widgets are in the category **Magebit / AI / MCP**, registered through
 | `magebit_campaign_asset_readiness_widget` | Media and link problems in the content of pending scheduled items |
 
 `hyva_dashboard.widget.refresh` clears a widget's cached data by type or instance, for every viewer of the instance.
+It needs `Hyva_AdminDashboardFramework::dashboard_views_save`, the permission Hyvä checks when a widget instance is
+saved (which refreshes its data in the admin); a role that can only view the dashboard cannot call it.
 
 ### How MCP Activity counts calls
 
